@@ -1,0 +1,128 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  admin_port: 8081
+  read_timeout: 30s
+  write_timeout: 120s
+  graceful_shutdown: 10s
+
+providers:
+  - name: "mock"
+    type: "mock"
+    enabled: true
+    default: true
+    config:
+      latency: "100ms"
+
+  - name: "openai"
+    type: "openai"
+    enabled: false
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      - "gpt-4o"
+      - "gpt-4o-mini"
+    timeout: 60s
+    max_retries: 2
+
+  - name: "anthropic"
+    type: "anthropic"
+    enabled: false
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+    models:
+      - "claude-sonnet-4-20250514"
+    timeout: 60s
+
+  - name: "ollama"
+    type: "ollama"
+    enabled: true
+    base_url: "http://localhost:11434"
+    models:
+      - "qwen2.5:0.5b"
+
+routes:
+  - match:
+      model: "qwen*"
+    providers: ["ollama", "mock"]
+    strategy: "priority"
+
+  - match:
+      model: "gpt-*"
+    providers: ["openai", "mock"]
+    strategy: "priority"
+
+  - match:
+      model: "claude-*"
+    providers: ["anthropic", "mock"]
+    strategy: "priority"
+
+  - match:
+      model: "*"
+    providers: ["ollama", "mock"]
+    strategy: "priority"
+
+tenants:
+  - id: "default"
+    name: "Default Tenant"
+    api_keys:
+      - "aegis-dev-key-001"
+      - "aegis-dev-key-002"
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    allowed_models:
+      - "*"
+
+  - id: "premium"
+    name: "Premium Tenant"
+    api_keys:
+      - "aegis-premium-key-001"
+    rate_limit:
+      requests_per_minute: 300
+      tokens_per_minute: 500000
+    allowed_models:
+      - "*"
+
+rate_limit:
+  backend: "memory"
+  redis:
+    address: "localhost:6379"
+    password: ""
+    db: 0
+
+policies:
+  input:
+    - name: "block-jailbreak"
+      type: "keyword"
+      action: "block"
+      keywords:
+        - "ignore previous instructions"
+        - "ignore all instructions"
+        - "DAN mode"
+    - name: "pii-detection"
+      type: "pii"
+      action: "warn"
+      patterns:
+        - "ssn"
+        - "email"
+        - "credit_card"
+  output:
+    - name: "content-filter"
+      type: "keyword"
+      action: "log"
+      keywords: []
+
+telemetry:
+  enabled: true
+  exporter: "stdout"
+  otlp:
+    endpoint: "localhost:4317"
+    insecure: true
+  metrics:
+    enabled: true
+    path: "/metrics"
+
+logging:
+  level: "info"
+  format: "json"

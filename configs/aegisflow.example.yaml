@@ -1,0 +1,143 @@
+# AegisFlow Configuration Reference
+# Copy this file to aegisflow.yaml and modify as needed.
+
+# Server settings
+server:
+  host: "0.0.0.0"              # Bind address
+  port: 8080                    # Gateway API port
+  admin_port: 8081              # Admin API port (health, metrics, usage)
+  read_timeout: 30s             # HTTP read timeout
+  write_timeout: 120s           # HTTP write timeout (long for streaming)
+  graceful_shutdown: 10s        # Graceful shutdown timeout
+
+# Provider definitions
+# Each provider needs a unique name and a type.
+# Supported types: mock, openai, anthropic, ollama
+providers:
+  - name: "mock"                # Unique identifier
+    type: "mock"                # Provider type
+    enabled: true               # Enable/disable this provider
+    default: true               # Use as default fallback
+    config:
+      latency: "100ms"          # Simulated response latency (mock only)
+
+  - name: "openai"
+    type: "openai"
+    enabled: false              # Set to true and provide API key to use
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"   # Environment variable containing the API key
+    models:                     # Models available from this provider
+      - "gpt-4o"
+      - "gpt-4o-mini"
+    timeout: 60s                # Request timeout
+    max_retries: 2              # Max retries on failure
+
+  - name: "anthropic"
+    type: "anthropic"
+    enabled: false
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+    models:
+      - "claude-sonnet-4-20250514"
+    timeout: 60s
+
+  - name: "ollama"
+    type: "ollama"
+    enabled: false
+    base_url: "http://localhost:11434"
+    models:
+      - "llama3"
+
+# Routes: map model patterns to provider chains
+# The first matching route is used. Use glob patterns for model matching.
+routes:
+  - match:
+      model: "gpt-*"           # Glob pattern for model names
+    providers: ["openai", "mock"]   # Provider fallback order
+    strategy: "priority"        # Routing strategy: priority | round-robin
+
+  - match:
+      model: "claude-*"
+    providers: ["anthropic", "mock"]
+    strategy: "priority"
+
+  - match:
+      model: "*"               # Catch-all route
+    providers: ["mock"]
+    strategy: "priority"
+
+# Tenant definitions
+# Each tenant has API keys and rate limits.
+tenants:
+  - id: "default"
+    name: "Default Tenant"
+    api_keys:
+      - "aegis-dev-key-001"
+      - "aegis-dev-key-002"
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    allowed_models:
+      - "*"                    # Allow all models
+
+  - id: "premium"
+    name: "Premium Tenant"
+    api_keys:
+      - "aegis-premium-key-001"
+    rate_limit:
+      requests_per_minute: 300
+      tokens_per_minute: 500000
+    allowed_models:
+      - "*"
+
+# Rate limiting backend
+rate_limit:
+  backend: "memory"            # memory (default) | redis
+  redis:                       # Only used when backend is "redis"
+    address: "localhost:6379"
+    password: ""
+    db: 0
+
+# Policy engine
+# Input policies run before the request reaches a provider.
+# Output policies run on the provider's response.
+# Actions: block (reject request), warn (log and allow), log (record only)
+policies:
+  input:
+    - name: "block-jailbreak"
+      type: "keyword"           # keyword | regex | pii
+      action: "block"
+      keywords:
+        - "ignore previous instructions"
+        - "ignore all instructions"
+        - "DAN mode"
+
+    - name: "pii-detection"
+      type: "pii"
+      action: "warn"
+      patterns:                 # PII types: ssn, email, credit_card, phone
+        - "ssn"
+        - "email"
+        - "credit_card"
+
+  output:
+    - name: "content-filter"
+      type: "keyword"
+      action: "log"
+      keywords: []              # Add keywords to filter from responses
+
+# Telemetry
+telemetry:
+  enabled: true
+  exporter: "stdout"           # stdout | otlp
+  otlp:
+    endpoint: "localhost:4317"
+    insecure: true
+  metrics:
+    enabled: true
+    path: "/metrics"           # Prometheus metrics path on admin port
+
+# Logging
+logging:
+  level: "info"                # debug | info | warn | error
+  format: "json"               # json | text

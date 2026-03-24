@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: AegisFlow API
+  description: AI Gateway + Policy + Observability Control Plane
+  version: 0.1.0
+  license:
+    name: Apache 2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Gateway API
+  - url: http://localhost:8081
+    description: Admin API
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /v1/chat/completions:
+    post:
+      summary: Create chat completion
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Successful completion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Policy violation
+        "429":
+          description: Rate limit exceeded
+        "502":
+          description: All providers failed
+
+  /v1/models:
+    get:
+      summary: List available models
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: List of models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelList"
+
+  /admin/v1/usage:
+    get:
+      summary: Get usage statistics
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Usage data per tenant
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Prometheus format metrics
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          example: mock
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+        stream:
+          type: boolean
+        top_p:
+          type: number
+        stop:
+          type: array
+          items:
+            type: string
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Choice"
+        usage:
+          $ref: "#/components/schemas/Usage"
+
+    Message:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+
+    Choice:
+      type: object
+      properties:
+        index:
+          type: integer
+        message:
+          $ref: "#/components/schemas/Message"
+        finish_reason:
+          type: string
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+
+    ModelList:
+      type: object
+      properties:
+        object:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        provider:
+          type: string

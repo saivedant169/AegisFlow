@@ -1,0 +1,42 @@
+services:
+  aegisflow:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      - AEGISFLOW_CONFIG=/etc/aegisflow/aegisflow.yaml
+    volumes:
+      - ../configs/aegisflow.yaml:/etc/aegisflow/aegisflow.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aegisflow
+      POSTGRES_USER: aegisflow
+      POSTGRES_PASSWORD: aegisflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisflow"]
+      interval: 5s
+      retries: 3
+
+volumes:
+  pgdata:
