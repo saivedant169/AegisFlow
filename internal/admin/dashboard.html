@@ -327,15 +327,21 @@ function initCharts() {
   Chart.defaults.color = '#64748b';
   Chart.defaults.borderColor = '#1e293b';
 
+  const legendPlugin = {
+    labels: {
+      padding: 20, font: { size: 11, weight: '500' }, color: '#94a3b8',
+      usePointStyle: true, pointStyle: 'circle', pointStyleWidth: 6,
+      boxWidth: 6, boxHeight: 6
+    }
+  };
+
   modelChart = new Chart(document.getElementById('modelChart'), {
     type: 'doughnut',
     data: { labels: [], datasets: [{ data: [], backgroundColor: CHART_COLORS, borderWidth: 0, hoverOffset: 6 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       cutout: '65%',
-      plugins: {
-        legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 } }
-      }
+      plugins: { legend: { position: 'bottom', ...legendPlugin } }
     }
   });
 
@@ -350,9 +356,7 @@ function initCharts() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 } }
-      },
+      plugins: { legend: { position: 'bottom', ...legendPlugin } },
       scales: {
         x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
         y: { stacked: true, grid: { color: '#1e293b40' }, ticks: { font: { size: 11 } } }
