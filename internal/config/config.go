@@ -17,6 +17,20 @@ type Config struct {
 	Policies  PoliciesConfig  `yaml:"policies"`
 	Telemetry TelemetryConfig `yaml:"telemetry"`
 	Logging   LoggingConfig   `yaml:"logging"`
+	Cache     CacheConfig     `yaml:"cache"`
+	Webhook   WebhookConfig   `yaml:"webhook"`
+}
+
+type CacheConfig struct {
+	Enabled  bool          `yaml:"enabled"`
+	Backend  string        `yaml:"backend"`
+	TTL      time.Duration `yaml:"ttl"`
+	MaxSize  int           `yaml:"max_size"`
+	Redis    RedisConfig   `yaml:"redis"`
+}
+
+type WebhookConfig struct {
+	URL string `yaml:"url"`
 }
 
 type ServerConfig struct {
@@ -158,6 +172,15 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Telemetry.Metrics.Path == "" {
 		cfg.Telemetry.Metrics.Path = "/metrics"
+	}
+	if cfg.Cache.Backend == "" {
+		cfg.Cache.Backend = "memory"
+	}
+	if cfg.Cache.TTL == 0 {
+		cfg.Cache.TTL = 5 * time.Minute
+	}
+	if cfg.Cache.MaxSize == 0 {
+		cfg.Cache.MaxSize = 1000
 	}
 }
 

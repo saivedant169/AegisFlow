@@ -128,3 +128,12 @@ telemetry:
 logging:
   level: "info"
   format: "json"
+
+cache:
+  enabled: true
+  backend: "memory"
+  ttl: 5m
+  max_size: 1000
+
+webhook:
+  url: ""
