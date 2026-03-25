@@ -6,138 +6,372 @@
 <title>AegisFlow Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --border: #1e293b;
+    --border-light: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-blue: #3b82f6;
+    --accent-green: #22c55e;
+    --accent-purple: #a855f7;
+    --accent-orange: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-cyan: #06b6d4;
+    --accent-pink: #ec4899;
+    --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    --gradient-green: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    --gradient-purple: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    --gradient-orange: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; }
-  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .header h1 { font-size: 20px; font-weight: 600; }
-  .header h1 span { color: #58a6ff; }
-  .header .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #8b949e; }
-  .header .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; }
-  .header .dot.error { background: #f85149; }
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-  .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
-  .stat-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-  .stat-card .value { font-size: 28px; font-weight: 700; }
-  .stat-card .value.green { color: #3fb950; }
-  .stat-card .value.blue { color: #58a6ff; }
-  .stat-card .value.purple { color: #bc8cff; }
-  .stat-card .value.orange { color: #d29922; }
-  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-  .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
-  .chart-card h3 { font-size: 14px; color: #8b949e; margin-bottom: 16px; }
-  .table-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-  .table-card h3 { font-size: 14px; color: #8b949e; margin-bottom: 16px; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 240px;
+    background: var(--bg-card); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  .sidebar-brand {
+    padding: 20px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sidebar-brand .logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--gradient-blue); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px; color: white;
+  }
+  .sidebar-brand .name { font-size: 16px; font-weight: 700; }
+  .sidebar-brand .name span { color: var(--accent-blue); }
+  .sidebar-brand .version { font-size: 10px; color: var(--text-muted); background: var(--border); padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+
+  .sidebar-nav { padding: 12px; flex: 1; }
+  .nav-section { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 12px 12px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 8px; color: var(--text-secondary); font-size: 13px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .nav-item:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+  .nav-item.active { background: #3b82f615; color: var(--accent-blue); }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+  .sidebar-footer .status-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); flex-shrink: 0; }
+  .status-dot.error { background: var(--accent-red); }
+
+  /* Main content */
+  .main { margin-left: 240px; padding: 24px 32px; }
+
+  /* Top bar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .topbar h2 { font-size: 22px; font-weight: 700; }
+  .topbar .refresh-info { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px; position: relative; overflow: hidden; transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--border-light); }
+  .stat-card .stat-icon {
+    width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+  }
+  .stat-card .stat-icon svg { width: 20px; height: 20px; color: white; }
+  .stat-card .stat-icon.blue { background: var(--gradient-blue); }
+  .stat-card .stat-icon.green { background: var(--gradient-green); }
+  .stat-card .stat-icon.purple { background: var(--gradient-purple); }
+  .stat-card .stat-icon.orange { background: var(--gradient-orange); }
+  .stat-card .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  .stat-card .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+  .stat-card .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .stat-card .stat-glow {
+    position: absolute; top: -30px; right: -30px; width: 100px; height: 100px;
+    border-radius: 50%; opacity: 0.06; filter: blur(30px);
+  }
+  .stat-card .stat-glow.blue { background: var(--accent-blue); }
+  .stat-card .stat-glow.green { background: var(--accent-green); }
+  .stat-card .stat-glow.purple { background: var(--accent-purple); }
+  .stat-card .stat-glow.orange { background: var(--accent-orange); }
+
+  /* Charts row */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .chart-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 22px;
+  }
+  .chart-card .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .chart-card .chart-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* Provider status */
+  .provider-list { display: flex; flex-direction: column; gap: 10px; }
+  .provider-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; background: var(--bg-primary); border-radius: 8px;
+  }
+  .provider-item .provider-info { display: flex; align-items: center; gap: 10px; }
+  .provider-item .provider-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .provider-item .provider-name { font-size: 13px; font-weight: 500; }
+  .provider-item .provider-type { font-size: 11px; color: var(--text-muted); }
+  .provider-item .provider-count { font-size: 13px; font-weight: 600; color: var(--accent-blue); }
+
+  /* Table */
+  .table-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px; margin-bottom: 24px;
+  }
+  .table-card .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .table-card .table-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .table-card .table-count { font-size: 11px; color: var(--text-muted); background: var(--border); padding: 2px 8px; border-radius: 4px; }
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid #30363d; }
-  td { padding: 10px 12px; border-bottom: 1px solid #21262d; font-size: 14px; }
-  tr:hover td { background: #1c2128; }
-  .tenant-badge { background: #1f6feb33; color: #58a6ff; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-  .model-badge { background: #8b949e22; color: #8b949e; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; }
-  .footer { text-align: center; padding: 24px; color: #484f58; font-size: 12px; }
-  @media (max-width: 768px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
-    .charts { grid-template-columns: 1fr; }
+  thead th {
+    text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-weight: 600;
+  }
+  tbody td { padding: 12px 14px; border-bottom: 1px solid #1e293b20; font-size: 13px; }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover td { background: var(--bg-card-hover); }
+  .badge {
+    display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+  }
+  .badge-tenant { background: #3b82f618; color: var(--accent-blue); }
+  .badge-model { background: #a855f718; color: var(--accent-purple); font-family: 'SF Mono', Monaco, monospace; }
+  .badge-mock { background: #22c55e18; color: var(--accent-green); }
+  .badge-openai { background: #f59e0b18; color: var(--accent-orange); }
+  .badge-ollama { background: #06b6d418; color: var(--accent-cyan); }
+
+  /* Token bar */
+  .token-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; min-width: 80px; }
+  .token-bar .prompt { background: var(--accent-blue); border-radius: 3px; }
+  .token-bar .completion { background: var(--accent-purple); border-radius: 3px; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.3; }
+  .empty-state p { font-size: 14px; }
+  .empty-state .hint { font-size: 12px; margin-top: 8px; color: var(--text-muted); }
+
+  @media (max-width: 1024px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1><span>Aegis</span>Flow Dashboard</h1>
-  <div class="status">
-    <div class="dot" id="statusDot"></div>
-    <span id="statusText">Connected</span>
-    <span>|</span>
-    <span id="lastUpdate">--</span>
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">A</div>
+    <div>
+      <div class="name"><span>Aegis</span>Flow</div>
+    </div>
+    <span class="version">v0.1.0</span>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-section">Monitoring</div>
+    <div class="nav-item" onclick="window.open('/metrics','_blank')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Metrics
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Policies
+    </div>
+    <div class="nav-section">Configuration</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
+      Providers
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Tenants
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Connected</span>
+    </div>
+    <div class="status-row" style="margin-top:6px;">
+      <span id="lastUpdate" style="font-size:11px;">--</span>
+    </div>
   </div>
 </div>
 
-<div class="container">
-  <div class="stats">
-    <div class="stat-card">
-      <div class="label">Total Requests</div>
-      <div class="value green" id="totalRequests">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Total Tokens</div>
-      <div class="value blue" id="totalTokens">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Estimated Cost</div>
-      <div class="value purple" id="totalCost">$0.00</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Active Tenants</div>
-      <div class="value orange" id="activeTenants">0</div>
+<div class="main">
+  <div class="topbar">
+    <h2>Gateway Overview</h2>
+    <div class="refresh-info">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Auto-refresh 3s
     </div>
   </div>
 
-  <div class="charts">
-    <div class="chart-card">
-      <h3>Requests by Model</h3>
-      <canvas id="modelChart"></canvas>
+  <!-- Stat Cards -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-glow green"></div>
+      <div class="stat-icon green">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="stat-label">Total Requests</div>
+      <div class="stat-value" id="totalRequests">0</div>
+      <div class="stat-sub" id="reqRate">0 req/min</div>
     </div>
-    <div class="chart-card">
-      <h3>Tokens by Tenant</h3>
-      <canvas id="tenantChart"></canvas>
+    <div class="stat-card">
+      <div class="stat-glow blue"></div>
+      <div class="stat-icon blue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
+      </div>
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value" id="totalTokens">0</div>
+      <div class="stat-sub" id="tokenSplit">0 prompt / 0 completion</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-glow purple"></div>
+      <div class="stat-icon purple">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      </div>
+      <div class="stat-label">Estimated Cost</div>
+      <div class="stat-value" id="totalCost">$0.00</div>
+      <div class="stat-sub">Based on provider pricing</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-glow orange"></div>
+      <div class="stat-icon orange">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="stat-label">Active Tenants</div>
+      <div class="stat-value" id="activeTenants">0</div>
+      <div class="stat-sub" id="modelCount">0 models active</div>
     </div>
   </div>
 
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Requests by Model</span>
+      </div>
+      <div class="chart-wrap"><canvas id="modelChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Token Distribution</span>
+      </div>
+      <div class="chart-wrap"><canvas id="tokenChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Provider Status</span>
+      </div>
+      <div class="provider-list" id="providerList">
+        <div class="empty-state">
+          <p>No data yet</p>
+          <div class="hint">Send requests to see provider stats</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
   <div class="table-card">
-    <h3>Usage Breakdown</h3>
+    <div class="table-header">
+      <span class="table-title">Usage Breakdown</span>
+      <span class="table-count" id="rowCount">0 entries</span>
+    </div>
     <table>
       <thead>
         <tr>
           <th>Tenant</th>
           <th>Model</th>
           <th>Requests</th>
-          <th>Prompt Tokens</th>
-          <th>Completion Tokens</th>
+          <th>Token Split</th>
           <th>Total Tokens</th>
-          <th>Cost</th>
+          <th>Estimated Cost</th>
         </tr>
       </thead>
-      <tbody id="usageTable"></tbody>
+      <tbody id="usageTable">
+        <tr><td colspan="6" class="empty-state"><p>No usage data yet</p><div class="hint">Send a request: curl -X POST http://localhost:8080/v1/chat/completions ...</div></td></tr>
+      </tbody>
     </table>
   </div>
 </div>
 
-<div class="footer">
-  AegisFlow — Open-Source AI Gateway + Policy + Observability Control Plane
-</div>
-
 <script>
-const COLORS = ['#58a6ff', '#3fb950', '#bc8cff', '#d29922', '#f85149', '#79c0ff', '#56d364', '#d2a8ff'];
+const COLORS = {
+  blue: '#3b82f6', green: '#22c55e', purple: '#a855f7', orange: '#f59e0b',
+  red: '#ef4444', cyan: '#06b6d4', pink: '#ec4899', indigo: '#6366f1'
+};
+const CHART_COLORS = [COLORS.blue, COLORS.green, COLORS.purple, COLORS.orange, COLORS.cyan, COLORS.pink, COLORS.indigo, COLORS.red];
 
-let modelChart, tenantChart;
+let modelChart, tokenChart;
+let prevTotalReqs = 0, prevTimestamp = Date.now();
 
 function initCharts() {
-  const modelCtx = document.getElementById('modelChart').getContext('2d');
-  modelChart = new Chart(modelCtx, {
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = '#1e293b';
+
+  modelChart = new Chart(document.getElementById('modelChart'), {
     type: 'doughnut',
-    data: { labels: [], datasets: [{ data: [], backgroundColor: COLORS, borderWidth: 0 }] },
+    data: { labels: [], datasets: [{ data: [], backgroundColor: CHART_COLORS, borderWidth: 0, hoverOffset: 6 }] },
     options: {
-      responsive: true,
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
       plugins: {
-        legend: { position: 'bottom', labels: { color: '#8b949e', padding: 12, font: { size: 12 } } }
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 } }
       }
     }
   });
 
-  const tenantCtx = document.getElementById('tenantChart').getContext('2d');
-  tenantChart = new Chart(tenantCtx, {
+  tokenChart = new Chart(document.getElementById('tokenChart'), {
     type: 'bar',
-    data: { labels: [], datasets: [{ label: 'Tokens', data: [], backgroundColor: '#58a6ff', borderRadius: 4 }] },
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Prompt', data: [], backgroundColor: COLORS.blue + 'cc', borderRadius: 4, barPercentage: 0.6 },
+        { label: 'Completion', data: [], backgroundColor: COLORS.purple + 'cc', borderRadius: 4, barPercentage: 0.6 }
+      ]
+    },
     options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 } }
+      },
       scales: {
-        x: { ticks: { color: '#8b949e' }, grid: { display: false } },
-        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { stacked: true, grid: { color: '#1e293b40' }, ticks: { font: { size: 11 } } }
       }
     }
   });
+}
+
+function getModelBadgeClass(model) {
+  if (model.startsWith('gpt')) return 'badge-openai';
+  if (model.startsWith('qwen') || model.startsWith('llama')) return 'badge-ollama';
+  if (model === 'mock' || model === 'mock-fast') return 'badge-mock';
+  return 'badge-model';
+}
+
+function formatNumber(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toLocaleString();
 }
 
 async function fetchUsage() {
@@ -145,69 +379,120 @@ async function fetchUsage() {
     const resp = await fetch('/admin/v1/usage');
     const data = await resp.json();
 
-    let totalReqs = 0, totalToks = 0, totalCost = 0;
+    let totalReqs = 0, totalToks = 0, totalCost = 0, totalPrompt = 0, totalCompletion = 0;
     const modelMap = {};
-    const tenantTokens = {};
+    const tenantData = {};
+    const providerRequests = {};
     const rows = [];
 
     for (const [tenantId, tenant] of Object.entries(data)) {
       totalReqs += tenant.total_requests;
       totalToks += tenant.total_tokens;
       totalCost += tenant.estimated_cost_usd;
-      tenantTokens[tenantId] = tenant.total_tokens;
+
+      tenantData[tenantId] = { prompt: 0, completion: 0 };
 
       for (const [model, m] of Object.entries(tenant.by_model || {})) {
         modelMap[model] = (modelMap[model] || 0) + m.requests;
-        rows.push({
-          tenant: tenantId,
-          model: model,
-          requests: m.requests,
-          promptTokens: m.prompt_tokens,
-          completionTokens: m.completion_tokens,
-          totalTokens: m.total_tokens,
-          cost: m.estimated_cost_usd
-        });
+        totalPrompt += m.prompt_tokens;
+        totalCompletion += m.completion_tokens;
+        tenantData[tenantId].prompt += m.prompt_tokens;
+        tenantData[tenantId].completion += m.completion_tokens;
+
+        let provider = 'mock';
+        if (model.startsWith('gpt')) provider = 'openai';
+        else if (model.startsWith('qwen') || model.startsWith('llama')) provider = 'ollama';
+        else if (model.startsWith('claude')) provider = 'anthropic';
+        providerRequests[provider] = (providerRequests[provider] || 0) + m.requests;
+
+        rows.push({ tenant: tenantId, model, requests: m.requests, promptTokens: m.prompt_tokens, completionTokens: m.completion_tokens, totalTokens: m.total_tokens, cost: m.estimated_cost_usd });
       }
     }
 
-    // Update stat cards
-    document.getElementById('totalRequests').textContent = totalReqs.toLocaleString();
-    document.getElementById('totalTokens').textContent = totalToks.toLocaleString();
-    document.getElementById('totalCost').textContent = '$' + totalCost.toFixed(4);
+    // Stat cards
+    document.getElementById('totalRequests').textContent = formatNumber(totalReqs);
+    document.getElementById('totalTokens').textContent = formatNumber(totalToks);
+    document.getElementById('totalCost').textContent = totalCost < 0.01 ? '$' + totalCost.toFixed(4) : '$' + totalCost.toFixed(2);
     document.getElementById('activeTenants').textContent = Object.keys(data).length;
+    document.getElementById('tokenSplit').textContent = formatNumber(totalPrompt) + ' prompt / ' + formatNumber(totalCompletion) + ' completion';
+    document.getElementById('modelCount').textContent = Object.keys(modelMap).length + ' models active';
 
-    // Update model chart
+    // Req rate
+    const now = Date.now();
+    const elapsed = (now - prevTimestamp) / 1000;
+    if (elapsed > 0 && prevTotalReqs > 0) {
+      const rate = ((totalReqs - prevTotalReqs) / elapsed * 60).toFixed(0);
+      document.getElementById('reqRate').textContent = rate + ' req/min';
+    }
+    prevTotalReqs = totalReqs;
+    prevTimestamp = now;
+
+    // Model chart
     modelChart.data.labels = Object.keys(modelMap);
     modelChart.data.datasets[0].data = Object.values(modelMap);
-    modelChart.data.datasets[0].backgroundColor = COLORS.slice(0, Object.keys(modelMap).length);
-    modelChart.update();
+    modelChart.data.datasets[0].backgroundColor = CHART_COLORS.slice(0, Object.keys(modelMap).length);
+    modelChart.update('none');
 
-    // Update tenant chart
-    tenantChart.data.labels = Object.keys(tenantTokens);
-    tenantChart.data.datasets[0].data = Object.values(tenantTokens);
-    tenantChart.update();
+    // Token chart (stacked bar per tenant)
+    const tenantLabels = Object.keys(tenantData);
+    tokenChart.data.labels = tenantLabels;
+    tokenChart.data.datasets[0].data = tenantLabels.map(t => tenantData[t].prompt);
+    tokenChart.data.datasets[1].data = tenantLabels.map(t => tenantData[t].completion);
+    tokenChart.update('none');
 
-    // Update table
-    const tbody = document.getElementById('usageTable');
-    tbody.innerHTML = rows.map(r => `
-      <tr>
-        <td><span class="tenant-badge">${r.tenant}</span></td>
-        <td><span class="model-badge">${r.model}</span></td>
-        <td>${r.requests.toLocaleString()}</td>
-        <td>${r.promptTokens.toLocaleString()}</td>
-        <td>${r.completionTokens.toLocaleString()}</td>
-        <td>${r.totalTokens.toLocaleString()}</td>
-        <td>$${r.cost.toFixed(6)}</td>
-      </tr>
+    // Provider list
+    const providerList = document.getElementById('providerList');
+    const providerColors = { openai: COLORS.orange, ollama: COLORS.cyan, mock: COLORS.green, anthropic: COLORS.purple };
+    providerList.innerHTML = Object.entries(providerRequests).sort((a,b) => b[1] - a[1]).map(([name, count]) => `
+      <div class="provider-item">
+        <div class="provider-info">
+          <div class="provider-dot" style="background:${providerColors[name] || COLORS.blue}"></div>
+          <div>
+            <div class="provider-name">${name}</div>
+            <div class="provider-type">${name === 'mock' ? 'Local mock' : name === 'ollama' ? 'Local inference' : 'Cloud API'}</div>
+          </div>
+        </div>
+        <div class="provider-count">${count} req</div>
+      </div>
     `).join('');
 
-    // Update status
-    document.getElementById('statusDot').className = 'dot';
+    // Table
+    const tbody = document.getElementById('usageTable');
+    document.getElementById('rowCount').textContent = rows.length + ' entries';
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No usage data yet</p></td></tr>';
+    } else {
+      rows.sort((a, b) => b.totalTokens - a.totalTokens);
+      tbody.innerHTML = rows.map(r => {
+        const total = r.promptTokens + r.completionTokens || 1;
+        const promptPct = (r.promptTokens / total * 100).toFixed(0);
+        const compPct = (r.completionTokens / total * 100).toFixed(0);
+        return `<tr>
+          <td><span class="badge badge-tenant">${r.tenant}</span></td>
+          <td><span class="badge ${getModelBadgeClass(r.model)}">${r.model}</span></td>
+          <td>${r.requests.toLocaleString()}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="token-bar" style="flex:1;">
+                <div class="prompt" style="width:${promptPct}%"></div>
+                <div class="completion" style="width:${compPct}%"></div>
+              </div>
+              <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${formatNumber(r.promptTokens)} / ${formatNumber(r.completionTokens)}</span>
+            </div>
+          </td>
+          <td style="font-weight:600;">${formatNumber(r.totalTokens)}</td>
+          <td style="font-family:monospace;color:var(--text-muted);">$${r.cost < 0.01 ? r.cost.toFixed(6) : r.cost.toFixed(4)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Status
+    document.getElementById('statusDot').className = 'status-dot';
     document.getElementById('statusText').textContent = 'Connected';
-    document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('lastUpdate').textContent = 'Last updated ' + new Date().toLocaleTimeString();
 
   } catch (err) {
-    document.getElementById('statusDot').className = 'dot error';
+    document.getElementById('statusDot').className = 'status-dot error';
     document.getElementById('statusText').textContent = 'Disconnected';
   }
 }
