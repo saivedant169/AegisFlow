@@ -32,3 +32,7 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yaml
+
+# Personal notes
+LAUNCH_POSTS.txt
+DEMO_GUIDE.txt
