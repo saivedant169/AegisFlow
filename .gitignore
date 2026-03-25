@@ -37,3 +37,5 @@ docker-compose.override.yaml
 LAUNCH_POSTS.txt
 DEMO_GUIDE.txt
 ai_gateway_project_idea.md
+*.mov
+*.mp4
