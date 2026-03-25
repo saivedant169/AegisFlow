@@ -53,6 +53,33 @@ AegisFlow solves all of these with a single, lightweight Go binary.
 
 ---
 
+## Performance
+
+Benchmarked on MacBook Air M1 (8GB RAM) with the full middleware pipeline enabled (auth, rate limiting, policy engine, routing, usage tracking):
+
+| Metric | Value |
+|--------|-------|
+| **Throughput** | 58,000+ requests/sec |
+| **p50 Latency** | 1.1 ms |
+| **p95 Latency** | 4.2 ms |
+| **p99 Latency** | 7.3 ms |
+| **Memory** | ~29 MB RSS after 10K requests |
+| **Binary Size** | ~15 MB |
+
+```
+$ hey -n 10000 -c 100 -m POST \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: bench-key" \
+  -d '{"model":"mock","messages":[{"role":"user","content":"test"}]}' \
+  http://localhost:8080/v1/chat/completions
+
+Requests/sec: 58,308
+Latency (p50): 1.1ms | (p95): 4.2ms | (p99): 7.3ms
+10,000/10,000 succeeded
+```
+
+---
+
 ## Features
 
 ### Unified AI Gateway
