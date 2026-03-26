@@ -137,3 +137,7 @@ cache:
 
 webhook:
   url: ""
+
+database:
+  enabled: false
+  conn_string: "postgres://aegisflow:aegisflow@localhost:5432/aegisflow?sslmode=disable"

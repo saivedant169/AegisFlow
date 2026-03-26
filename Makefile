@@ -5,6 +5,7 @@ CONFIG=configs/aegisflow.yaml
 
 build:
 	go build -o bin/$(BINARY) ./cmd/aegisflow
+	go build -o bin/aegisctl ./cmd/aegisctl
 
 run: build
 	./bin/$(BINARY) --config $(CONFIG)

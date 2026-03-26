@@ -19,6 +19,7 @@ type Config struct {
 	Logging   LoggingConfig   `yaml:"logging"`
 	Cache     CacheConfig     `yaml:"cache"`
 	Webhook   WebhookConfig   `yaml:"webhook"`
+	Database  DatabaseConfig  `yaml:"database"`
 }
 
 type CacheConfig struct {
@@ -31,6 +32,11 @@ type CacheConfig struct {
 
 type WebhookConfig struct {
 	URL string `yaml:"url"`
+}
+
+type DatabaseConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	ConnString string `yaml:"conn_string"`
 }
 
 type ServerConfig struct {
