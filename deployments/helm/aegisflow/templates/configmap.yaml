@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: aegisflow
+    release: {{ .Release.Name }}
+data:
+  aegisflow.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: {{ .Values.service.gateway.port }}
+      admin_port: {{ .Values.service.admin.port }}
+    providers:
+      - name: "mock"
+        type: "mock"
+        enabled: true
+        default: true
+    routes:
+      - match:
+          model: "*"
+        providers: ["mock"]
+        strategy: "priority"
+    tenants:
+      - id: "default"
+        name: "Default Tenant"
+        api_keys:
+          - "aegis-test-default-001"
+        rate_limit:
+          requests_per_minute: 60
+          tokens_per_minute: 100000
+        allowed_models:
+          - "*"
+    rate_limit:
+      backend: "memory"
+    policies:
+      input:
+        - name: "block-jailbreak"
+          type: "keyword"
+          action: "block"
+          keywords:
+            - "ignore previous instructions"
+            - "DAN mode"
+      output: []
+    telemetry:
+      enabled: false
+    cache:
+      enabled: true
+      backend: "memory"
+      ttl: 5m
+      max_size: 1000
+    logging:
+      level: "info"
+      format: "json"

@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: aegisflow
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  gateway:
+    type: ClusterIP
+    port: 8080
+  admin:
+    type: ClusterIP
+    port: 8081
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: aegisflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+config:
+  # Inline aegisflow.yaml config
+  server:
+    host: "0.0.0.0"
+    port: 8080
+    admin_port: 8081
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+
+postgresql:
+  enabled: false
+  image: postgres:16-alpine
+  password: aegisflow
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
