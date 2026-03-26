@@ -22,6 +22,10 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 <p align="center">
+  <img src="aegisflow.png" alt="AegisFlow" width="800">
+</p>
+
+<p align="center">
   <img src="demo.gif" alt="AegisFlow Demo" width="800">
 </p>
 
