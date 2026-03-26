@@ -18,13 +18,14 @@ import (
 var dashboardHTML []byte
 
 type Server struct {
-	tracker  *usage.Tracker
-	cfg      *config.Config
-	registry *provider.Registry
+	tracker    *usage.Tracker
+	cfg        *config.Config
+	registry   *provider.Registry
+	requestLog *RequestLog
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog}
 }
 
 func (s *Server) Router() http.Handler {
@@ -37,10 +38,15 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/providers", s.providersHandler)
 	r.Get("/admin/v1/tenants", s.tenantsHandler)
 	r.Get("/admin/v1/policies", s.policiesHandler)
+	r.Get("/admin/v1/requests", s.requestLog.ServeHTTP)
 	r.Get("/dashboard", s.dashboardHandler)
 	r.Get("/", s.dashboardHandler)
 
 	return r
+}
+
+func (s *Server) GetRequestLog() *RequestLog {
+	return s.requestLog
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {

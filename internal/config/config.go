@@ -20,6 +20,9 @@ type Config struct {
 	Cache     CacheConfig     `yaml:"cache"`
 	Webhook   WebhookConfig   `yaml:"webhook"`
 	Database  DatabaseConfig  `yaml:"database"`
+	Admin     AdminConfig     `yaml:"admin"`
+	Aliases   AliasConfig     `yaml:"aliases"`
+	Transform TransformConfig `yaml:"transform"`
 }
 
 type CacheConfig struct {
@@ -37,6 +40,20 @@ type WebhookConfig struct {
 type DatabaseConfig struct {
 	Enabled    bool   `yaml:"enabled"`
 	ConnString string `yaml:"conn_string"`
+}
+
+type AdminConfig struct {
+	Token string `yaml:"token"`
+}
+
+type AliasConfig struct {
+	Models map[string]string `yaml:"models"`
+}
+
+type TransformConfig struct {
+	SystemPromptPrefix  string `yaml:"system_prompt_prefix"`
+	SystemPromptSuffix  string `yaml:"system_prompt_suffix"`
+	DefaultSystemPrompt string `yaml:"default_system_prompt"`
 }
 
 type ServerConfig struct {

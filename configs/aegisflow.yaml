@@ -141,3 +141,18 @@ webhook:
 database:
   enabled: false
   conn_string: "postgres://aegisflow:aegisflow@localhost:5432/aegisflow?sslmode=disable"
+
+admin:
+  token: ""
+
+aliases:
+  models:
+    fast: "gpt-4o-mini"
+    smart: "gpt-4o"
+    local: "qwen2.5:0.5b"
+    cheap: "mock"
+
+transform:
+  default_system_prompt: ""
+  system_prompt_prefix: ""
+  system_prompt_suffix: ""
