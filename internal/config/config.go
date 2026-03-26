@@ -52,6 +52,7 @@ type ProviderConfig struct {
 	Models    []string          `yaml:"models"`
 	Timeout   time.Duration     `yaml:"timeout"`
 	MaxRetries int              `yaml:"max_retries"`
+	APIVersion string           `yaml:"api_version"`
 	Config    map[string]string `yaml:"config"`
 }
 
