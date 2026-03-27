@@ -290,6 +290,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
       Rollouts
     </div>
+    <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Analytics
+    </div>
+    <div class="nav-item" data-page="alerts" onclick="switchPage('alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+      Alerts
+    </div>
     <div class="nav-section">Configuration</div>
     <div class="nav-item" data-page="providers" onclick="switchPage('providers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
@@ -663,6 +671,107 @@
     </div>
   </div>
 
+  <!-- PAGE: Analytics -->
+  <div class="page" id="page-analytics" style="display:none;">
+    <div class="topbar">
+      <h2>Analytics</h2>
+      <div class="refresh-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Auto-refresh 3s
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <div class="stat-label">Total Requests (Last Hour)</div>
+        <div class="stat-value" id="analyticsRequests">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-icon orange">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <div class="stat-label">Avg Error Rate</div>
+        <div class="stat-value" id="analyticsErrorRate">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow purple"></div>
+        <div class="stat-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="stat-label">Avg P95 Latency</div>
+        <div class="stat-value" id="analyticsP95">0ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        </div>
+        <div class="stat-label">Active Dimensions</div>
+        <div class="stat-value" id="analyticsDimensions">0</div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:24px;">
+      <div class="chart-header"><span class="chart-title">Request Rate Over Time</span></div>
+      <div class="chart-wrap"><canvas id="analyticsChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- PAGE: Alerts -->
+  <div class="page" id="page-alerts" style="display:none;">
+    <div class="topbar">
+      <h2>Alerts</h2>
+      <div class="refresh-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Auto-refresh 3s
+      </div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Active Alerts</div>
+        <div class="stat-value" id="alertsActive">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow" style="background:var(--accent-red);"></div>
+        <div class="stat-label">Critical</div>
+        <div class="stat-value" id="alertsCritical">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Warnings</div>
+        <div class="stat-value" id="alertsWarnings">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Alert Feed</span>
+        <span class="table-count" id="alertsCount">0 entries</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Severity</th>
+            <th>Dimension</th>
+            <th>Metric</th>
+            <th>Value</th>
+            <th>Threshold</th>
+            <th>Message</th>
+            <th>State</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="alertsTable">
+          <tr><td colspan="9" class="empty-state"><p>No alerts</p><div class="hint">Alerts appear when metrics exceed configured thresholds</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <script>
@@ -874,6 +983,8 @@ function switchPage(page) {
   if (page === 'cache') fetchCache();
   if (page === 'violations') fetchViolations();
   if (page === 'rollouts') fetchRollouts();
+  if (page === 'analytics') fetchAnalytics();
+  if (page === 'alerts') fetchAlerts();
 }
 
 async function fetchPolicies() {
@@ -1261,6 +1372,137 @@ async function rolloutAction(id, action) {
 setInterval(() => {
   const rolloutPage = document.getElementById('page-rollouts');
   if (rolloutPage && rolloutPage.style.display !== 'none') fetchRollouts();
+}, 3000);
+
+// --- Analytics ---
+let analyticsChart2 = null;
+const analyticsHistory = { labels: [], rates: [] };
+
+async function fetchAnalytics() {
+  try {
+    const resp = await fetch('/admin/v1/analytics/realtime');
+    const data = await resp.json();
+    const dimensions = data.dimensions || {};
+    const keys = Object.keys(dimensions);
+
+    let totalReqs = 0, errorRateSum = 0, p95Sum = 0, count = 0;
+    keys.forEach(k => {
+      const d = dimensions[k];
+      totalReqs += d.request_count || 0;
+      errorRateSum += d.error_rate || 0;
+      p95Sum += d.p95_latency_ms || 0;
+      count++;
+    });
+
+    const avgError = count > 0 ? (errorRateSum / count * 100).toFixed(2) : '0.00';
+    const avgP95 = count > 0 ? Math.round(p95Sum / count) : 0;
+
+    document.getElementById('analyticsRequests').textContent = formatNumber(totalReqs);
+    document.getElementById('analyticsErrorRate').textContent = avgError + '%';
+    document.getElementById('analyticsP95').textContent = avgP95 + 'ms';
+    document.getElementById('analyticsDimensions').textContent = keys.length;
+
+    // Update chart
+    const now = new Date().toLocaleTimeString();
+    analyticsHistory.labels.push(now);
+    analyticsHistory.rates.push(totalReqs);
+    if (analyticsHistory.labels.length > 30) {
+      analyticsHistory.labels.shift();
+      analyticsHistory.rates.shift();
+    }
+
+    if (!analyticsChart2) {
+      analyticsChart2 = new Chart(document.getElementById('analyticsChart'), {
+        type: 'line',
+        data: {
+          labels: analyticsHistory.labels,
+          datasets: [{
+            label: 'Requests',
+            data: analyticsHistory.rates,
+            borderColor: COLORS.blue,
+            backgroundColor: COLORS.blue + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#64748b', maxTicksLimit: 10 } },
+            y: { grid: { color: '#1e293b40' }, ticks: { font: { size: 10 }, color: '#64748b' } }
+          }
+        }
+      });
+    } else {
+      analyticsChart2.data.labels = analyticsHistory.labels;
+      analyticsChart2.data.datasets[0].data = analyticsHistory.rates;
+      analyticsChart2.update('none');
+    }
+  } catch (err) { console.error('Failed to fetch analytics', err); }
+}
+
+// Auto-refresh analytics when on analytics page
+setInterval(() => {
+  const analyticsPage = document.getElementById('page-analytics');
+  if (analyticsPage && analyticsPage.style.display !== 'none') fetchAnalytics();
+}, 3000);
+
+// --- Alerts ---
+async function fetchAlerts() {
+  try {
+    const resp = await fetch('/admin/v1/alerts');
+    const data = await resp.json();
+    const alerts = data || [];
+
+    const active = alerts.filter(a => a.state === 'firing' || a.state === 'active');
+    const critical = alerts.filter(a => a.severity === 'critical' && (a.state === 'firing' || a.state === 'active'));
+    const warnings = alerts.filter(a => a.severity === 'warning' && (a.state === 'firing' || a.state === 'active'));
+
+    document.getElementById('alertsActive').textContent = active.length;
+    document.getElementById('alertsCritical').textContent = critical.length;
+    document.getElementById('alertsWarnings').textContent = warnings.length;
+    document.getElementById('alertsCount').textContent = alerts.length + ' entries';
+
+    const tbody = document.getElementById('alertsTable');
+    if (alerts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>No alerts</p><div class="hint">Alerts appear when metrics exceed configured thresholds</div></td></tr>';
+    } else {
+      tbody.innerHTML = alerts.map(a => {
+        const time = a.fired_at ? new Date(a.fired_at).toLocaleTimeString() : '--';
+        const sevColor = a.severity === 'critical' ? 'var(--accent-red)' : 'var(--accent-orange)';
+        const sevBg = a.severity === 'critical' ? '#ef444418' : '#f59e0b18';
+        const stateColor = (a.state === 'firing' || a.state === 'active') ? 'var(--accent-red)' : a.state === 'acknowledged' ? 'var(--accent-orange)' : 'var(--accent-green)';
+        const stateBg = (a.state === 'firing' || a.state === 'active') ? '#ef444418' : a.state === 'acknowledged' ? '#f59e0b18' : '#22c55e18';
+        const canAck = a.state === 'firing' || a.state === 'active';
+        return `<tr>
+          <td style="font-size:12px;color:var(--text-muted);white-space:nowrap;">${time}</td>
+          <td><span class="badge" style="background:${sevBg};color:${sevColor};font-weight:600;text-transform:uppercase;">${a.severity || '--'}</span></td>
+          <td style="font-size:12px;">${a.dimension || '--'}</td>
+          <td style="font-size:12px;font-family:'JetBrains Mono',monospace;">${a.metric || '--'}</td>
+          <td style="font-weight:600;">${a.value != null ? a.value.toFixed(2) : '--'}</td>
+          <td style="color:var(--text-muted);">${a.threshold != null ? a.threshold.toFixed(2) : '--'}</td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.message || '--'}</td>
+          <td><span class="badge" style="background:${stateBg};color:${stateColor};font-weight:600;text-transform:uppercase;">${a.state || '--'}</span></td>
+          <td>${canAck ? '<button onclick="acknowledgeAlert(\'' + a.id + '\')" style="padding:5px 12px;border:1px solid var(--accent-blue);background:rgba(88,166,255,0.08);color:var(--accent-blue);border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all 0.15s;">Ack</button>' : '<span style="color:var(--text-muted);font-size:11px;">--</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+  } catch (err) { console.error('Failed to fetch alerts', err); }
+}
+
+async function acknowledgeAlert(id) {
+  try {
+    await fetch('/admin/v1/alerts/' + id + '/acknowledge', { method: 'POST' });
+    fetchAlerts();
+  } catch (err) { console.error('Failed to acknowledge alert', err); }
+}
+
+// Auto-refresh alerts when on alerts page
+setInterval(() => {
+  const alertsPage = document.getElementById('page-alerts');
+  if (alertsPage && alertsPage.style.display !== 'none') fetchAlerts();
 }, 3000);
 
 initCharts();
