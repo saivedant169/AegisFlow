@@ -17,6 +17,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/aegisflow/aegisflow/internal/admin"
+	"github.com/aegisflow/aegisflow/internal/analytics"
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
 	"github.com/aegisflow/aegisflow/internal/gateway"
@@ -102,7 +103,39 @@ func main() {
 		log.Printf("webhook notifications enabled: %s", cfg.Webhook.URL)
 	}
 
-	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore)
+	// Analytics
+	var analyticsCollector *analytics.Collector
+	if cfg.Analytics.Enabled {
+		analyticsCollector = analytics.NewCollector(cfg.Analytics.RetentionHours)
+
+		if cfg.Analytics.AnomalyDetection.Enabled {
+			alertMgr := analytics.NewAlertManager(wh)
+			detector := analytics.NewDetector(analyticsCollector,
+				analytics.StaticThresholds{
+					ErrorRateMax:         cfg.Analytics.AnomalyDetection.Static.ErrorRateMax,
+					P95LatencyMax:        cfg.Analytics.AnomalyDetection.Static.P95LatencyMax,
+					RequestsPerMinuteMax: cfg.Analytics.AnomalyDetection.Static.RequestsPerMinuteMax,
+					CostPerMinuteMax:     cfg.Analytics.AnomalyDetection.Static.CostPerMinuteMax,
+				},
+				analytics.BaselineConfig{
+					Window:          cfg.Analytics.AnomalyDetection.Baseline.Window,
+					StddevThreshold: cfg.Analytics.AnomalyDetection.Baseline.StddevThreshold,
+				},
+			)
+			go func() {
+				ticker := time.NewTicker(cfg.Analytics.AnomalyDetection.EvaluationInterval)
+				defer ticker.Stop()
+				for range ticker.C {
+					result := detector.Evaluate()
+					alertMgr.ProcessAlerts(result)
+				}
+			}()
+			log.Printf("anomaly detection enabled (interval: %s)", cfg.Analytics.AnomalyDetection.EvaluationInterval)
+		}
+		log.Printf("analytics enabled (retention: %dh)", cfg.Analytics.RetentionHours)
+	}
+
+	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector)
 
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap

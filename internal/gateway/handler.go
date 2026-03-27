@@ -10,6 +10,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/aegisflow/aegisflow/internal/analytics"
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/middleware"
 	"github.com/aegisflow/aegisflow/internal/policy"
@@ -22,20 +23,21 @@ import (
 )
 
 type Handler struct {
-	registry *provider.Registry
-	router   *router.Router
-	policy   *policy.Engine
-	usage    *usage.Tracker
-	cache    cache.Cache
-	webhook  *webhook.Notifier
-	store    *storage.PostgresStore
-	dbQueue  chan storage.UsageEvent
+	registry  *provider.Registry
+	router    *router.Router
+	policy    *policy.Engine
+	usage     *usage.Tracker
+	cache     cache.Cache
+	webhook   *webhook.Notifier
+	store     *storage.PostgresStore
+	dbQueue   chan storage.UsageEvent
+	analytics *analytics.Collector
 }
 
 const dbQueueSize = 1024
 
-func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore) *Handler {
-	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store}
+func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector) *Handler {
+	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac}
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
 		go h.dbWorker()
@@ -107,11 +109,13 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := h.router.Route(r.Context(), &req)
+	routed, err := h.router.RouteWithProvider(r.Context(), &req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
 		return
 	}
+	resp := routed.Response
+	providerName := routed.Provider
 
 	// Policy check: output
 	if h.policy != nil && len(resp.Choices) > 0 {
@@ -148,6 +152,20 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		default:
 			log.Printf("db queue full — dropping usage event for tenant %s", tenantID)
 		}
+	}
+
+	// Record analytics data point
+	if h.analytics != nil {
+		h.analytics.Record(analytics.DataPoint{
+			TenantID:      tenantID,
+			Model:         req.Model,
+			Provider:      providerName,
+			StatusCode:    200,
+			LatencyMs:     time.Since(startTime).Milliseconds(),
+			Tokens:        int64(resp.Usage.TotalTokens),
+			EstimatedCost: 0,
+			Timestamp:     time.Now(),
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

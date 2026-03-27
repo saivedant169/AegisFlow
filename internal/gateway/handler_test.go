@@ -24,7 +24,7 @@ func setupTestHandler() *Handler {
 	rt := router.NewRouter(routes, registry)
 	pe := policy.NewEngine(nil, nil)
 	ut := usage.NewTracker(usage.NewStore())
-	return NewHandler(registry, rt, pe, ut, nil, nil, nil)
+	return NewHandler(registry, rt, pe, ut, nil, nil, nil, nil)
 }
 
 func TestChatCompletionSuccess(t *testing.T) {
