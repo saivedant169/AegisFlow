@@ -42,3 +42,6 @@ ai_gateway_project_idea.md
 resume/
 INTERVIEW_NOTES.md
 DEVTO_ARTICLE.md
+
+# Example WASM build artifacts
+examples/wasm-plugin/plugin.wasm
