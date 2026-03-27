@@ -1,0 +1,327 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+	"bufio"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
+
+	"github.com/aegisflow/aegisflow/internal/admin"
+	"github.com/aegisflow/aegisflow/internal/cache"
+	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/aegisflow/aegisflow/internal/gateway"
+	"github.com/aegisflow/aegisflow/internal/logger"
+	"github.com/aegisflow/aegisflow/internal/middleware"
+	"github.com/aegisflow/aegisflow/internal/policy"
+	"github.com/aegisflow/aegisflow/internal/provider"
+	"github.com/aegisflow/aegisflow/internal/ratelimit"
+	"github.com/aegisflow/aegisflow/internal/router"
+	"github.com/aegisflow/aegisflow/internal/storage"
+	"github.com/aegisflow/aegisflow/internal/telemetry"
+	"github.com/aegisflow/aegisflow/internal/usage"
+	"github.com/aegisflow/aegisflow/internal/webhook"
+)
+
+func main() {
+	configPath := flag.String("config", "configs/aegisflow.yaml", "path to config file")
+	flag.Parse()
+
+	loadEnvFile(".env")
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	// Structured logger
+	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
+	defer logger.Sync()
+
+	// Config hot-reload
+	watcher := config.NewWatcher(*configPath, cfg, func(newCfg *config.Config) {
+		log.Printf("config reloaded — some changes require restart")
+	})
+	watcher.Start(5 * time.Second)
+	defer watcher.Stop()
+
+	// Telemetry
+	if cfg.Telemetry.Enabled {
+		shutdown, err := telemetry.Init("aegisflow", cfg.Telemetry.Exporter)
+		if err != nil {
+			log.Printf("telemetry init failed: %v", err)
+		} else {
+			defer shutdown()
+		}
+	}
+
+	registry := provider.NewRegistry()
+	initProviders(cfg, registry)
+
+	rt := router.NewRouter(cfg.Routes, registry)
+	pe := initPolicyEngine(cfg)
+	usageStore := usage.NewStore()
+	ut := usage.NewTracker(usageStore)
+
+	// Response cache
+	var responseCache cache.Cache
+	if cfg.Cache.Enabled {
+		responseCache = cache.NewMemoryCache(cfg.Cache.TTL, cfg.Cache.MaxSize)
+		log.Printf("response cache enabled (backend: %s, ttl: %s, max_size: %d)", cfg.Cache.Backend, cfg.Cache.TTL, cfg.Cache.MaxSize)
+	}
+
+	// PostgreSQL persistent storage
+	var pgStore *storage.PostgresStore
+	if cfg.Database.Enabled {
+		var err error
+		pgStore, err = storage.NewPostgresStore(cfg.Database.ConnString)
+		if err != nil {
+			log.Printf("database connection failed (continuing without persistence): %v", err)
+		} else {
+			defer pgStore.Close()
+			if err := pgStore.MigrateAudit(); err != nil {
+				log.Printf("audit table migration failed: %v", err)
+			}
+			log.Printf("database connected: persistent usage storage and audit logging enabled")
+		}
+	}
+
+	// Webhook notifier
+	wh := webhook.NewNotifier(cfg.Webhook.URL)
+	if wh != nil {
+		log.Printf("webhook notifications enabled: %s", cfg.Webhook.URL)
+	}
+
+	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore)
+
+	// Rate limiter
+	// Use the highest tenant rate limit as the global limiter cap
+	maxRPM := 60
+	for _, t := range cfg.Tenants {
+		if t.RateLimit.RequestsPerMinute > maxRPM {
+			maxRPM = t.RateLimit.RequestsPerMinute
+		}
+	}
+	limiter := ratelimit.NewMemoryLimiter(maxRPM, time.Minute)
+
+	// Token rate limiter
+	maxTPM := 100000
+	for _, t := range cfg.Tenants {
+		if t.RateLimit.TokensPerMinute > maxTPM {
+			maxTPM = t.RateLimit.TokensPerMinute
+		}
+	}
+	tokenLimiter := ratelimit.NewMemoryLimiter(maxTPM, time.Minute)
+
+	// Gateway router
+	r := chi.NewRouter()
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Recoverer)
+	r.Use(middleware.Auth(cfg))
+	r.Use(middleware.RateLimit(limiter))
+	r.Use(middleware.TokenRateLimit(tokenLimiter))
+	r.Use(middleware.Logging)
+	r.Use(middleware.Metrics)
+
+	r.Get("/health", healthHandler)
+	r.Post("/v1/chat/completions", handler.ChatCompletion)
+	r.Get("/v1/models", handler.ListModels)
+
+	// Request log for live feed
+	reqLog := admin.NewRequestLog(200)
+
+	// Admin server
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog)
+
+	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
+
+	gatewaySrv := &http.Server{
+		Addr:         gatewayAddr,
+		Handler:      r,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	adminSrv := &http.Server{
+		Addr:         adminAddr,
+		Handler:      adminSvr.Router(),
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	// Start servers
+	go func() {
+		log.Printf("AegisFlow gateway listening on %s", gatewayAddr)
+		if err := gatewaySrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("gateway server error: %v", err)
+		}
+	}()
+
+	go func() {
+		log.Printf("AegisFlow admin API listening on %s", adminAddr)
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("admin server error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down servers...")
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdown)
+	defer cancel()
+
+	gatewaySrv.Shutdown(ctx)
+	adminSrv.Shutdown(ctx)
+	log.Println("servers stopped")
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
+func initProviders(cfg *config.Config, registry *provider.Registry) {
+	for _, pc := range cfg.Providers {
+		if !pc.Enabled {
+			continue
+		}
+
+		switch pc.Type {
+		case "mock":
+			latency := 100 * time.Millisecond
+			if v, ok := pc.Config["latency"]; ok {
+				if d, err := time.ParseDuration(v); err == nil {
+					latency = d
+				}
+			}
+			registry.Register(provider.NewMockProvider(pc.Name, latency))
+			log.Printf("registered provider: %s (type: mock, latency: %s)", pc.Name, latency)
+		case "openai":
+			registry.Register(provider.NewOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout, pc.MaxRetries))
+			log.Printf("registered provider: %s (type: openai, base_url: %s)", pc.Name, pc.BaseURL)
+		case "anthropic":
+			registry.Register(provider.NewAnthropicProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: anthropic, base_url: %s)", pc.Name, pc.BaseURL)
+		case "ollama":
+			registry.Register(provider.NewOllamaProvider(pc.Name, pc.BaseURL, pc.Models))
+			log.Printf("registered provider: %s (type: ollama, base_url: %s)", pc.Name, pc.BaseURL)
+		case "gemini":
+			registry.Register(provider.NewGeminiProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: gemini)", pc.Name)
+		case "azure_openai":
+			registry.Register(provider.NewAzureOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.APIVersion, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: azure_openai, endpoint: %s)", pc.Name, pc.BaseURL)
+		case "groq":
+			registry.Register(provider.NewGroqProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: groq)", pc.Name)
+		case "mistral":
+			registry.Register(provider.NewMistralProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: mistral)", pc.Name)
+		case "together":
+			registry.Register(provider.NewTogetherProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: together)", pc.Name)
+		case "bedrock":
+			registry.Register(provider.NewBedrockProvider(pc.Name, pc.Config["region"], pc.APIKeyEnv, pc.Config["secret_key_env"], pc.Models, pc.Timeout))
+			log.Printf("registered provider: %s (type: bedrock, region: %s)", pc.Name, pc.Config["region"])
+		default:
+			log.Printf("skipping unsupported provider type: %s", pc.Type)
+		}
+	}
+}
+
+func initPolicyEngine(cfg *config.Config) *policy.Engine {
+	var inputFilters []policy.Filter
+	for _, p := range cfg.Policies.Input {
+		switch p.Type {
+		case "keyword":
+			inputFilters = append(inputFilters, policy.NewKeywordFilter(p.Name, policy.Action(p.Action), p.Keywords))
+		case "regex":
+			inputFilters = append(inputFilters, policy.NewRegexFilter(p.Name, policy.Action(p.Action), p.Patterns))
+		case "pii":
+			inputFilters = append(inputFilters, policy.NewPIIFilter(p.Name, policy.Action(p.Action), p.Patterns))
+		case "wasm":
+			timeout := p.Timeout
+			if timeout == 0 {
+				timeout = 100 * time.Millisecond
+			}
+			onError := p.OnError
+			if onError == "" {
+				onError = "block"
+			}
+			wf, err := policy.NewWasmFilter(p.Name, policy.Action(p.Action), p.Path, timeout, onError)
+			if err != nil {
+				log.Printf("failed to load wasm input filter %s: %v", p.Name, err)
+				continue
+			}
+			log.Printf("loaded wasm input filter: %s (path: %s, timeout: %s, on_error: %s)", p.Name, p.Path, timeout, onError)
+			inputFilters = append(inputFilters, wf)
+		}
+	}
+
+	var outputFilters []policy.Filter
+	for _, p := range cfg.Policies.Output {
+		switch p.Type {
+		case "keyword":
+			outputFilters = append(outputFilters, policy.NewKeywordFilter(p.Name, policy.Action(p.Action), p.Keywords))
+		case "regex":
+			outputFilters = append(outputFilters, policy.NewRegexFilter(p.Name, policy.Action(p.Action), p.Patterns))
+		case "wasm":
+			timeout := p.Timeout
+			if timeout == 0 {
+				timeout = 100 * time.Millisecond
+			}
+			onError := p.OnError
+			if onError == "" {
+				onError = "block"
+			}
+			wf, err := policy.NewWasmFilter(p.Name, policy.Action(p.Action), p.Path, timeout, onError)
+			if err != nil {
+				log.Printf("failed to load wasm output filter %s: %v", p.Name, err)
+				continue
+			}
+			log.Printf("loaded wasm output filter: %s (path: %s, timeout: %s, on_error: %s)", p.Name, p.Path, timeout, onError)
+			outputFilters = append(outputFilters, wf)
+		}
+	}
+
+	log.Printf("loaded %d input policies, %d output policies", len(inputFilters), len(outputFilters))
+	return policy.NewEngine(inputFilters, outputFilters)
+}
+
+func loadEnvFile(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			if os.Getenv(key) == "" {
+				os.Setenv(key, val)
+			}
+		}
+	}
+}
