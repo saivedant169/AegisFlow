@@ -14,6 +14,10 @@ type BudgetCheckFunc func(tenantID, model string) (allowed bool, warnings []stri
 // BudgetCheck returns middleware that enforces spend budgets per tenant.
 // Requests that exceed the budget receive a 429 response; requests approaching
 // the limit receive X-AegisFlow-Budget-Warning headers.
+//
+// This middleware checks the global and tenant-level budgets using model "*".
+// Per-model budget checks happen in the handler after the request body is parsed,
+// since the middleware runs before the body is decoded and the model is unknown.
 func BudgetCheck(checkFn BudgetCheckFunc) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,8 +32,9 @@ func BudgetCheck(checkFn BudgetCheckFunc) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Check tenant-level budget. Model-specific checks happen after
-			// the handler parses the request body.
+			// Check global and tenant-level budget (model="*" won't match
+			// tenant_model scopes, which is correct — those are checked by
+			// the handler after parsing the model from the request body).
 			allowed, warnings, blockMsg := checkFn(tenant.ID, "*")
 
 			if !allowed {

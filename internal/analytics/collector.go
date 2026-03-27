@@ -181,18 +181,24 @@ func (c *Collector) Record(dp DataPoint) {
 		"provider:" + dp.Provider,
 		"global",
 	}
+
+	// Collect all TimeSeries references under a single lock, then record outside.
+	// This avoids unlock/relock inside the loop which could race with map mutations.
 	c.mu.Lock()
-	for _, dim := range dims {
+	targets := make([]*TimeSeries, len(dims))
+	for i, dim := range dims {
 		ts, ok := c.series[dim]
 		if !ok {
 			ts = NewTimeSeries(c.retention)
 			c.series[dim] = ts
 		}
-		c.mu.Unlock()
-		ts.Record(dp)
-		c.mu.Lock()
+		targets[i] = ts
 	}
 	c.mu.Unlock()
+
+	for _, ts := range targets {
+		ts.Record(dp)
+	}
 }
 
 func (c *Collector) GetSeries(dimension string) *TimeSeries {

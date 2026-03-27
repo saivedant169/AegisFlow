@@ -140,7 +140,7 @@ func (m *Manager) CreateRollout(
 // ActiveRollout returns the running rollout for the given model, or nil if none exists.
 func (m *Manager) ActiveRollout(model string) *Rollout {
 	r, err := m.store.GetByModel(model)
-	if err != nil {
+	if err != nil || r == nil {
 		return nil
 	}
 	if r.State != StateRunning {

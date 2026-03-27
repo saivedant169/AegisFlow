@@ -23,22 +23,23 @@ import (
 )
 
 type Handler struct {
-	registry  *provider.Registry
-	router    *router.Router
-	policy    *policy.Engine
-	usage     *usage.Tracker
-	cache     cache.Cache
-	webhook   *webhook.Notifier
-	store     *storage.PostgresStore
+	registry    *provider.Registry
+	router      *router.Router
+	policy      *policy.Engine
+	usage       *usage.Tracker
+	cache       cache.Cache
+	webhook     *webhook.Notifier
+	store       *storage.PostgresStore
 	dbQueue     chan storage.UsageEvent
 	analytics   *analytics.Collector
 	recordSpend func(tenantID, model string, cost float64)
+	budgetCheck func(tenantID, model string) (bool, []string, string)
 }
 
 const dbQueueSize = 1024
 
-func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector, recordSpend func(string, string, float64)) *Handler {
-	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, recordSpend: recordSpend}
+func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector, recordSpend func(string, string, float64), budgetCheck func(string, string) (bool, []string, string)) *Handler {
+	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, recordSpend: recordSpend, budgetCheck: budgetCheck}
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
 		go h.dbWorker()
@@ -77,6 +78,18 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	tenantID := ""
 	if t := middleware.TenantFromContext(r.Context()); t != nil {
 		tenantID = t.ID
+	}
+
+	// Per-model budget check (global/tenant checks run in middleware, model-level here)
+	if h.budgetCheck != nil && tenantID != "" {
+		allowed, warnings, blockMsg := h.budgetCheck(tenantID, req.Model)
+		if !allowed {
+			writeError(w, http.StatusTooManyRequests, "budget_exceeded", blockMsg)
+			return
+		}
+		for _, warning := range warnings {
+			w.Header().Add("X-AegisFlow-Budget-Warning", warning)
+		}
 	}
 
 	// Policy check: input

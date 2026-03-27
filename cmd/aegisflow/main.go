@@ -174,10 +174,12 @@ func main() {
 	}
 
 	var recordSpendFn func(string, string, float64)
+	var budgetCheckFn func(string, string) (bool, []string, string)
 	if budgetMgr != nil {
 		recordSpendFn = budgetMgr.RecordSpend
+		budgetCheckFn = budgetMgr.CheckFunc()
 	}
-	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, recordSpendFn)
+	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, recordSpendFn, budgetCheckFn)
 
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap
