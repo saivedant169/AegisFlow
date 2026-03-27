@@ -13,6 +13,7 @@ type RequestEntry struct {
 	RequestID  string    `json:"request_id"`
 	TenantID   string    `json:"tenant_id"`
 	Model      string    `json:"model"`
+	Provider   string    `json:"provider,omitempty"`
 	Status     int       `json:"status"`
 	LatencyMs  int64     `json:"latency_ms"`
 	Tokens     int       `json:"tokens"`
@@ -84,6 +85,13 @@ func (rl *RequestLog) RecentViolations(n int) []RequestEntry {
 		}
 	}
 	return violations
+}
+
+// Count returns the number of entries currently stored in the log.
+func (rl *RequestLog) Count() int {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+	return rl.count
 }
 
 func (rl *RequestLog) ServeHTTP(w http.ResponseWriter, r *http.Request) {
