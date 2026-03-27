@@ -298,6 +298,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
       Alerts
     </div>
+    <div class="nav-item" data-page="budgets" onclick="switchPage('budgets')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Budgets
+    </div>
     <div class="nav-section">Configuration</div>
     <div class="nav-item" data-page="providers" onclick="switchPage('providers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
@@ -772,6 +776,40 @@
     </div>
   </div>
 
+  <!-- PAGE: Budgets -->
+  <div class="page" id="page-budgets" style="display:none;">
+    <div class="topbar">
+      <h2>Budgets</h2>
+      <div class="refresh-info">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        Auto-refresh 5s
+      </div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Total Scopes</div>
+        <div class="stat-value" id="budgetTotalScopes">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Over Warning</div>
+        <div class="stat-value" id="budgetOverWarn">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow" style="background:var(--accent-red);"></div>
+        <div class="stat-label">Blocked</div>
+        <div class="stat-value" id="budgetBlocked">0</div>
+      </div>
+    </div>
+    <div id="budgetCards" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:16px; margin-top:16px;">
+      <div class="stat-card" style="grid-column:1/-1; text-align:center; padding:40px;">
+        <p style="color:var(--text-secondary);">No budget scopes configured</p>
+        <div style="color:var(--text-muted); font-size:12px; margin-top:8px;">Configure budget scopes in aegisflow.yaml to track spend</div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <script>
@@ -985,6 +1023,7 @@ function switchPage(page) {
   if (page === 'rollouts') fetchRollouts();
   if (page === 'analytics') fetchAnalytics();
   if (page === 'alerts') fetchAlerts();
+  if (page === 'budgets') fetchBudgets();
 }
 
 async function fetchPolicies() {
@@ -1504,6 +1543,80 @@ setInterval(() => {
   const alertsPage = document.getElementById('page-alerts');
   if (alertsPage && alertsPage.style.display !== 'none') fetchAlerts();
 }, 3000);
+
+// --- Budgets ---
+async function fetchBudgets() {
+  try {
+    const resp = await fetch('/admin/v1/budgets');
+    const data = await resp.json();
+    const statuses = data.statuses || [];
+    const forecasts = data.forecasts || [];
+
+    document.getElementById('budgetTotalScopes').textContent = statuses.length;
+    document.getElementById('budgetOverWarn').textContent = statuses.filter(s => s.status === 'warn' || s.status === 'alert').length;
+    document.getElementById('budgetBlocked').textContent = statuses.filter(s => s.status === 'blocked').length;
+
+    const container = document.getElementById('budgetCards');
+    if (statuses.length === 0) {
+      container.innerHTML = '<div class="stat-card" style="grid-column:1/-1; text-align:center; padding:40px;"><p style="color:var(--text-secondary);">No budget scopes configured</p><div style="color:var(--text-muted); font-size:12px; margin-top:8px;">Configure budget scopes in aegisflow.yaml to track spend</div></div>';
+      return;
+    }
+
+    const forecastMap = {};
+    forecasts.forEach(f => { forecastMap[f.scope_id] = f; });
+
+    container.innerHTML = statuses.map(s => {
+      const pct = Math.min(s.percentage, 100).toFixed(1);
+      let barColor = 'var(--accent-green)';
+      if (s.percentage >= 100) barColor = 'var(--accent-red)';
+      else if (s.percentage >= 90) barColor = 'var(--accent-orange)';
+      else if (s.percentage >= 80) barColor = 'var(--accent-orange)'; // yellow-ish
+
+      let statusBadge = '';
+      if (s.status === 'blocked') statusBadge = '<span style="color:var(--accent-red); font-weight:600; font-size:11px; background:rgba(248,81,73,0.1); padding:2px 8px; border-radius:4px;">BLOCKED</span>';
+      else if (s.status === 'warn') statusBadge = '<span style="color:var(--accent-orange); font-weight:600; font-size:11px; background:rgba(210,153,34,0.1); padding:2px 8px; border-radius:4px;">WARNING</span>';
+      else if (s.status === 'alert') statusBadge = '<span style="color:#d29922; font-weight:600; font-size:11px; background:rgba(210,153,34,0.1); padding:2px 8px; border-radius:4px;">ALERT</span>';
+      else statusBadge = '<span style="color:var(--accent-green); font-weight:600; font-size:11px; background:rgba(63,185,80,0.1); padding:2px 8px; border-radius:4px;">NORMAL</span>';
+
+      const fc = forecastMap[s.scope_id];
+      let forecastHtml = '';
+      if (fc) {
+        const exceedIcon = fc.will_exceed
+          ? '<span style="color:var(--accent-red);">&#9650; Will exceed</span>'
+          : '<span style="color:var(--accent-green);">&#9660; Within budget</span>';
+        forecastHtml = '<div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:12px; color:var(--text-secondary); display:flex; justify-content:space-between;">'
+          + '<span>Projected: $' + fc.projected_total.toFixed(2) + '</span>'
+          + '<span>' + fc.days_remaining + 'd remaining</span>'
+          + exceedIcon
+          + '</div>';
+      }
+
+      return '<div class="stat-card" style="padding:20px;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<div><div style="font-size:14px; font-weight:600;">' + s.scope_id + '</div>'
+        + '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">' + s.scope + '</div></div>'
+        + statusBadge
+        + '</div>'
+        + '<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">'
+        + '<span style="color:var(--text-secondary);">$' + s.current_spend.toFixed(2) + ' / $' + s.limit.toFixed(2) + '</span>'
+        + '<span style="font-weight:600;">' + pct + '%</span>'
+        + '</div>'
+        + '<div style="background:var(--bg-elevated); border-radius:4px; height:8px; overflow:hidden;">'
+        + '<div style="height:100%; width:' + pct + '%; background:' + barColor + '; border-radius:4px; transition:width 0.3s;"></div>'
+        + '</div>'
+        + forecastHtml
+        + '</div>';
+    }).join('');
+  } catch (err) {
+    console.error('Failed to fetch budgets', err);
+  }
+}
+
+// Auto-refresh budgets when on budgets page
+setInterval(() => {
+  const budgetsPage = document.getElementById('page-budgets');
+  if (budgetsPage && budgetsPage.style.display !== 'none') fetchBudgets();
+}, 5000);
 
 initCharts();
 fetchUsage();

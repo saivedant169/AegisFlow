@@ -27,6 +27,14 @@ type AnalyticsProvider interface {
 	Dimensions() []string
 }
 
+// BudgetProvider is the interface consumed by the admin API to avoid an import
+// cycle with the budget package. Use budget.NewAdminAdapter to wrap a
+// *budget.Manager so it satisfies this interface.
+type BudgetProvider interface {
+	AllStatuses() interface{}
+	ForecastAll() interface{}
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -50,10 +58,11 @@ type Server struct {
 	cache              cache.Cache
 	rolloutMgr         RolloutManager
 	analyticsProvider  AnalyticsProvider
+	budgetProvider     BudgetProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp}
 }
 
 func (s *Server) Router() http.Handler {
@@ -77,6 +86,9 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
 	r.Get("/admin/v1/alerts", s.alertsHandler)
 	r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+
+	// Budget endpoints
+	r.Get("/admin/v1/budgets", s.budgetsHandler)
 
 	// Rollout management endpoints
 	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
@@ -357,6 +369,23 @@ func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// --- Budget handlers ---
+
+func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.budgetProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"statuses":  []interface{}{},
+			"forecasts": []interface{}{},
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"statuses":  s.budgetProvider.AllStatuses(),
+		"forecasts": s.budgetProvider.ForecastAll(),
+	})
 }
 
 // --- Analytics handlers ---
