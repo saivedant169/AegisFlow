@@ -59,7 +59,14 @@ func NewWasmFilter(name string, action Action, wasmPath string, timeout time.Dur
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 
-	module, err := rt.Instantiate(ctx, wasmBytes)
+	compiled, err := rt.CompileModule(ctx, wasmBytes)
+	if err != nil {
+		rt.Close(ctx)
+		return nil, fmt.Errorf("compiling wasm module %s: %w", wasmPath, err)
+	}
+
+	cfg := wasmModuleConfig(compiled)
+	module, err := rt.InstantiateModule(ctx, compiled, cfg)
 	if err != nil {
 		rt.Close(ctx)
 		return nil, fmt.Errorf("instantiating wasm module %s: %w", wasmPath, err)
@@ -96,7 +103,14 @@ func NewWasmFilterFromBytes(name string, action Action, wasmBytes []byte, timeou
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 
-	module, err := rt.Instantiate(ctx, wasmBytes)
+	compiled, err := rt.CompileModule(ctx, wasmBytes)
+	if err != nil {
+		rt.Close(ctx)
+		return nil, fmt.Errorf("compiling wasm module: %w", err)
+	}
+
+	cfg := wasmModuleConfig(compiled)
+	module, err := rt.InstantiateModule(ctx, compiled, cfg)
 	if err != nil {
 		rt.Close(ctx)
 		return nil, fmt.Errorf("instantiating wasm module: %w", err)
@@ -118,6 +132,17 @@ func NewWasmFilterFromBytes(name string, action Action, wasmBytes []byte, timeou
 		runtime: rt,
 		module:  module,
 	}, nil
+}
+
+// wasmModuleConfig returns a module config that calls _initialize for reactor-style
+// modules or _start for command-style modules.
+func wasmModuleConfig(compiled wazero.CompiledModule) wazero.ModuleConfig {
+	cfg := wazero.NewModuleConfig()
+	exports := compiled.ExportedFunctions()
+	if _, ok := exports["_initialize"]; ok {
+		return cfg.WithStartFunctions("_initialize")
+	}
+	return cfg
 }
 
 func (f *WasmFilter) Name() string   { return f.name }

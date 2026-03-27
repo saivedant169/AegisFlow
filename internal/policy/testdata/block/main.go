@@ -7,16 +7,19 @@ import (
 )
 
 var resultBuf []byte
+var allocBufs [][]byte // keep references to prevent GC
 
-//export alloc
-func alloc(size uint32) *byte {
+//go:wasmexport alloc
+func alloc(size uint32) uint32 {
 	buf := make([]byte, size)
-	return &buf[0]
+	allocBufs = append(allocBufs, buf)
+	return uint32(uintptr(unsafe.Pointer(&buf[0])))
 }
 
-//export check
-func check(contentPtr *byte, contentLen uint32, metaPtr *byte, metaLen uint32) int32 {
-	content := unsafe.String(contentPtr, contentLen)
+//go:wasmexport check
+func check(contentPtr uint32, contentLen uint32, metaPtr uint32, metaLen uint32) int32 {
+	content := unsafe.String((*byte)(unsafe.Pointer(uintptr(contentPtr))), contentLen)
+	allocBufs = nil // free alloc'd buffers after reading
 	if strings.Contains(strings.ToLower(content), "forbidden") {
 		result, _ := json.Marshal(map[string]string{
 			"action":  "block",
@@ -28,15 +31,15 @@ func check(contentPtr *byte, contentLen uint32, metaPtr *byte, metaLen uint32) i
 	return 0
 }
 
-//export get_result_ptr
-func getResultPtr() *byte {
+//go:wasmexport get_result_ptr
+func getResultPtr() uint32 {
 	if len(resultBuf) == 0 {
-		return nil
+		return 0
 	}
-	return &resultBuf[0]
+	return uint32(uintptr(unsafe.Pointer(&resultBuf[0])))
 }
 
-//export get_result_len
+//go:wasmexport get_result_len
 func getResultLen() uint32 {
 	return uint32(len(resultBuf))
 }
