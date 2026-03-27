@@ -125,6 +125,8 @@ func main() {
 	// Gateway router
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
+	// RealIP trusts X-Forwarded-For/X-Real-IP headers.
+	// In production, ensure only your reverse proxy (nginx, ALB, etc.) sets these.
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.Auth(cfg))

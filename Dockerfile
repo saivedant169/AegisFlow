@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /aegisflow ./cmd/aegis
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /aegisflow /aegisflow
-COPY configs/aegisflow.yaml /etc/aegisflow/aegisflow.yaml
+COPY --from=builder /app/configs/aegisflow.yaml /etc/aegisflow/aegisflow.yaml
 EXPOSE 8080 8081
 USER nonroot:nonroot
 ENTRYPOINT ["/aegisflow"]
