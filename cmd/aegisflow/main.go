@@ -292,6 +292,7 @@ func main() {
 
 	gatewaySrv.Shutdown(ctx)
 	adminSrv.Shutdown(ctx)
+	handler.Close()
 	log.Println("servers stopped")
 }
 

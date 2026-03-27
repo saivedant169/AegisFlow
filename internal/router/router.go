@@ -222,6 +222,55 @@ func (r *Router) tryProviders(ctx context.Context, req *types.ChatCompletionRequ
 }
 
 func (r *Router) RouteStream(ctx context.Context, req *types.ChatCompletionRequest) (io.ReadCloser, error) {
+	// Use same canary/region logic as non-streaming to pick the provider.
+	// We resolve the target provider first, then call ChatCompletionStream on it.
+
+	// Check canary rollout.
+	if r.rolloutMgr != nil {
+		if active := r.rolloutMgr.ActiveRollout(req.Model); active != nil {
+			if rand.Intn(100) < active.CurrentPercentage {
+				canary, err := r.registry.Get(active.CanaryProvider)
+				if err == nil && !r.circuitBreaker.IsOpen(canary.Name()) {
+					stream, err := canary.ChatCompletionStream(ctx, req)
+					if err == nil {
+						r.circuitBreaker.RecordSuccess(canary.Name())
+						return stream, nil
+					}
+					r.circuitBreaker.RecordFailure(canary.Name())
+				}
+			}
+		}
+	}
+
+	// Check region-based routing.
+	route := r.matchRoute(req.Model)
+	if route != nil && len(route.Regions) > 0 {
+		for _, region := range route.Regions {
+			var providers []provider.Provider
+			for _, name := range region.Providers {
+				p, err := r.registry.Get(name)
+				if err == nil {
+					providers = append(providers, p)
+				}
+			}
+			ordered := region.Strategy.Select(providers)
+			for _, p := range ordered {
+				if r.circuitBreaker.IsOpen(p.Name()) {
+					continue
+				}
+				stream, err := p.ChatCompletionStream(ctx, req)
+				if err != nil {
+					r.circuitBreaker.RecordFailure(p.Name())
+					continue
+				}
+				r.circuitBreaker.RecordSuccess(p.Name())
+				return stream, nil
+			}
+		}
+		return nil, fmt.Errorf("no available providers across all regions for model %q (stream)", req.Model)
+	}
+
+	// Flat provider list fallback.
 	providers, err := r.resolveProviders(req.Model)
 	if err != nil {
 		return nil, err
@@ -232,14 +281,12 @@ func (r *Router) RouteStream(ctx context.Context, req *types.ChatCompletionReque
 		if r.circuitBreaker.IsOpen(p.Name()) {
 			continue
 		}
-
 		stream, err := p.ChatCompletionStream(ctx, req)
 		if err != nil {
 			r.circuitBreaker.RecordFailure(p.Name())
 			lastErr = err
 			continue
 		}
-
 		r.circuitBreaker.RecordSuccess(p.Name())
 		return stream, nil
 	}

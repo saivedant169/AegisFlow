@@ -57,6 +57,13 @@ func (h *Handler) dbWorker() {
 	}
 }
 
+// Close shuts down the handler's background workers cleanly.
+func (h *Handler) Close() {
+	if h.dbQueue != nil {
+		close(h.dbQueue)
+	}
+}
+
 func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	const maxBodySize = 10 * 1024 * 1024 // 10MB
@@ -84,6 +91,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	if h.budgetCheck != nil && tenantID != "" {
 		allowed, warnings, blockMsg := h.budgetCheck(tenantID, req.Model)
 		if !allowed {
+			h.recordAnalytics(tenantID, req.Model, "", http.StatusTooManyRequests, startTime, 0)
 			writeError(w, http.StatusTooManyRequests, "budget_exceeded", blockMsg)
 			return
 		}
@@ -98,6 +106,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		if v, _ := h.policy.CheckInput(inputContent); v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
+				h.recordAnalytics(tenantID, req.Model, "", http.StatusForbidden, startTime, 0)
 				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
@@ -125,6 +134,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	routed, err := h.router.RouteWithProvider(r.Context(), &req)
 	if err != nil {
+		h.recordAnalytics(tenantID, req.Model, "", http.StatusBadGateway, startTime, 0)
 		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
 		return
 	}
@@ -136,6 +146,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		if v, _ := h.policy.CheckOutput(resp.Choices[0].Message.Content); v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
+				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
 				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
@@ -174,18 +185,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record analytics data point
-	if h.analytics != nil {
-		h.analytics.Record(analytics.DataPoint{
-			TenantID:      tenantID,
-			Model:         req.Model,
-			Provider:      providerName,
-			StatusCode:    200,
-			LatencyMs:     time.Since(startTime).Milliseconds(),
-			Tokens:        int64(resp.Usage.TotalTokens),
-			EstimatedCost: 0,
-			Timestamp:     time.Now(),
-		})
-	}
+	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-AegisFlow-Cache", "MISS")
@@ -268,6 +268,21 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCode int, startTime time.Time, tokens int64) {
+	if h.analytics == nil {
+		return
+	}
+	h.analytics.Record(analytics.DataPoint{
+		TenantID:   tenantID,
+		Model:      model,
+		Provider:   providerName,
+		StatusCode: statusCode,
+		LatencyMs:  time.Since(startTime).Milliseconds(),
+		Tokens:     tokens,
+		Timestamp:  time.Now(),
+	})
 }
 
 func (h *Handler) fireWebhook(eventType, policyName, action, tenantID, model, message string) {
