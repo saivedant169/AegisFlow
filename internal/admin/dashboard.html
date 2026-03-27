@@ -1092,11 +1092,12 @@ async function fetchPolicies() {
         const visible = rules.slice(0, maxShow);
         const remaining = rules.length - maxShow;
         const ruleId = 'rules-' + p.name.replace(/[^a-z0-9]/gi, '-');
-        rulesHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">` +
-          visible.map(r => `<code style="background:var(--bg-elevated, var(--border));padding:2px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:nowrap;">${r}</code>`).join('') +
-          (remaining > 0 ? `<span id="${ruleId}-toggle" onclick="document.getElementById('${ruleId}').style.display=document.getElementById('${ruleId}').style.display==='none'?'flex':'none';this.textContent=this.textContent.includes('+')?'show less':'+${remaining} more'" style="cursor:pointer;font-size:11px;color:var(--accent-blue);font-weight:500;padding:2px 8px;background:rgba(88,166,255,0.08);border-radius:4px;">+${remaining} more</span>` +
-            `<div id="${ruleId}" style="display:none;flex-wrap:wrap;gap:4px;width:100%;margin-top:4px;">` +
-            rules.slice(maxShow).map(r => `<code style="background:var(--bg-elevated, var(--border));padding:2px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:nowrap;">${r}</code>`).join('') +
+        const codeStyle = 'background:var(--bg-elevated, var(--border));padding:4px 10px;border-radius:6px;font-size:11px;font-family:"JetBrains Mono",monospace;color:var(--text-secondary);white-space:nowrap;line-height:1.8;border:1px solid rgba(48,54,61,0.4);';
+        rulesHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">` +
+          visible.map(r => `<code style="${codeStyle}">${r}</code>`).join('') +
+          (remaining > 0 ? `<span id="${ruleId}-toggle" onclick="document.getElementById('${ruleId}').style.display=document.getElementById('${ruleId}').style.display==='none'?'flex':'none';this.textContent=this.textContent.includes('+')?'show less':'+${remaining} more'" style="cursor:pointer;font-size:11px;color:var(--accent-blue);font-weight:500;padding:4px 10px;background:rgba(88,166,255,0.08);border-radius:6px;border:1px solid rgba(88,166,255,0.15);line-height:1.8;">+${remaining} more</span>` +
+            `<div id="${ruleId}" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">` +
+            rules.slice(maxShow).map(r => `<code style="${codeStyle}">${r}</code>`).join('') +
             `</div>` : '') +
           `</div>`;
       }
