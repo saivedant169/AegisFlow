@@ -25,6 +25,7 @@ type Config struct {
 	Admin     AdminConfig     `yaml:"admin"`
 	Aliases   AliasConfig     `yaml:"aliases"`
 	Transform TransformConfig `yaml:"transform"`
+	Analytics AnalyticsConfig `yaml:"analytics"`
 }
 
 type CacheConfig struct {
@@ -56,6 +57,32 @@ type TransformConfig struct {
 	SystemPromptPrefix  string `yaml:"system_prompt_prefix"`
 	SystemPromptSuffix  string `yaml:"system_prompt_suffix"`
 	DefaultSystemPrompt string `yaml:"default_system_prompt"`
+}
+
+type AnalyticsConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	RetentionHours   int           `yaml:"retention_hours"`
+	FlushInterval    time.Duration `yaml:"flush_interval"`
+	AnomalyDetection AnomalyConfig `yaml:"anomaly_detection"`
+}
+
+type AnomalyConfig struct {
+	Enabled            bool             `yaml:"enabled"`
+	EvaluationInterval time.Duration    `yaml:"evaluation_interval"`
+	Static             StaticThresholds `yaml:"static"`
+	Baseline           BaselineConfig   `yaml:"baseline"`
+}
+
+type StaticThresholds struct {
+	ErrorRateMax         float64 `yaml:"error_rate_max"`
+	P95LatencyMax        int64   `yaml:"p95_latency_max"`
+	RequestsPerMinuteMax int64   `yaml:"requests_per_minute_max"`
+	CostPerMinuteMax     float64 `yaml:"cost_per_minute_max"`
+}
+
+type BaselineConfig struct {
+	Window          time.Duration `yaml:"window"`
+	StddevThreshold float64       `yaml:"stddev_threshold"`
 }
 
 type ServerConfig struct {
@@ -219,6 +246,33 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Cache.MaxSize == 0 {
 		cfg.Cache.MaxSize = 1000
+	}
+	if cfg.Analytics.RetentionHours == 0 {
+		cfg.Analytics.RetentionHours = 48
+	}
+	if cfg.Analytics.FlushInterval == 0 {
+		cfg.Analytics.FlushInterval = time.Hour
+	}
+	if cfg.Analytics.AnomalyDetection.EvaluationInterval == 0 {
+		cfg.Analytics.AnomalyDetection.EvaluationInterval = time.Minute
+	}
+	if cfg.Analytics.AnomalyDetection.Static.ErrorRateMax == 0 {
+		cfg.Analytics.AnomalyDetection.Static.ErrorRateMax = 20
+	}
+	if cfg.Analytics.AnomalyDetection.Static.P95LatencyMax == 0 {
+		cfg.Analytics.AnomalyDetection.Static.P95LatencyMax = 5000
+	}
+	if cfg.Analytics.AnomalyDetection.Static.RequestsPerMinuteMax == 0 {
+		cfg.Analytics.AnomalyDetection.Static.RequestsPerMinuteMax = 10000
+	}
+	if cfg.Analytics.AnomalyDetection.Static.CostPerMinuteMax == 0 {
+		cfg.Analytics.AnomalyDetection.Static.CostPerMinuteMax = 50.0
+	}
+	if cfg.Analytics.AnomalyDetection.Baseline.Window == 0 {
+		cfg.Analytics.AnomalyDetection.Baseline.Window = 24 * time.Hour
+	}
+	if cfg.Analytics.AnomalyDetection.Baseline.StddevThreshold == 0 {
+		cfg.Analytics.AnomalyDetection.Baseline.StddevThreshold = 3
 	}
 }
 
