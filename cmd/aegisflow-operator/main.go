@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -11,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	v1alpha1 "github.com/aegisflow/aegisflow/api/v1alpha1"
 	"github.com/aegisflow/aegisflow/internal/operator"
 )
 
@@ -18,6 +21,19 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
+	_ = v1alpha1.AddToScheme(scheme)
+}
+
+type operatorReconciler struct {
+	reconciler *operator.Reconciler
+}
+
+func (r *operatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if err := r.reconciler.Reconcile(ctx); err != nil {
+		log.Printf("reconciliation error: %v", err)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+	return ctrl.Result{}, nil
 }
 
 func main() {
@@ -39,7 +55,13 @@ func main() {
 	}
 
 	reconciler := operator.NewReconciler(mgr.GetClient(), *namespace)
-	_ = reconciler // Will be wired to controller watches when CRD scheme registration is added
+
+	if err := ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.AegisFlowGateway{}).
+		Complete(&operatorReconciler{reconciler: reconciler}); err != nil {
+		log.Fatalf("unable to create controller: %v", err)
+		os.Exit(1)
+	}
 
 	log.Printf("aegisflow-operator starting (namespace: %s)", *namespace)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
