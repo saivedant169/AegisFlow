@@ -1,0 +1,81 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: aegisflowproviders.aegisflow.io
+spec:
+  group: aegisflow.io
+  names:
+    kind: AegisFlowProvider
+    listKind: AegisFlowProviderList
+    plural: aegisflowproviders
+    singular: aegisflowprovider
+    shortNames: [afp]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                baseURL:
+                  type: string
+                apiKeySecret:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    key:
+                      type: string
+                  required: [name, key]
+                models:
+                  type: array
+                  items:
+                    type: string
+                timeout:
+                  type: string
+                maxRetries:
+                  type: integer
+                region:
+                  type: string
+            status:
+              type: object
+              properties:
+                healthy:
+                  type: boolean
+                averageLatencyMs:
+                  type: integer
+                  format: int64
+                errorRate:
+                  type: number
+                  format: double
+                lastCheckedAt:
+                  type: string
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Region
+          type: string
+          jsonPath: .spec.region
+        - name: Healthy
+          type: boolean
+          jsonPath: .status.healthy
+        - name: Latency
+          type: integer
+          jsonPath: .status.averageLatencyMs
+        - name: Error-Rate
+          type: number
+          jsonPath: .status.errorRate
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}

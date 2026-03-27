@@ -1,0 +1,60 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: aegisflowpolicies.aegisflow.io
+spec:
+  group: aegisflow.io
+  names:
+    kind: AegisFlowPolicy
+    listKind: AegisFlowPolicyList
+    plural: aegisflowpolicies
+    singular: aegisflowpolicy
+    shortNames: [afpol]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [phase, type, action]
+              properties:
+                phase:
+                  type: string
+                type:
+                  type: string
+                action:
+                  type: string
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                patterns:
+                  type: array
+                  items:
+                    type: string
+                wasmPath:
+                  type: string
+                timeout:
+                  type: string
+                onError:
+                  type: string
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .spec.phase
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Action
+          type: string
+          jsonPath: .spec.action
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}

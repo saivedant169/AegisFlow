@@ -1,0 +1,89 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: aegisflowroutes.aegisflow.io
+spec:
+  group: aegisflow.io
+  names:
+    kind: AegisFlowRoute
+    listKind: AegisFlowRouteList
+    plural: aegisflowroutes
+    singular: aegisflowroute
+    shortNames: [afr]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [match]
+              properties:
+                match:
+                  type: object
+                  required: [model]
+                  properties:
+                    model:
+                      type: string
+                regions:
+                  type: array
+                  items:
+                    type: object
+                    required: [name, providers]
+                    properties:
+                      name:
+                        type: string
+                      providers:
+                        type: array
+                        items:
+                          type: string
+                      strategy:
+                        type: string
+                canary:
+                  type: object
+                  properties:
+                    targetProvider:
+                      type: string
+                    stages:
+                      type: array
+                      items:
+                        type: integer
+                    observationWindow:
+                      type: string
+                    errorThreshold:
+                      type: number
+                      format: double
+                    latencyP95Threshold:
+                      type: integer
+                      format: int64
+            status:
+              type: object
+              properties:
+                activeCanary:
+                  type: boolean
+                canaryPercentage:
+                  type: integer
+                canaryHealth:
+                  type: string
+      additionalPrinterColumns:
+        - name: Model
+          type: string
+          jsonPath: .spec.match.model
+        - name: Strategy
+          type: string
+          jsonPath: .spec.regions[0].strategy
+        - name: Canary
+          type: boolean
+          jsonPath: .status.activeCanary
+        - name: Health
+          type: string
+          jsonPath: .status.canaryHealth
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
