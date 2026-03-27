@@ -198,6 +198,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Policies
     </div>
+    <div class="nav-item" data-page="requests" onclick="switchPage('requests')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Live Feed
+    </div>
     <div class="nav-section">Configuration</div>
     <div class="nav-item" data-page="providers" onclick="switchPage('providers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
@@ -370,6 +374,63 @@
   <div class="page" id="page-tenants" style="display:none;">
     <div class="topbar"><h2>Tenants</h2></div>
     <div id="tenantCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:24px;"></div>
+  </div>
+
+  <!-- PAGE: Live Request Feed -->
+  <div class="page" id="page-requests" style="display:none;">
+    <div class="topbar">
+      <h2>Live Request Feed</h2>
+      <div class="refresh-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Auto-refresh 2s
+      </div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Recent Requests</div>
+        <div class="stat-value" id="feedTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-label">Avg Latency</div>
+        <div class="stat-value" id="feedAvgLatency">0ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow purple"></div>
+        <div class="stat-label">Cache Hit Rate</div>
+        <div class="stat-value" id="feedCacheRate">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Policy Hits</div>
+        <div class="stat-value" id="feedPolicyHits">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Recent Requests</span>
+        <span class="table-count" id="feedCount">0 entries</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Request ID</th>
+            <th>Tenant</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Latency</th>
+            <th>Tokens</th>
+            <th>Cache</th>
+            <th>Policy</th>
+          </tr>
+        </thead>
+        <tbody id="feedTable">
+          <tr><td colspan="9" class="empty-state"><p>No requests yet</p><div class="hint">Send a request to see live feed data</div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
 </div><!-- end main -->
@@ -577,6 +638,7 @@ function switchPage(page) {
   if (page === 'policies') fetchPolicies();
   if (page === 'providers') fetchProviders();
   if (page === 'tenants') fetchTenants();
+  if (page === 'requests') fetchRequests();
 }
 
 async function fetchPolicies() {
@@ -689,6 +751,58 @@ async function fetchTenants() {
       </div>`;
     }).join('');
   } catch (err) { console.error('Failed to fetch tenants', err); }
+}
+
+let feedInterval = null;
+
+async function fetchRequests() {
+  try {
+    const resp = await fetch('/admin/v1/requests');
+    const data = await resp.json();
+
+    const entries = data || [];
+    const total = entries.length;
+    const cached = entries.filter(r => r.cached).length;
+    const policyHits = entries.filter(r => r.policy_hit).length;
+    const avgLatency = total > 0 ? Math.round(entries.reduce((sum, r) => sum + r.latency_ms, 0) / total) : 0;
+    const cacheRate = total > 0 ? Math.round(cached / total * 100) : 0;
+
+    document.getElementById('feedTotal').textContent = total;
+    document.getElementById('feedAvgLatency').textContent = avgLatency + 'ms';
+    document.getElementById('feedCacheRate').textContent = cacheRate + '%';
+    document.getElementById('feedPolicyHits').textContent = policyHits;
+    document.getElementById('feedCount').textContent = total + ' entries';
+
+    const tbody = document.getElementById('feedTable');
+    if (total === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><p>No requests yet</p></td></tr>';
+    } else {
+      tbody.innerHTML = entries.map(r => {
+        const time = new Date(r.timestamp).toLocaleTimeString();
+        const statusColor = r.status < 300 ? 'var(--accent-green)' : r.status < 500 ? 'var(--accent-orange)' : 'var(--accent-red)';
+        const latencyColor = r.latency_ms < 200 ? 'var(--accent-green)' : r.latency_ms < 1000 ? 'var(--accent-orange)' : 'var(--accent-red)';
+        return `<tr>
+          <td style="font-size:12px;color:var(--text-muted);white-space:nowrap;">${time}</td>
+          <td style="font-size:11px;font-family:monospace;color:var(--text-muted);">${(r.request_id || '').substring(0, 12)}...</td>
+          <td><span class="badge badge-tenant">${r.tenant_id || '-'}</span></td>
+          <td><span class="badge ${getModelBadgeClass(r.model || '')}">${r.model || '-'}</span></td>
+          <td><span style="color:${statusColor};font-weight:600;">${r.status}</span></td>
+          <td><span style="color:${latencyColor};font-weight:500;">${r.latency_ms}ms</span></td>
+          <td style="font-weight:500;">${formatNumber(r.tokens || 0)}</td>
+          <td>${r.cached ? '<span style="color:var(--accent-green);font-weight:600;">HIT</span>' : '<span style="color:var(--text-muted);">MISS</span>'}</td>
+          <td>${r.policy_hit ? '<span class="badge" style="background:#ef444418;color:var(--accent-red);font-weight:600;">' + r.policy_hit + '</span>' : '<span style="color:var(--text-muted);">-</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Auto-refresh if on requests page
+    if (!feedInterval) {
+      feedInterval = setInterval(() => {
+        const reqPage = document.getElementById('page-requests');
+        if (reqPage && reqPage.style.display !== 'none') fetchRequests();
+      }, 2000);
+    }
+  } catch (err) { console.error('Failed to fetch requests', err); }
 }
 
 initCharts();
