@@ -32,7 +32,10 @@ func CORS(cfg *config.Config) func(http.Handler) http.Handler {
 
 			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
-				if cfg.Server.CORS.AllowCredentials {
+				// Only set credentials header when origins are explicitly listed.
+				// Credentials + wildcard origin is a security misconfiguration that
+				// allows any website to make authenticated requests.
+				if cfg.Server.CORS.AllowCredentials && !hasWildcardOrigin(cfg.Server.CORS.AllowedOrigins) {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
 				if len(cfg.Server.CORS.ExposedHeaders) > 0 {
@@ -51,4 +54,13 @@ func CORS(cfg *config.Config) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func hasWildcardOrigin(origins []string) bool {
+	for _, o := range origins {
+		if o == "*" {
+			return true
+		}
+	}
+	return false
 }

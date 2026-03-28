@@ -124,14 +124,21 @@ func main() {
 					StddevThreshold: cfg.Analytics.AnomalyDetection.Baseline.StddevThreshold,
 				},
 			)
+			detectorStop := make(chan struct{})
 			go func() {
 				ticker := time.NewTicker(cfg.Analytics.AnomalyDetection.EvaluationInterval)
 				defer ticker.Stop()
-				for range ticker.C {
-					result := detector.Evaluate()
-					alertMgr.ProcessAlerts(result)
+				for {
+					select {
+					case <-detectorStop:
+						return
+					case <-ticker.C:
+						result := detector.Evaluate()
+						alertMgr.ProcessAlerts(result)
+					}
 				}
 			}()
+			defer close(detectorStop)
 			log.Printf("anomaly detection enabled (interval: %s)", cfg.Analytics.AnomalyDetection.EvaluationInterval)
 		}
 		log.Printf("analytics enabled (retention: %dh)", cfg.Analytics.RetentionHours)
