@@ -114,6 +114,17 @@ type ServerConfig struct {
 	ReadTimeout      time.Duration `yaml:"read_timeout"`
 	WriteTimeout     time.Duration `yaml:"write_timeout"`
 	GracefulShutdown time.Duration `yaml:"graceful_shutdown"`
+	CORS             CORSConfig    `yaml:"cors"`
+}
+
+type CORSConfig struct {
+	Enabled          bool     `yaml:"enabled"`
+	AllowedOrigins   []string `yaml:"allowed_origins"`
+	AllowedMethods   []string `yaml:"allowed_methods"`
+	AllowedHeaders   []string `yaml:"allowed_headers"`
+	ExposedHeaders   []string `yaml:"exposed_headers"`
+	AllowCredentials bool     `yaml:"allow_credentials"`
+	MaxAge           int      `yaml:"max_age"`
 }
 
 type ProviderConfig struct {
@@ -309,6 +320,22 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Budgets.Global.WarnAt == 0 {
 		cfg.Budgets.Global.WarnAt = 90
+	}
+
+	// CORS defaults
+	if cfg.Server.CORS.Enabled {
+		if len(cfg.Server.CORS.AllowedOrigins) == 0 {
+			cfg.Server.CORS.AllowedOrigins = []string{"*"}
+		}
+		if len(cfg.Server.CORS.AllowedMethods) == 0 {
+			cfg.Server.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+		}
+		if len(cfg.Server.CORS.AllowedHeaders) == 0 {
+			cfg.Server.CORS.AllowedHeaders = []string{"Authorization", "Content-Type", "X-API-Key"}
+		}
+		if cfg.Server.CORS.MaxAge == 0 {
+			cfg.Server.CORS.MaxAge = 86400
+		}
 	}
 }
 

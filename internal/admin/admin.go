@@ -13,6 +13,7 @@ import (
 
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/aegisflow/aegisflow/internal/middleware"
 	"github.com/aegisflow/aegisflow/internal/provider"
 	"github.com/aegisflow/aegisflow/internal/usage"
 )
@@ -68,6 +69,7 @@ func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Re
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.CORS(s.cfg))
 
 	r.Get("/health", s.healthHandler)
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)

@@ -207,6 +207,7 @@ func main() {
 	// In production, ensure only your reverse proxy (nginx, ALB, etc.) sets these.
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.CORS(cfg))
 	r.Use(middleware.Auth(cfg))
 	r.Use(middleware.RateLimit(limiter))
 	r.Use(middleware.TokenRateLimit(tokenLimiter))
