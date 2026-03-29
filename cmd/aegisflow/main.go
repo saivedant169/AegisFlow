@@ -35,9 +35,17 @@ import (
 	"github.com/aegisflow/aegisflow/internal/webhook"
 )
 
+const version = "v0.3.0"
+
 func main() {
 	configPath := flag.String("config", "configs/aegisflow.yaml", "path to config file")
+	showVersion := flag.Bool("version", false, "print aegisflow version")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	loadEnvFile(".env")
 
