@@ -32,14 +32,21 @@ type Handler struct {
 	store       *storage.PostgresStore
 	dbQueue     chan storage.UsageEvent
 	analytics   *analytics.Collector
+	maxBodySize int64
 	recordSpend func(tenantID, model string, cost float64)
 	budgetCheck func(tenantID, model string) (bool, []string, string)
 }
 
-const dbQueueSize = 1024
+const (
+	dbQueueSize        = 1024
+	defaultMaxBodySize = 10 * 1024 * 1024
+)
 
-func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector, recordSpend func(string, string, float64), budgetCheck func(string, string) (bool, []string, string)) *Handler {
-	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, recordSpend: recordSpend, budgetCheck: budgetCheck}
+func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector, maxBodySize int64, recordSpend func(string, string, float64), budgetCheck func(string, string) (bool, []string, string)) *Handler {
+	if maxBodySize <= 0 {
+		maxBodySize = defaultMaxBodySize
+	}
+	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, maxBodySize: maxBodySize, recordSpend: recordSpend, budgetCheck: budgetCheck}
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
 		go h.dbWorker()
@@ -66,9 +73,8 @@ func (h *Handler) Close() {
 
 func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
-	const maxBodySize = 10 * 1024 * 1024 // 10MB
 	var req types.ChatCompletionRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxBodySize)).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, h.maxBodySize)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 		return
 	}

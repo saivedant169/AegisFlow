@@ -11,30 +11,30 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig    `yaml:"server"`
+	Server    ServerConfig     `yaml:"server"`
 	Providers []ProviderConfig `yaml:"providers"`
-	Routes    []RouteConfig   `yaml:"routes"`
-	Tenants   []TenantConfig  `yaml:"tenants"`
-	RateLimit RateLimitConfig `yaml:"rate_limit"`
-	Policies  PoliciesConfig  `yaml:"policies"`
-	Telemetry TelemetryConfig `yaml:"telemetry"`
-	Logging   LoggingConfig   `yaml:"logging"`
-	Cache     CacheConfig     `yaml:"cache"`
-	Webhook   WebhookConfig   `yaml:"webhook"`
-	Database  DatabaseConfig  `yaml:"database"`
-	Admin     AdminConfig     `yaml:"admin"`
-	Aliases   AliasConfig     `yaml:"aliases"`
-	Transform TransformConfig `yaml:"transform"`
-	Analytics AnalyticsConfig `yaml:"analytics"`
-	Budgets   BudgetsConfig   `yaml:"budgets"`
+	Routes    []RouteConfig    `yaml:"routes"`
+	Tenants   []TenantConfig   `yaml:"tenants"`
+	RateLimit RateLimitConfig  `yaml:"rate_limit"`
+	Policies  PoliciesConfig   `yaml:"policies"`
+	Telemetry TelemetryConfig  `yaml:"telemetry"`
+	Logging   LoggingConfig    `yaml:"logging"`
+	Cache     CacheConfig      `yaml:"cache"`
+	Webhook   WebhookConfig    `yaml:"webhook"`
+	Database  DatabaseConfig   `yaml:"database"`
+	Admin     AdminConfig      `yaml:"admin"`
+	Aliases   AliasConfig      `yaml:"aliases"`
+	Transform TransformConfig  `yaml:"transform"`
+	Analytics AnalyticsConfig  `yaml:"analytics"`
+	Budgets   BudgetsConfig    `yaml:"budgets"`
 }
 
 type CacheConfig struct {
-	Enabled  bool          `yaml:"enabled"`
-	Backend  string        `yaml:"backend"`
-	TTL      time.Duration `yaml:"ttl"`
-	MaxSize  int           `yaml:"max_size"`
-	Redis    RedisConfig   `yaml:"redis"`
+	Enabled bool          `yaml:"enabled"`
+	Backend string        `yaml:"backend"`
+	TTL     time.Duration `yaml:"ttl"`
+	MaxSize int           `yaml:"max_size"`
+	Redis   RedisConfig   `yaml:"redis"`
 }
 
 type WebhookConfig struct {
@@ -114,6 +114,7 @@ type ServerConfig struct {
 	ReadTimeout      time.Duration `yaml:"read_timeout"`
 	WriteTimeout     time.Duration `yaml:"write_timeout"`
 	GracefulShutdown time.Duration `yaml:"graceful_shutdown"`
+	MaxBodySize      int64         `yaml:"max_body_size"`
 	CORS             CORSConfig    `yaml:"cors"`
 }
 
@@ -128,18 +129,18 @@ type CORSConfig struct {
 }
 
 type ProviderConfig struct {
-	Name      string            `yaml:"name"`
-	Type      string            `yaml:"type"`
-	Enabled   bool              `yaml:"enabled"`
-	Default   bool              `yaml:"default"`
-	BaseURL   string            `yaml:"base_url"`
-	APIKeyEnv string            `yaml:"api_key_env"`
-	Models    []string          `yaml:"models"`
-	Timeout   time.Duration     `yaml:"timeout"`
-	MaxRetries int              `yaml:"max_retries"`
-	APIVersion string           `yaml:"api_version"`
-	Config    map[string]string `yaml:"config"`
-	Region    string            `yaml:"region"`
+	Name       string            `yaml:"name"`
+	Type       string            `yaml:"type"`
+	Enabled    bool              `yaml:"enabled"`
+	Default    bool              `yaml:"default"`
+	BaseURL    string            `yaml:"base_url"`
+	APIKeyEnv  string            `yaml:"api_key_env"`
+	Models     []string          `yaml:"models"`
+	Timeout    time.Duration     `yaml:"timeout"`
+	MaxRetries int               `yaml:"max_retries"`
+	APIVersion string            `yaml:"api_version"`
+	Config     map[string]string `yaml:"config"`
+	Region     string            `yaml:"region"`
 }
 
 type RegionConfig struct {

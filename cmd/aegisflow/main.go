@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
-	"bufio"
 	"os"
 	"os/signal"
 	"strings"
@@ -194,7 +194,7 @@ func main() {
 		recordSpendFn = budgetMgr.RecordSpend
 		budgetCheckFn = budgetMgr.CheckFunc()
 	}
-	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, recordSpendFn, budgetCheckFn)
+	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
 
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap
