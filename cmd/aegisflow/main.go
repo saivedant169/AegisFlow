@@ -282,6 +282,9 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
+	// Log initialization summary
+	log.Printf("AegisFlow ready: %d providers, %d routes, %d tenants, %d policies", len(registry.List()), len(cfg.Routes), len(cfg.Tenants), len(cfg.Policies.Input)+len(cfg.Policies.Output))
+
 	// Start servers
 	go func() {
 		log.Printf("AegisFlow gateway listening on %s", gatewayAddr)
