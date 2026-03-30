@@ -28,6 +28,31 @@ func main() {
 	gatewayURL := getEnv("AEGISFLOW_GATEWAY_URL", defaultGatewayURL)
 
 	switch os.Args[1] {
+	case "plugin":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl plugin <search|info|install|list|remove> [args]")
+			os.Exit(1)
+		}
+		var err error
+		switch os.Args[2] {
+		case "search":
+			err = pluginSearch(os.Args[3:])
+		case "info":
+			err = pluginInfo(os.Args[3:])
+		case "install":
+			err = pluginInstall(os.Args[3:])
+		case "list":
+			err = pluginList(os.Args[3:])
+		case "remove":
+			err = pluginRemove(os.Args[3:])
+		default:
+			fmt.Printf("Unknown plugin command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "status":
 		cmdStatus(gatewayURL, adminURL)
 	case "usage":
@@ -65,6 +90,7 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
+  plugin      Manage WASM plugins (search, info, install, list, remove)
   status      Check gateway and admin health
   usage       Show usage per tenant and model
   models      List available models
