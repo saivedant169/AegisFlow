@@ -18,6 +18,7 @@ import (
 
 	"github.com/aegisflow/aegisflow/internal/admin"
 	"github.com/aegisflow/aegisflow/internal/analytics"
+	"github.com/aegisflow/aegisflow/internal/audit"
 	"github.com/aegisflow/aegisflow/internal/budget"
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
@@ -256,6 +257,36 @@ func main() {
 		log.Printf("rollout manager started")
 	}
 
+	// Audit logger
+	var auditLogger *audit.Logger
+	if pgStore != nil {
+		auditStore := audit.NewPostgresStore(pgStore.DB())
+		var err error
+		auditLogger, err = audit.NewLogger(auditStore)
+		if err != nil {
+			log.Printf("audit logger init failed: %v", err)
+		} else {
+			defer auditLogger.Stop()
+			log.Printf("audit logger enabled")
+		}
+	} else {
+		memStore := audit.NewMemoryStore()
+		var err error
+		auditLogger, err = audit.NewLogger(memStore)
+		if err != nil {
+			log.Printf("audit logger init failed: %v", err)
+		} else {
+			defer auditLogger.Stop()
+			log.Printf("audit logger enabled (in-memory)")
+		}
+	}
+
+	// Audit admin adapter
+	var auditAdapter admin.AuditProvider
+	if auditLogger != nil {
+		auditAdapter = audit.NewAdminAdapter(auditLogger)
+	}
+
 	// Analytics admin adapter
 	var analyticsAdapter admin.AnalyticsProvider
 	if analyticsCollector != nil && alertMgr != nil {
@@ -263,7 +294,7 @@ func main() {
 	}
 
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

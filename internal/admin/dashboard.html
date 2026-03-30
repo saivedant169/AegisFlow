@@ -302,6 +302,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       Budgets
     </div>
+    <div class="nav-item" data-page="audit" onclick="switchPage('audit')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Audit Log
+    </div>
     <div class="nav-section">Configuration</div>
     <div class="nav-item" data-page="providers" onclick="switchPage('providers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/></svg>
@@ -851,6 +855,41 @@
     </div>
   </div>
 
+  <!-- PAGE: Audit Log -->
+  <div class="page" id="page-audit" style="display:none;">
+    <div class="topbar">
+      <h2>Audit Log</h2>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button onclick="verifyAudit()" style="background:var(--gradient-purple); color:white; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Verify Integrity
+        </button>
+        <div class="refresh-info">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Auto-refresh 5s
+        </div>
+      </div>
+    </div>
+    <div id="auditVerifyResult" style="display:none; margin-bottom:16px; padding:12px 16px; border-radius:8px; font-size:13px;"></div>
+    <div class="stat-card" style="overflow-x:auto;">
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Actor</th>
+            <th>Role</th>
+            <th>Action</th>
+            <th>Resource</th>
+            <th>Tenant</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-secondary); padding:40px;">No audit entries</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <script>
@@ -1065,6 +1104,7 @@ function switchPage(page) {
   if (page === 'analytics') fetchAnalytics();
   if (page === 'alerts') fetchAlerts();
   if (page === 'budgets') fetchBudgets();
+  if (page === 'audit') fetchAudit();
 }
 
 async function fetchPolicies() {
@@ -1676,6 +1716,71 @@ async function fetchBudgets() {
 setInterval(() => {
   const budgetsPage = document.getElementById('page-budgets');
   if (budgetsPage && budgetsPage.style.display !== 'none') fetchBudgets();
+}, 5000);
+
+// --- Audit Log ---
+async function fetchAudit() {
+  try {
+    const resp = await fetch('/admin/v1/audit');
+    const data = await resp.json();
+    const tbody = document.getElementById('auditTableBody');
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary); padding:40px;">No audit entries</td></tr>';
+      return;
+    }
+    const roleBadge = (role) => {
+      const colors = { admin: 'var(--accent-red)', operator: 'var(--accent-orange)', viewer: 'var(--accent-blue)', system: 'var(--accent-purple)' };
+      const color = colors[role] || 'var(--text-muted)';
+      return '<span style="background:' + color + '22; color:' + color + '; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500;">' + (role || '-') + '</span>';
+    };
+    tbody.innerHTML = data.slice(-100).reverse().map(e => {
+      const ts = new Date(e.timestamp).toLocaleString();
+      return '<tr>' +
+        '<td style="font-family:JetBrains Mono,monospace; font-size:12px;">' + ts + '</td>' +
+        '<td>' + (e.actor || '-') + '</td>' +
+        '<td>' + roleBadge(e.actor_role) + '</td>' +
+        '<td><span style="font-weight:500;">' + (e.action || '-') + '</span></td>' +
+        '<td style="font-family:JetBrains Mono,monospace; font-size:12px;">' + (e.resource || '-') + '</td>' +
+        '<td>' + (e.tenant_id || '-') + '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (err) {
+    console.error('Failed to fetch audit log', err);
+  }
+}
+
+async function verifyAudit() {
+  const resultDiv = document.getElementById('auditVerifyResult');
+  resultDiv.style.display = 'block';
+  resultDiv.style.background = 'var(--bg-elevated)';
+  resultDiv.style.border = '1px solid var(--border)';
+  resultDiv.textContent = 'Verifying audit log integrity...';
+  try {
+    const resp = await fetch('/admin/v1/audit/verify', { method: 'POST' });
+    const data = await resp.json();
+    if (data.valid) {
+      resultDiv.style.background = 'rgba(63, 185, 80, 0.1)';
+      resultDiv.style.border = '1px solid rgba(63, 185, 80, 0.3)';
+      resultDiv.style.color = 'var(--accent-green)';
+      resultDiv.textContent = data.message + (data.total_entries ? ' (' + data.total_entries + ' entries)' : '');
+    } else {
+      resultDiv.style.background = 'rgba(248, 81, 73, 0.1)';
+      resultDiv.style.border = '1px solid rgba(248, 81, 73, 0.3)';
+      resultDiv.style.color = 'var(--accent-red)';
+      resultDiv.textContent = 'INTEGRITY FAILURE: ' + data.message;
+    }
+  } catch (err) {
+    resultDiv.style.background = 'rgba(248, 81, 73, 0.1)';
+    resultDiv.style.border = '1px solid rgba(248, 81, 73, 0.3)';
+    resultDiv.style.color = 'var(--accent-red)';
+    resultDiv.textContent = 'Verification failed: ' + err.message;
+  }
+}
+
+// Auto-refresh audit when on audit page
+setInterval(() => {
+  const auditPage = document.getElementById('page-audit');
+  if (auditPage && auditPage.style.display !== 'none') fetchAudit();
 }, 5000);
 
 async function fetchOverviewStatus() {

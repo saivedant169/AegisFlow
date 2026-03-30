@@ -36,6 +36,14 @@ type BudgetProvider interface {
 	ForecastAll() interface{}
 }
 
+// AuditProvider is the interface consumed by the admin API to avoid an import
+// cycle with the audit package. Use audit.NewAdminAdapter to wrap a
+// *audit.Logger so it satisfies this interface.
+type AuditProvider interface {
+	Query(actor, action, tenantID string, limit int) (interface{}, error)
+	Verify() (interface{}, error)
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -60,10 +68,11 @@ type Server struct {
 	rolloutMgr         RolloutManager
 	analyticsProvider  AnalyticsProvider
 	budgetProvider     BudgetProvider
+	auditProvider      AuditProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup}
 }
 
 func (s *Server) Router() http.Handler {
@@ -94,6 +103,7 @@ func (s *Server) Router() http.Handler {
 		r.Get("/admin/v1/budgets", s.budgetsHandler)
 		r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 		r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
+		r.Get("/admin/v1/audit", s.auditHandler)
 		r.Get("/admin/v1/whoami", s.whoamiHandler)
 	})
 
@@ -105,6 +115,12 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
 		r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
 		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+	})
+
+	// Admin — audit integrity verification
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RBAC("admin"))
+		r.Post("/admin/v1/audit/verify", s.auditVerifyHandler)
 	})
 
 	return r
@@ -453,6 +469,46 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "alert not found"})
 	}
+}
+
+// --- Audit handlers ---
+
+func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
+	if s.auditProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+	actor := r.URL.Query().Get("actor")
+	action := r.URL.Query().Get("action")
+	tenantID := r.URL.Query().Get("tenant_id")
+	limit := 100 // default
+	result, err := s.auditProvider.Query(actor, action, tenantID, limit)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) auditVerifyHandler(w http.ResponseWriter, r *http.Request) {
+	if s.auditProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"valid": true, "message": "audit not configured"})
+		return
+	}
+	result, err := s.auditProvider.Verify()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // --- Whoami handler ---
