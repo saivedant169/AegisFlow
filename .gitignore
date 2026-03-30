@@ -45,3 +45,6 @@ DEVTO_ARTICLE.md
 
 # Example WASM build artifacts
 examples/wasm-plugin/plugin.wasm
+# Internal docs
+docs/specs/
+docs/plans/
