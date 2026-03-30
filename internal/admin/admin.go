@@ -70,35 +70,42 @@ func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS(s.cfg))
+	r.Use(middleware.SoftAuth(s.cfg))
 
+	// Public — no auth required
 	r.Get("/health", s.healthHandler)
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
-	r.Get("/admin/v1/usage", s.usageHandler)
-	r.Get("/admin/v1/providers", s.providersHandler)
-	r.Get("/admin/v1/tenants", s.tenantsHandler)
-	r.Get("/admin/v1/policies", s.policiesHandler)
-	r.Get("/admin/v1/requests", s.requestLog.ServeHTTP)
-	r.Get("/admin/v1/violations", s.violationsHandler)
-	r.Get("/admin/v1/cache", s.cacheHandler)
 	r.Get("/dashboard", s.dashboardHandler)
 	r.Get("/", s.dashboardHandler)
 
-	// Analytics and alerts endpoints
-	r.Get("/admin/v1/analytics", s.analyticsHandler)
-	r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
-	r.Get("/admin/v1/alerts", s.alertsHandler)
-	r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+	// Viewer — read-only access
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RBAC("viewer"))
+		r.Get("/admin/v1/usage", s.usageHandler)
+		r.Get("/admin/v1/providers", s.providersHandler)
+		r.Get("/admin/v1/tenants", s.tenantsHandler)
+		r.Get("/admin/v1/policies", s.policiesHandler)
+		r.Get("/admin/v1/requests", s.requestLog.ServeHTTP)
+		r.Get("/admin/v1/violations", s.violationsHandler)
+		r.Get("/admin/v1/cache", s.cacheHandler)
+		r.Get("/admin/v1/analytics", s.analyticsHandler)
+		r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
+		r.Get("/admin/v1/alerts", s.alertsHandler)
+		r.Get("/admin/v1/budgets", s.budgetsHandler)
+		r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
+		r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
+		r.Get("/admin/v1/whoami", s.whoamiHandler)
+	})
 
-	// Budget endpoints
-	r.Get("/admin/v1/budgets", s.budgetsHandler)
-
-	// Rollout management endpoints
-	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
-	r.Post("/admin/v1/rollouts", s.rolloutsCreateHandler)
-	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
-	r.Post("/admin/v1/rollouts/{id}/pause", s.rolloutPauseHandler)
-	r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
-	r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
+	// Operator — state changes
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RBAC("operator"))
+		r.Post("/admin/v1/rollouts", s.rolloutsCreateHandler)
+		r.Post("/admin/v1/rollouts/{id}/pause", s.rolloutPauseHandler)
+		r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
+		r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
+		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+	})
 
 	return r
 }
@@ -446,4 +453,18 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "alert not found"})
 	}
+}
+
+// --- Whoami handler ---
+
+func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
+	role := middleware.RoleFromContext(r.Context())
+	tenant := middleware.TenantFromContext(r.Context())
+	resp := map[string]string{"role": role}
+	if tenant != nil {
+		resp["tenant_id"] = tenant.ID
+		resp["tenant_name"] = tenant.Name
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }

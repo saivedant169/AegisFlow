@@ -57,6 +57,32 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 	}
 }
 
+// SoftAuth is like Auth but doesn't reject missing API keys.
+// If a key is present and valid, it sets tenant+role in context.
+// If no key is present, the request continues without context (RBAC will handle the 403).
+func SoftAuth(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			apiKey := extractAPIKey(r)
+			if apiKey == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			match := cfg.FindTenantByAPIKey(apiKey)
+			if match == nil {
+				// Invalid key — still proceed but without context
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), TenantContextKey, match.Tenant)
+			ctx = context.WithValue(ctx, RoleContextKey, match.Role)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func extractAPIKey(r *http.Request) string {
 	if key := r.Header.Get("X-API-Key"); key != "" {
 		return key
