@@ -69,12 +69,15 @@ routes:
 
 # Tenant definitions
 # Each tenant has API keys and rate limits.
+# API keys can be plain strings (backward-compatible, defaults to "viewer" role)
+# or objects with "key" and "role" fields. Supported roles: admin, operator, viewer.
 tenants:
   - id: "default"
     name: "Default Tenant"
     api_keys:
-      - "aegis-test-default-001"
-      - "aegis-test-default-002"
+      - key: "aegis-test-default-001"
+        role: "admin"            # Structured key with explicit role
+      - "aegis-test-default-002" # Plain string key (defaults to "viewer")
     rate_limit:
       requests_per_minute: 60
       tokens_per_minute: 100000
@@ -84,7 +87,8 @@ tenants:
   - id: "premium"
     name: "Premium Tenant"
     api_keys:
-      - "aegis-test-premium-001"
+      - key: "aegis-test-premium-001"
+        role: "operator"
     rate_limit:
       requests_per_minute: 300
       tokens_per_minute: 500000
