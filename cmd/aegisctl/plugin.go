@@ -165,6 +165,11 @@ func pluginInstall(args []string) error {
 		return fmt.Errorf("creating plugins dir: %w", err)
 	}
 
+	// Validate download URL is HTTPS
+	if !strings.HasPrefix(plugin.URL, "https://") {
+		return fmt.Errorf("refusing to download from non-HTTPS URL: %s", plugin.URL)
+	}
+
 	// Download
 	fmt.Printf("Downloading %s v%s...\n", plugin.Name, plugin.Version)
 	dlClient := &http.Client{Timeout: 60 * time.Second}
@@ -174,7 +179,8 @@ func pluginInstall(args []string) error {
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
+	const maxPluginSize = 50 * 1024 * 1024 // 50MB max plugin size
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPluginSize))
 	if err != nil {
 		return fmt.Errorf("reading plugin data: %w", err)
 	}

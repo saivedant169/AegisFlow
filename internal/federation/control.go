@@ -1,7 +1,9 @@
 package federation
 
 import (
+	"crypto/subtle"
 	"encoding/json"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -10,6 +12,8 @@ import (
 
 	"github.com/aegisflow/aegisflow/internal/config"
 )
+
+const maxFederationBodySize = 1024 * 1024 // 1MB
 
 // PlaneStatus tracks the health and metrics of a data plane.
 type PlaneStatus struct {
@@ -71,7 +75,7 @@ func (cp *ControlPlane) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var status PlaneStatus
-	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxFederationBodySize)).Decode(&status); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -103,8 +107,12 @@ func (cp *ControlPlane) validateToken(r *http.Request) bool {
 	if len(token) > 7 && token[:7] == "Bearer " {
 		token = token[7:]
 	}
+	if token == "" {
+		return false
+	}
+	// Constant-time comparison to prevent timing attacks
 	for _, t := range cp.tokens {
-		if t != "" && t == token {
+		if t != "" && subtle.ConstantTimeCompare([]byte(t), []byte(token)) == 1 {
 			return true
 		}
 	}

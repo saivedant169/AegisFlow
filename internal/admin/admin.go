@@ -120,7 +120,9 @@ func (s *Server) Router() http.Handler {
 		r.Get("/admin/v1/budgets", s.budgetsHandler)
 		r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 		r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
-		r.Get("/admin/v1/audit", s.auditHandler)
+		// Audit is in viewer group for metadata, but detail field may contain
+		// partial prompts — moved to operator group below for access control
+		// r.Get("/admin/v1/audit", s.auditHandler)
 		r.Get("/admin/v1/whoami", s.whoamiHandler)
 		if s.federationProvider != nil {
 			r.Get("/admin/v1/federation/planes", s.federationProvider.PlanesHandler)
@@ -135,6 +137,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
 		r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
 		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+		r.Get("/admin/v1/audit", s.auditHandler)
 	})
 
 	// Admin — audit integrity verification
