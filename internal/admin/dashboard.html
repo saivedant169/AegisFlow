@@ -315,6 +315,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
       Tenants
     </div>
+    <div class="nav-item" data-page="federation" onclick="switchPage('federation')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/></svg>
+      Federation
+    </div>
   </div>
   <div class="sidebar-footer">
     <div class="status-row">
@@ -890,6 +894,33 @@
     </div>
   </div>
 
+  <!-- PAGE: Federation -->
+  <div class="page" id="page-federation" style="display:none;">
+    <div class="topbar">
+      <h2>Federation</h2>
+      <div class="refresh-info">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/></svg>
+        Auto-refresh 5s
+      </div>
+    </div>
+    <div class="stat-card" style="overflow-x:auto;">
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Health</th>
+            <th>Last Seen</th>
+            <th>Requests</th>
+            <th>Error Rate</th>
+          </tr>
+        </thead>
+        <tbody id="federationTableBody">
+          <tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding:40px;">No data planes registered</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <script>
@@ -1105,6 +1136,7 @@ function switchPage(page) {
   if (page === 'alerts') fetchAlerts();
   if (page === 'budgets') fetchBudgets();
   if (page === 'audit') fetchAudit();
+  if (page === 'federation') fetchFederation();
 }
 
 async function fetchPolicies() {
@@ -1864,6 +1896,38 @@ async function fetchOverviewStatus() {
     }
   } catch (e) {}
 }
+
+async function fetchFederation() {
+  try {
+    const resp = await fetch('/admin/v1/federation/planes');
+    const planes = await resp.json();
+    const tbody = document.getElementById('federationTableBody');
+    if (!planes || planes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding:40px;">No data planes registered</td></tr>';
+      return;
+    }
+    tbody.innerHTML = planes.map(p => {
+      const healthDot = p.healthy
+        ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-green);margin-right:6px;"></span>Healthy'
+        : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-red);margin-right:6px;"></span>Unhealthy';
+      const lastSeen = p.last_seen ? new Date(p.last_seen).toLocaleString() : '--';
+      const errRate = p.error_rate !== undefined ? (p.error_rate).toFixed(2) + '%' : '--';
+      return `<tr>
+        <td style="font-weight:500;">${p.name || '--'}</td>
+        <td>${healthDot}</td>
+        <td>${lastSeen}</td>
+        <td>${p.requests != null ? p.requests.toLocaleString() : '0'}</td>
+        <td>${errRate}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
+// Auto-refresh federation page every 5s
+setInterval(() => {
+  const fedPage = document.getElementById('page-federation');
+  if (fedPage && fedPage.style.display !== 'none') fetchFederation();
+}, 5000);
 
 initCharts();
 fetchUsage();

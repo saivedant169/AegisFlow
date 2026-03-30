@@ -23,6 +23,7 @@ import (
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
 	"github.com/aegisflow/aegisflow/internal/eval"
+	"github.com/aegisflow/aegisflow/internal/federation"
 	"github.com/aegisflow/aegisflow/internal/gateway"
 	"github.com/aegisflow/aegisflow/internal/logger"
 	"github.com/aegisflow/aegisflow/internal/middleware"
@@ -308,8 +309,23 @@ func main() {
 		analyticsAdapter = analytics.NewAdminAdapter(analyticsCollector, alertMgr)
 	}
 
+	// Federation
+	var federationProvider admin.FederationProvider
+	if cfg.Federation.Enabled {
+		if cfg.Federation.Mode == "control-plane" {
+			cp := federation.NewControlPlane(cfg)
+			federationProvider = cp
+			log.Printf("federation control plane enabled (%d data planes)", len(cfg.Federation.DataPlanes))
+		} else if cfg.Federation.Mode == "data-plane" {
+			dp := federation.NewDataPlane(cfg.Federation.ControlPlane.URL, cfg.Federation.ControlPlane.Token, cfg.Federation.ControlPlane.SyncInterval)
+			dp.Start()
+			defer dp.Stop()
+			log.Printf("federation data plane enabled (control: %s)", cfg.Federation.ControlPlane.URL)
+		}
+	}
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

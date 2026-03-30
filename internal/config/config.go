@@ -27,7 +27,27 @@ type Config struct {
 	Transform TransformConfig  `yaml:"transform"`
 	Analytics AnalyticsConfig  `yaml:"analytics"`
 	Budgets   BudgetsConfig    `yaml:"budgets"`
-	Eval      EvalConfig       `yaml:"eval"`
+	Eval       EvalConfig       `yaml:"eval"`
+	Federation FederationConfig `yaml:"federation"`
+}
+
+type FederationConfig struct {
+	Enabled      bool              `yaml:"enabled"`
+	Mode         string            `yaml:"mode"` // "control-plane" or "data-plane"
+	DataPlanes   []DataPlaneConfig `yaml:"data_planes"`
+	ControlPlane ControlPlaneRef   `yaml:"control_plane"`
+}
+
+type DataPlaneConfig struct {
+	Name  string `yaml:"name"`
+	URL   string `yaml:"url"`
+	Token string `yaml:"token"`
+}
+
+type ControlPlaneRef struct {
+	URL          string        `yaml:"url"`
+	Token        string        `yaml:"token"`
+	SyncInterval time.Duration `yaml:"sync_interval"`
 }
 
 type EvalConfig struct {
@@ -382,6 +402,11 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Eval.Webhook.Timeout == 0 {
 		cfg.Eval.Webhook.Timeout = 5 * time.Second
+	}
+
+	// Federation defaults
+	if cfg.Federation.ControlPlane.SyncInterval == 0 {
+		cfg.Federation.ControlPlane.SyncInterval = 30 * time.Second
 	}
 
 	// CORS defaults

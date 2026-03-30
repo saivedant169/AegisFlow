@@ -44,6 +44,15 @@ type AuditProvider interface {
 	Verify() (interface{}, error)
 }
 
+// FederationProvider is the interface consumed by the admin API to avoid an
+// import cycle with the federation package.
+type FederationProvider interface {
+	ConfigHandler(w http.ResponseWriter, r *http.Request)
+	MetricsHandler(w http.ResponseWriter, r *http.Request)
+	StatusHandler(w http.ResponseWriter, r *http.Request)
+	PlanesHandler(w http.ResponseWriter, r *http.Request)
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -69,10 +78,11 @@ type Server struct {
 	analyticsProvider  AnalyticsProvider
 	budgetProvider     BudgetProvider
 	auditProvider      AuditProvider
+	federationProvider FederationProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp}
 }
 
 func (s *Server) Router() http.Handler {
@@ -86,6 +96,13 @@ func (s *Server) Router() http.Handler {
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 	r.Get("/dashboard", s.dashboardHandler)
 	r.Get("/", s.dashboardHandler)
+
+	// Federation endpoints (own token auth, outside RBAC groups)
+	if s.federationProvider != nil {
+		r.Get("/admin/v1/federation/config", s.federationProvider.ConfigHandler)
+		r.Post("/admin/v1/federation/metrics", s.federationProvider.MetricsHandler)
+		r.Post("/admin/v1/federation/status", s.federationProvider.StatusHandler)
+	}
 
 	// Viewer — read-only access
 	r.Group(func(r chi.Router) {
@@ -105,6 +122,9 @@ func (s *Server) Router() http.Handler {
 		r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
 		r.Get("/admin/v1/audit", s.auditHandler)
 		r.Get("/admin/v1/whoami", s.whoamiHandler)
+		if s.federationProvider != nil {
+			r.Get("/admin/v1/federation/planes", s.federationProvider.PlanesHandler)
+		}
 	})
 
 	// Operator — state changes
