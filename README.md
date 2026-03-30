@@ -563,12 +563,12 @@ Every request produces a trace span with:
 - [x] Multi-region routing with per-region strategy and cross-region fallback
 - [x] Kubernetes operator with CRDs and status reporting
 
-### Phase 4
-- [ ] Multi-cluster federation
-- [ ] Enterprise RBAC
-- [ ] Audit logging with tamper-proof storage
-- [ ] Marketplace for community plugins
-- [ ] AI evaluation hooks (quality scoring)
+### Phase 4 (complete)
+- [x] Enterprise RBAC (3 roles per API key, backward-compatible config)
+- [x] Audit logging with SHA-256 hash chain and tamper detection
+- [x] AI evaluation hooks (built-in quality scoring + webhook sampling)
+- [x] Plugin marketplace (aegisctl CLI with registry, SHA-256 verification)
+- [x] Multi-cluster federation (control plane + data plane architecture)
 
 ---
 

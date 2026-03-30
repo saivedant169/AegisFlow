@@ -2,6 +2,54 @@
 
 All notable changes to AegisFlow will be documented in this file.
 
+## [0.4.0] - 2026-03-30
+
+### Added — Phase 4: Advanced Governance & Marketplace
+
+#### Enterprise RBAC (4A)
+- Three roles per API key: admin, operator, viewer with hierarchy enforcement
+- Custom YAML unmarshalling for backward compatibility (plain strings default to operator)
+- SoftAuth middleware for admin server (doesn't reject missing keys)
+- /admin/v1/whoami endpoint returns current role and tenant
+- RBAC middleware with per-route groups (viewer/operator/admin)
+- admin_auth.go removed — RBAC replaces it entirely
+
+#### Audit Logging (4B)
+- Append-only PostgreSQL table with SHA-256 hash chain
+- Buffered channel writer for serialized hash computation
+- In-memory store fallback when PostgreSQL is disabled
+- /admin/v1/audit endpoint for querying with filters (operator role required)
+- /admin/v1/audit/verify endpoint for integrity verification (admin role required)
+- Audit Log dashboard page with verify button
+
+#### AI Evaluation Hooks (4C)
+- Built-in quality scorer: empty response (0), truncated (-30), too short (-20), latency degradation (-10)
+- Webhook evaluator with configurable sampling rate and content truncation
+- QualityScore field added to analytics DataPoint
+- Wired into gateway handler after every response
+
+#### Plugin Marketplace (4D)
+- aegisctl plugin subcommand: search, info, install, list, remove
+- JSON registry format hosted on GitHub
+- SHA-256 verification on download
+- Separate plugins.yaml (never touches main config)
+- HTTPS-only download enforcement
+
+#### Multi-Cluster Federation (4E)
+- Control plane serves stripped config (API keys removed) to data planes
+- Data planes poll config and push metrics/status on configurable interval
+- Bearer token authentication between planes
+- Federation dashboard page showing data plane health
+- Graceful degradation when control plane is down
+
+### Security
+- Timing-safe federation token comparison (subtle.ConstantTimeCompare)
+- Body size limit on federation status endpoint (1MB)
+- Audit endpoint moved from viewer to operator RBAC group (prevents prompt leakage)
+- Unicode-safe content truncation in eval webhook
+- HTTPS-only enforcement for plugin downloads
+- Plugin download size limit (50MB)
+
 ## [0.3.0] - 2026-03-27
 
 ### Added — Phase 3: Enterprise Capabilities

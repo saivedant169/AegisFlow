@@ -38,7 +38,7 @@ import (
 	"github.com/aegisflow/aegisflow/internal/webhook"
 )
 
-const version = "v0.3.0"
+const version = "v0.4.0"
 
 func main() {
 	configPath := flag.String("config", "configs/aegisflow.yaml", "path to config file")
