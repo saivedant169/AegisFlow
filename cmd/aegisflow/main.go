@@ -22,6 +22,7 @@ import (
 	"github.com/aegisflow/aegisflow/internal/budget"
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/aegisflow/aegisflow/internal/eval"
 	"github.com/aegisflow/aegisflow/internal/gateway"
 	"github.com/aegisflow/aegisflow/internal/logger"
 	"github.com/aegisflow/aegisflow/internal/middleware"
@@ -196,6 +197,20 @@ func main() {
 		budgetCheckFn = budgetMgr.CheckFunc()
 	}
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
+
+	// Eval hooks
+	if cfg.Eval.Enabled {
+		var webhookEval *eval.WebhookEvaluator
+		if cfg.Eval.Webhook.URL != "" {
+			webhookEval = eval.NewWebhookEvaluator(
+				cfg.Eval.Webhook.URL, cfg.Eval.Webhook.SampleRate,
+				cfg.Eval.Webhook.Timeout, cfg.Eval.Webhook.SendFullContent,
+			)
+		}
+		handler.SetEval(cfg.Eval.Builtin.Enabled, cfg.Eval.Builtin.MinResponseTokens,
+			cfg.Eval.Builtin.LatencyMultiplier, webhookEval)
+		log.Printf("eval hooks enabled (builtin: %v, webhook: %v)", cfg.Eval.Builtin.Enabled, cfg.Eval.Webhook.URL != "")
+	}
 
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap

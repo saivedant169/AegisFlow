@@ -12,6 +12,7 @@ import (
 
 	"github.com/aegisflow/aegisflow/internal/analytics"
 	"github.com/aegisflow/aegisflow/internal/cache"
+	"github.com/aegisflow/aegisflow/internal/eval"
 	"github.com/aegisflow/aegisflow/internal/middleware"
 	"github.com/aegisflow/aegisflow/internal/policy"
 	"github.com/aegisflow/aegisflow/internal/provider"
@@ -32,9 +33,13 @@ type Handler struct {
 	store       *storage.PostgresStore
 	dbQueue     chan storage.UsageEvent
 	analytics   *analytics.Collector
-	maxBodySize int64
-	recordSpend func(tenantID, model string, cost float64)
-	budgetCheck func(tenantID, model string) (bool, []string, string)
+	maxBodySize    int64
+	recordSpend    func(tenantID, model string, cost float64)
+	budgetCheck    func(tenantID, model string) (bool, []string, string)
+	evalBuiltin    bool
+	evalMinTokens  int
+	evalLatencyMul float64
+	evalWebhook    *eval.WebhookEvaluator
 }
 
 const (
@@ -69,6 +74,14 @@ func (h *Handler) Close() {
 	if h.dbQueue != nil {
 		close(h.dbQueue)
 	}
+}
+
+// SetEval configures the quality evaluation hooks on the handler.
+func (h *Handler) SetEval(builtinEnabled bool, minTokens int, latencyMul float64, webhook *eval.WebhookEvaluator) {
+	h.evalBuiltin = builtinEnabled
+	h.evalMinTokens = minTokens
+	h.evalLatencyMul = latencyMul
+	h.evalWebhook = webhook
 }
 
 func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
@@ -190,8 +203,32 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		h.recordSpend(tenantID, req.Model, float64(resp.Usage.TotalTokens)*0.00001)
 	}
 
+	// Quality evaluation
+	var qualityScore int
+	if h.evalBuiltin {
+		evalResult := eval.ScoreResponse(resp, time.Since(startTime).Milliseconds(), 0, h.evalMinTokens, h.evalLatencyMul)
+		qualityScore = evalResult.Score
+	}
+
+	if h.evalWebhook != nil && h.evalWebhook.ShouldEvaluate() {
+		prompt := ""
+		if len(req.Messages) > 0 {
+			prompt = req.Messages[len(req.Messages)-1].Content
+		}
+		response := ""
+		if len(resp.Choices) > 0 {
+			response = resp.Choices[0].Message.Content
+		}
+		h.evalWebhook.Evaluate(eval.WebhookRequest{
+			Model: req.Model, Provider: providerName,
+			Prompt: prompt, Response: response,
+			LatencyMs:    time.Since(startTime).Milliseconds(),
+			BuiltinScore: qualityScore,
+		})
+	}
+
 	// Record analytics data point
-	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens))
+	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens), qualityScore)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-AegisFlow-Cache", "MISS")
@@ -276,11 +313,11 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCode int, startTime time.Time, tokens int64) {
+func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCode int, startTime time.Time, tokens int64, qualityScore ...int) {
 	if h.analytics == nil {
 		return
 	}
-	h.analytics.Record(analytics.DataPoint{
+	dp := analytics.DataPoint{
 		TenantID:   tenantID,
 		Model:      model,
 		Provider:   providerName,
@@ -288,7 +325,11 @@ func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCo
 		LatencyMs:  time.Since(startTime).Milliseconds(),
 		Tokens:     tokens,
 		Timestamp:  time.Now(),
-	})
+	}
+	if len(qualityScore) > 0 {
+		dp.QualityScore = qualityScore[0]
+	}
+	h.analytics.Record(dp)
 }
 
 func (h *Handler) fireWebhook(eventType, policyName, action, tenantID, model, message string) {

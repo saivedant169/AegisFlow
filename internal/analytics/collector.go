@@ -16,6 +16,7 @@ type DataPoint struct {
 	LatencyMs     int64
 	Tokens        int64
 	EstimatedCost float64
+	QualityScore  int
 	Timestamp     time.Time
 }
 
