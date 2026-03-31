@@ -40,6 +40,12 @@ type Handler struct {
 	evalMinTokens  int
 	evalLatencyMul float64
 	evalWebhook    *eval.WebhookEvaluator
+	auditLog       func(actor, actorRole, action, resource, detail, tenantID, model string)
+}
+
+// SetAuditLogger sets the audit logging function on the handler.
+func (h *Handler) SetAuditLogger(logFn func(actor, actorRole, action, resource, detail, tenantID, model string)) {
+	h.auditLog = logFn
 }
 
 const (
@@ -126,6 +132,13 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, "", http.StatusForbidden, startTime, 0)
+				if h.auditLog != nil {
+					prompt := inputContent
+					if len(prompt) > 200 {
+						prompt = prompt[:200]
+					}
+					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, `{"message":"`+v.Message+`","prompt":"`+prompt+`"}`, tenantID, req.Model)
+				}
 				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
@@ -166,6 +179,9 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
+				if h.auditLog != nil {
+					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, `{"message":"`+v.Message+`","phase":"output"}`, tenantID, req.Model)
+				}
 				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
