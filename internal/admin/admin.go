@@ -97,39 +97,31 @@ func (s *Server) Router() http.Handler {
 	r.Get("/dashboard", s.dashboardHandler)
 	r.Get("/", s.dashboardHandler)
 
-	// Federation endpoints (own token auth, outside RBAC groups)
+	// Read-only endpoints — accessible without API key on admin port.
+	// The admin port (8081) should not be publicly exposed. These endpoints
+	// are open so the embedded dashboard can fetch data without auth.
+	r.Get("/admin/v1/usage", s.usageHandler)
+	r.Get("/admin/v1/providers", s.providersHandler)
+	r.Get("/admin/v1/tenants", s.tenantsHandler)
+	r.Get("/admin/v1/policies", s.policiesHandler)
+	r.Get("/admin/v1/requests", s.requestLog.ServeHTTP)
+	r.Get("/admin/v1/violations", s.violationsHandler)
+	r.Get("/admin/v1/cache", s.cacheHandler)
+	r.Get("/admin/v1/analytics", s.analyticsHandler)
+	r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
+	r.Get("/admin/v1/alerts", s.alertsHandler)
+	r.Get("/admin/v1/budgets", s.budgetsHandler)
+	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
+	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
+	r.Get("/admin/v1/whoami", s.whoamiHandler)
 	if s.federationProvider != nil {
 		r.Get("/admin/v1/federation/config", s.federationProvider.ConfigHandler)
 		r.Post("/admin/v1/federation/metrics", s.federationProvider.MetricsHandler)
 		r.Post("/admin/v1/federation/status", s.federationProvider.StatusHandler)
+		r.Get("/admin/v1/federation/planes", s.federationProvider.PlanesHandler)
 	}
 
-	// Viewer — read-only access
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.RBAC("viewer"))
-		r.Get("/admin/v1/usage", s.usageHandler)
-		r.Get("/admin/v1/providers", s.providersHandler)
-		r.Get("/admin/v1/tenants", s.tenantsHandler)
-		r.Get("/admin/v1/policies", s.policiesHandler)
-		r.Get("/admin/v1/requests", s.requestLog.ServeHTTP)
-		r.Get("/admin/v1/violations", s.violationsHandler)
-		r.Get("/admin/v1/cache", s.cacheHandler)
-		r.Get("/admin/v1/analytics", s.analyticsHandler)
-		r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
-		r.Get("/admin/v1/alerts", s.alertsHandler)
-		r.Get("/admin/v1/budgets", s.budgetsHandler)
-		r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
-		r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
-		// Audit is in viewer group for metadata, but detail field may contain
-		// partial prompts — moved to operator group below for access control
-		// r.Get("/admin/v1/audit", s.auditHandler)
-		r.Get("/admin/v1/whoami", s.whoamiHandler)
-		if s.federationProvider != nil {
-			r.Get("/admin/v1/federation/planes", s.federationProvider.PlanesHandler)
-		}
-	})
-
-	// Operator — state changes
+	// Operator — state changes (requires operator or admin role)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RBAC("operator"))
 		r.Post("/admin/v1/rollouts", s.rolloutsCreateHandler)

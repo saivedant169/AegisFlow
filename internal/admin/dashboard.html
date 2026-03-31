@@ -1933,7 +1933,37 @@ setInterval(() => {
   if (fedPage && fedPage.style.display !== 'none') fetchFederation();
 }, 5000);
 
+// Fetch current user role and hide action buttons for viewers
+let currentRole = 'viewer';
+async function fetchWhoami() {
+  try {
+    const resp = await fetch('/admin/v1/whoami');
+    if (resp.ok) {
+      const data = await resp.json();
+      currentRole = data.role || 'viewer';
+      // Update sidebar footer with role
+      const statusRow = document.querySelector('.sidebar-footer .status-row');
+      if (statusRow && !document.getElementById('roleDisplay')) {
+        const roleEl = document.createElement('div');
+        roleEl.id = 'roleDisplay';
+        roleEl.className = 'status-row';
+        roleEl.style.marginTop = '6px';
+        roleEl.innerHTML = `<span style="font-size:11px;color:var(--text-secondary);">Role: <span style="color:var(--accent-blue);font-weight:600;">${currentRole}</span></span>`;
+        statusRow.parentElement.appendChild(roleEl);
+      }
+      // Hide action buttons for viewers
+      if (currentRole === 'viewer') {
+        document.querySelectorAll('[data-requires-role]').forEach(el => {
+          const req = el.getAttribute('data-requires-role');
+          if (req === 'operator' || req === 'admin') el.style.display = 'none';
+        });
+      }
+    }
+  } catch (e) {}
+}
+
 initCharts();
+fetchWhoami();
 fetchUsage();
 fetchOverviewStatus();
 setInterval(fetchUsage, 3000);

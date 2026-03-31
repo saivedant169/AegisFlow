@@ -213,6 +213,8 @@ func main() {
 		log.Printf("eval hooks enabled (builtin: %v, webhook: %v)", cfg.Eval.Builtin.Enabled, cfg.Eval.Webhook.URL != "")
 	}
 
+
+
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap
 	maxRPM := 60
@@ -301,6 +303,7 @@ func main() {
 	var auditAdapter admin.AuditProvider
 	if auditLogger != nil {
 		auditAdapter = audit.NewAdminAdapter(auditLogger)
+		handler.SetAuditLogger(auditLogger.Log)
 	}
 
 	// Analytics admin adapter
