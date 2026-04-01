@@ -25,7 +25,7 @@
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
 <p align="center">
-  <img src="aegisflow.png" alt="AegisFlow" width="800">
+  <img src="aegiflow_1.png" alt="AegisFlow" width="800">
 </p>
 
 <p align="center">
