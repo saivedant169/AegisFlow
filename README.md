@@ -29,6 +29,10 @@
 </p>
 
 <p align="center">
+  <img src="aegisflow.png" alt="AegisFlow Architecture" width="800">
+</p>
+
+<p align="center">
   <img src="demo.gif" alt="AegisFlow Demo" width="800">
 </p>
 
