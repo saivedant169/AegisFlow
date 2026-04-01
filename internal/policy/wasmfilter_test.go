@@ -107,6 +107,55 @@ func TestWasmFilterBadResultOnErrorAllow(t *testing.T) {
 	}
 }
 
+func TestNewWasmFilterFromFile(t *testing.T) {
+	f, err := NewWasmFilter("test-file", ActionBlock, "testdata/allow.wasm", time.Second, "block")
+	if err != nil {
+		t.Fatalf("failed to create wasm filter from file: %v", err)
+	}
+	defer f.Close()
+
+	if f.Name() != "test-file" {
+		t.Errorf("expected name 'test-file', got %q", f.Name())
+	}
+}
+
+func TestNewWasmFilterFileNotFound(t *testing.T) {
+	_, err := NewWasmFilter("test-missing", ActionBlock, "testdata/nonexistent.wasm", time.Second, "block")
+	if err == nil {
+		t.Fatal("expected error for missing wasm file")
+	}
+}
+
+func TestNewWasmFilterDefaultTimeoutAndOnError(t *testing.T) {
+	f, err := NewWasmFilter("test-defaults", ActionBlock, "testdata/allow.wasm", 0, "")
+	if err != nil {
+		t.Fatalf("failed to create wasm filter: %v", err)
+	}
+	defer f.Close()
+	if f.timeout != 100*time.Millisecond {
+		t.Errorf("expected default timeout 100ms, got %v", f.timeout)
+	}
+	if f.onError != "block" {
+		t.Errorf("expected default onError 'block', got %q", f.onError)
+	}
+}
+
+func TestWasmFilterNameAndAction(t *testing.T) {
+	wasm := loadTestWasm(t, "allow.wasm")
+	f, err := NewWasmFilterFromBytes("test-name", ActionWarn, wasm, time.Second, "block")
+	if err != nil {
+		t.Fatalf("failed to create wasm filter: %v", err)
+	}
+	defer f.Close()
+
+	if f.Name() != "test-name" {
+		t.Errorf("expected name 'test-name', got %q", f.Name())
+	}
+	if f.Action() != ActionWarn {
+		t.Errorf("expected action 'warn', got %q", f.Action())
+	}
+}
+
 func TestWasmFilterMissingExports(t *testing.T) {
 	emptyWasm := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00}
 	_, err := NewWasmFilterFromBytes("test-empty", ActionBlock, emptyWasm, time.Second, "block")
