@@ -1,9 +1,11 @@
-package analytics
+package pgstore
 
 import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/aegisflow/aegisflow/internal/analytics"
 )
 
 type AnalyticsStore struct {
@@ -52,7 +54,7 @@ func (s *AnalyticsStore) Migrate() error {
 	return err
 }
 
-func (s *AnalyticsStore) SaveAlert(a *Alert) error {
+func (s *AnalyticsStore) SaveAlert(a *analytics.Alert) error {
 	_, err := s.db.ExecContext(context.Background(),
 		`INSERT INTO alerts (id, severity, type, dimension, metric, value, threshold, message, state, created_at, resolved_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
@@ -61,7 +63,7 @@ func (s *AnalyticsStore) SaveAlert(a *Alert) error {
 	return err
 }
 
-func (s *AnalyticsStore) FlushAggregates(dim string, period string, buckets []BucketSummary) error {
+func (s *AnalyticsStore) FlushAggregates(dim string, period string, buckets []analytics.BucketSummary) error {
 	for _, b := range buckets {
 		_, err := s.db.ExecContext(context.Background(),
 			`INSERT INTO metric_aggregates (dimension, period, bucket_start, request_count, error_count, p50_latency, p95_latency, p99_latency, token_count, estimated_cost)
@@ -76,7 +78,7 @@ func (s *AnalyticsStore) FlushAggregates(dim string, period string, buckets []Bu
 	return nil
 }
 
-func (s *AnalyticsStore) QueryAggregates(dim, period string, from, to time.Time) ([]BucketSummary, error) {
+func (s *AnalyticsStore) QueryAggregates(dim, period string, from, to time.Time) ([]analytics.BucketSummary, error) {
 	rows, err := s.db.QueryContext(context.Background(),
 		`SELECT bucket_start, request_count, error_count, p50_latency, p95_latency, p99_latency, token_count, estimated_cost
 		FROM metric_aggregates WHERE dimension=$1 AND period=$2 AND bucket_start >= $3 AND bucket_start <= $4
@@ -86,9 +88,9 @@ func (s *AnalyticsStore) QueryAggregates(dim, period string, from, to time.Time)
 	}
 	defer rows.Close()
 
-	var result []BucketSummary
+	var result []analytics.BucketSummary
 	for rows.Next() {
-		var b BucketSummary
+		var b analytics.BucketSummary
 		if err := rows.Scan(&b.Timestamp, &b.Requests, &b.Errors, &b.P50Latency, &b.P95Latency, &b.P99Latency, &b.Tokens, &b.EstimatedCost); err != nil {
 			return nil, err
 		}

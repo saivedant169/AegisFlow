@@ -1,9 +1,11 @@
-package audit
+package pgstore
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/aegisflow/aegisflow/internal/audit"
 )
 
 type PostgresStore struct {
@@ -38,7 +40,7 @@ func (s *PostgresStore) Migrate() error {
 	return err
 }
 
-func (s *PostgresStore) Insert(entry Entry) error {
+func (s *PostgresStore) Insert(entry audit.Entry) error {
 	_, err := s.db.ExecContext(context.Background(),
 		`INSERT INTO audit_log_v2 (timestamp, actor, actor_role, action, resource, detail, tenant_id, model, previous_hash, entry_hash)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
@@ -57,7 +59,7 @@ func (s *PostgresStore) LastHash() (string, error) {
 	return hash, err
 }
 
-func (s *PostgresStore) Query(filters QueryFilters) ([]Entry, error) {
+func (s *PostgresStore) Query(filters audit.QueryFilters) ([]audit.Entry, error) {
 	query := `SELECT id, timestamp, actor, actor_role, action, resource, detail, tenant_id, model, previous_hash, entry_hash
 		FROM audit_log_v2 WHERE 1=1`
 	args := []interface{}{}
@@ -101,9 +103,9 @@ func (s *PostgresStore) Query(filters QueryFilters) ([]Entry, error) {
 	}
 	defer rows.Close()
 
-	var entries []Entry
+	var entries []audit.Entry
 	for rows.Next() {
-		var e Entry
+		var e audit.Entry
 		if err := rows.Scan(&e.ID, &e.Timestamp, &e.Actor, &e.ActorRole, &e.Action,
 			&e.Resource, &e.Detail, &e.TenantID, &e.Model, &e.PreviousHash, &e.EntryHash); err != nil {
 			return nil, err

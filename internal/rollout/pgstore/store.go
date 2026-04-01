@@ -1,4 +1,4 @@
-package rollout
+package pgstore
 
 import (
 	"context"
@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/aegisflow/aegisflow/internal/rollout"
 )
 
-// PostgresStore implements Store using a PostgreSQL database.
+// PostgresStore implements rollout.Store using a PostgreSQL database.
 type PostgresStore struct {
 	db *sql.DB
 }
@@ -52,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_rollouts_route_model ON rollouts (route_model);
 }
 
 // Create inserts a new rollout into the database.
-func (s *PostgresStore) Create(r *Rollout) error {
+func (s *PostgresStore) Create(r *rollout.Rollout) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -87,7 +89,7 @@ INSERT INTO rollouts (
 }
 
 // Get retrieves a rollout by its ID.
-func (s *PostgresStore) Get(id string) (*Rollout, error) {
+func (s *PostgresStore) Get(id string) (*rollout.Rollout, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -102,7 +104,7 @@ FROM rollouts WHERE id = $1`
 }
 
 // GetByModel returns the active rollout for a given model (state IN pending, running, paused).
-func (s *PostgresStore) GetByModel(model string) (*Rollout, error) {
+func (s *PostgresStore) GetByModel(model string) (*rollout.Rollout, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -115,11 +117,11 @@ FROM rollouts
 WHERE route_model = $1 AND state IN ($2, $3, $4)
 LIMIT 1`
 
-	return s.scanRollout(s.db.QueryRowContext(ctx, query, model, StatePending, StateRunning, StatePaused))
+	return s.scanRollout(s.db.QueryRowContext(ctx, query, model, rollout.StatePending, rollout.StateRunning, rollout.StatePaused))
 }
 
 // Update persists changes to an existing rollout.
-func (s *PostgresStore) Update(r *Rollout) error {
+func (s *PostgresStore) Update(r *rollout.Rollout) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -160,7 +162,7 @@ WHERE id = $15`
 }
 
 // List returns the most recent 50 rollouts ordered by creation time descending.
-func (s *PostgresStore) List() ([]*Rollout, error) {
+func (s *PostgresStore) List() ([]*rollout.Rollout, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -179,7 +181,7 @@ LIMIT 50`
 	}
 	defer rows.Close()
 
-	var rollouts []*Rollout
+	var rollouts []*rollout.Rollout
 	for rows.Next() {
 		r, err := s.scanRolloutFromRows(rows)
 		if err != nil {
@@ -191,8 +193,8 @@ LIMIT 50`
 }
 
 // scanRollout scans a single row into a Rollout struct.
-func (s *PostgresStore) scanRollout(row *sql.Row) (*Rollout, error) {
-	var r Rollout
+func (s *PostgresStore) scanRollout(row *sql.Row) (*rollout.Rollout, error) {
+	var r rollout.Rollout
 	var baseline, stagesJSON string
 	var observationMs int64
 	var completedAt sql.NullTime
@@ -222,8 +224,8 @@ func (s *PostgresStore) scanRollout(row *sql.Row) (*Rollout, error) {
 }
 
 // scanRolloutFromRows scans a row from sql.Rows into a Rollout struct.
-func (s *PostgresStore) scanRolloutFromRows(rows *sql.Rows) (*Rollout, error) {
-	var r Rollout
+func (s *PostgresStore) scanRolloutFromRows(rows *sql.Rows) (*rollout.Rollout, error) {
+	var r rollout.Rollout
 	var baseline, stagesJSON string
 	var observationMs int64
 	var completedAt sql.NullTime

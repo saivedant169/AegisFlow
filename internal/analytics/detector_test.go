@@ -177,6 +177,112 @@ func TestBaselineInsufficientData(t *testing.T) {
 	}
 }
 
+func TestStaticThresholdAllFourMetrics(t *testing.T) {
+	c := NewCollector(24)
+	now := time.Now().Truncate(time.Minute)
+
+	// Record data that exceeds all 4 thresholds:
+	// - high error rate (all 500s)
+	// - high p95 latency (10000ms)
+	// - high request count (20 requests in 1 minute)
+	// - high cost ($5 per request)
+	for i := 0; i < 20; i++ {
+		c.Record(DataPoint{
+			TenantID:      "t1",
+			Model:         "gpt-4",
+			Provider:      "openai",
+			StatusCode:    500,
+			LatencyMs:     10000,
+			Tokens:        100,
+			EstimatedCost: 5.0,
+			Timestamp:     now,
+		})
+	}
+
+	d := NewDetector(c, StaticThresholds{
+		ErrorRateMax:         10,   // 10%, actual is 100%
+		P95LatencyMax:        5000, // 5000ms, actual is 10000ms
+		RequestsPerMinuteMax: 10,   // 10/min, actual is 20
+		CostPerMinuteMax:     50,   // $50/min, actual is $100
+	}, BaselineConfig{})
+
+	result := d.Evaluate()
+
+	// We should find alerts for all 4 metrics across at least one dimension.
+	metricsFound := map[string]bool{}
+	for _, a := range result.Alerts {
+		if a.Type == "static_threshold" {
+			metricsFound[a.Metric] = true
+		}
+	}
+
+	for _, metric := range []string{"error_rate", "p95_latency", "request_rate", "cost_rate"} {
+		if !metricsFound[metric] {
+			t.Errorf("expected static threshold alert for %s, but none found", metric)
+		}
+	}
+}
+
+func TestBaselineExactly60Buckets(t *testing.T) {
+	c := NewCollector(24)
+	baseTime := time.Now().Add(-70 * time.Minute).Truncate(time.Minute)
+
+	// Record exactly 60 minutes of steady traffic (boundary case for the >= 60 check).
+	for m := 0; m < 55; m++ {
+		ts := baseTime.Add(time.Duration(m) * time.Minute)
+		count := 10
+		if m%2 == 0 {
+			count = 8
+		} else {
+			count = 12
+		}
+		for r := 0; r < count; r++ {
+			c.Record(DataPoint{
+				TenantID:   "t1",
+				Model:      "gpt-4",
+				Provider:   "openai",
+				StatusCode: 200,
+				LatencyMs:  100,
+				Tokens:     10,
+				Timestamp:  ts,
+			})
+		}
+	}
+
+	// Spike in last 5 minutes
+	for m := 55; m < 60; m++ {
+		ts := baseTime.Add(time.Duration(m) * time.Minute)
+		for r := 0; r < 200; r++ {
+			c.Record(DataPoint{
+				TenantID:   "t1",
+				Model:      "gpt-4",
+				Provider:   "openai",
+				StatusCode: 200,
+				LatencyMs:  100,
+				Tokens:     10,
+				Timestamp:  ts,
+			})
+		}
+	}
+
+	d := NewDetector(c, StaticThresholds{}, BaselineConfig{
+		Window:          2 * time.Hour,
+		StddevThreshold: 3,
+	})
+
+	result := d.Evaluate()
+
+	found := false
+	for _, a := range result.Alerts {
+		if a.Type == "statistical_baseline" && a.Metric == "request_rate" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected baseline anomaly alert with exactly 60 buckets of data")
+	}
+}
+
 func TestDetectorEvaluateMultipleDimensions(t *testing.T) {
 	c := NewCollector(24)
 	now := time.Now().Truncate(time.Minute)

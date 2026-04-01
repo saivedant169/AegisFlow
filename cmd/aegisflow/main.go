@@ -20,6 +20,7 @@ import (
 	"github.com/aegisflow/aegisflow/internal/admin"
 	"github.com/aegisflow/aegisflow/internal/analytics"
 	"github.com/aegisflow/aegisflow/internal/audit"
+	auditpg "github.com/aegisflow/aegisflow/internal/audit/pgstore"
 	"github.com/aegisflow/aegisflow/internal/budget"
 	"github.com/aegisflow/aegisflow/internal/cache"
 	"github.com/aegisflow/aegisflow/internal/config"
@@ -32,6 +33,7 @@ import (
 	"github.com/aegisflow/aegisflow/internal/provider"
 	"github.com/aegisflow/aegisflow/internal/ratelimit"
 	"github.com/aegisflow/aegisflow/internal/rollout"
+	rolloutpg "github.com/aegisflow/aegisflow/internal/rollout/pgstore"
 	"github.com/aegisflow/aegisflow/internal/router"
 	"github.com/aegisflow/aegisflow/internal/storage"
 	"github.com/aegisflow/aegisflow/internal/telemetry"
@@ -269,7 +271,7 @@ func main() {
 	var rolloutAdapter admin.RolloutManager
 	var rolloutStore rollout.Store = rollout.NewMemoryStore()
 	if pgStore != nil {
-		rolloutStore = rollout.NewPostgresStore(pgStore.DB())
+		rolloutStore = rolloutpg.NewPostgresStore(pgStore.DB())
 	}
 	rolloutMgr, err := rollout.NewManager(rolloutStore, reqLog)
 	if err != nil {
@@ -285,7 +287,7 @@ func main() {
 	// Audit logger
 	var auditLogger *audit.Logger
 	if pgStore != nil {
-		auditStore := audit.NewPostgresStore(pgStore.DB())
+		auditStore := auditpg.NewPostgresStore(pgStore.DB())
 		var err error
 		auditLogger, err = audit.NewLogger(auditStore)
 		if err != nil {
