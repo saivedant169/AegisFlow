@@ -30,7 +30,7 @@ func main() {
 	switch os.Args[1] {
 	case "plugin":
 		if len(os.Args) < 3 {
-			fmt.Println("Usage: aegisctl plugin <search|info|install|list|remove> [args]")
+			fmt.Println("Usage: aegisctl plugin <search|info|install|list|outdated|remove> [args]")
 			os.Exit(1)
 		}
 		var err error
@@ -43,6 +43,8 @@ func main() {
 			err = pluginInstall(os.Args[3:])
 		case "list":
 			err = pluginList(os.Args[3:])
+		case "outdated":
+			err = pluginOutdated(os.Args[3:])
 		case "remove":
 			err = pluginRemove(os.Args[3:])
 		default:
@@ -90,7 +92,7 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
-  plugin      Manage WASM plugins (search, info, install, list, remove)
+  plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
   status      Check gateway and admin health
   usage       Show usage per tenant and model
   models      List available models

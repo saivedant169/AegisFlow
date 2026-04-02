@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +17,8 @@ import (
 )
 
 const defaultRegistryURL = "https://raw.githubusercontent.com/aegisflow/plugin-registry/main/registry.json"
+
+var registryURL = defaultRegistryURL
 
 type PluginEntry struct {
 	Name        string   `json:"name"`
@@ -41,15 +45,22 @@ type PluginsConfig struct {
 }
 
 type PluginPolicyEntry struct {
-	Name   string `yaml:"name"`
-	Type   string `yaml:"type"`
-	Action string `yaml:"action"`
-	Path   string `yaml:"path"`
+	Name    string `yaml:"name"`
+	Type    string `yaml:"type"`
+	Action  string `yaml:"action"`
+	Path    string `yaml:"path"`
+	Version string `yaml:"version,omitempty"`
+}
+
+type OutdatedPlugin struct {
+	Name             string
+	InstalledVersion string
+	LatestVersion    string
 }
 
 func fetchRegistry(url string) (*Registry, error) {
 	if url == "" {
-		url = defaultRegistryURL
+		url = registryURL
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
@@ -205,10 +216,11 @@ func pluginInstall(args []string) error {
 	}
 
 	entry := PluginPolicyEntry{
-		Name:   plugin.Name,
-		Type:   "wasm",
-		Action: plugin.Action,
-		Path:   wasmPath,
+		Name:    plugin.Name,
+		Type:    "wasm",
+		Action:  plugin.Action,
+		Path:    wasmPath,
+		Version: plugin.Version,
 	}
 
 	if plugin.Phase == "output" {
@@ -249,9 +261,53 @@ func pluginList(args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%-25s %-10s %s\n", "NAME", "ACTION", "PATH")
+	fmt.Printf("%-25s %-10s %-12s %s\n", "NAME", "ACTION", "VERSION", "PATH")
 	for _, p := range all {
-		fmt.Printf("%-25s %-10s %s\n", p.Name, p.Action, p.Path)
+		version := p.Version
+		if version == "" {
+			version = "unknown"
+		}
+		fmt.Printf("%-25s %-10s %-12s %s\n", p.Name, p.Action, version, p.Path)
+	}
+	return nil
+}
+
+func pluginOutdated(args []string) error {
+	pluginsConfig := "plugins.yaml"
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--plugins-config" && i+1 < len(args) {
+			pluginsConfig = args[i+1]
+		}
+	}
+
+	var cfg PluginsConfig
+	data, err := os.ReadFile(pluginsConfig)
+	if err != nil {
+		fmt.Println("No plugins installed.")
+		return nil
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parsing plugins config: %w", err)
+	}
+
+	reg, err := fetchRegistry("")
+	if err != nil {
+		return err
+	}
+
+	outdated := collectOutdatedPlugins(cfg, reg)
+	if len(outdated) == 0 {
+		fmt.Println("All installed plugins are up to date.")
+		return nil
+	}
+
+	fmt.Printf("%-25s %-16s %s\n", "NAME", "INSTALLED", "LATEST")
+	for _, plugin := range outdated {
+		installed := plugin.InstalledVersion
+		if installed == "" {
+			installed = "unknown"
+		}
+		fmt.Printf("%-25s %-16s %s\n", plugin.Name, installed, plugin.LatestVersion)
 	}
 	return nil
 }
@@ -312,4 +368,94 @@ func containsTag(tags []string, query string) bool {
 		}
 	}
 	return false
+}
+
+func collectOutdatedPlugins(cfg PluginsConfig, reg *Registry) []OutdatedPlugin {
+	installed := append([]PluginPolicyEntry{}, cfg.Policies.Input...)
+	installed = append(installed, cfg.Policies.Output...)
+
+	registryByName := make(map[string]PluginEntry, len(reg.Plugins))
+	for _, plugin := range reg.Plugins {
+		registryByName[plugin.Name] = plugin
+	}
+
+	var outdated []OutdatedPlugin
+	seen := make(map[string]bool)
+	for _, plugin := range installed {
+		if seen[plugin.Name] {
+			continue
+		}
+		seen[plugin.Name] = true
+
+		registryPlugin, ok := registryByName[plugin.Name]
+		if !ok {
+			continue
+		}
+
+		if plugin.Version == "" || compareVersion(plugin.Version, registryPlugin.Version) < 0 {
+			outdated = append(outdated, OutdatedPlugin{
+				Name:             plugin.Name,
+				InstalledVersion: plugin.Version,
+				LatestVersion:    registryPlugin.Version,
+			})
+		}
+	}
+
+	sort.Slice(outdated, func(i, j int) bool { return outdated[i].Name < outdated[j].Name })
+	return outdated
+}
+
+func compareVersion(a, b string) int {
+	if a == b {
+		return 0
+	}
+
+	parse := func(v string) []int {
+		v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+		parts := strings.Split(v, ".")
+		out := make([]int, 0, len(parts))
+		for _, part := range parts {
+			numeric := part
+			for idx, ch := range part {
+				if ch < '0' || ch > '9' {
+					numeric = part[:idx]
+					break
+				}
+			}
+			if numeric == "" {
+				out = append(out, 0)
+				continue
+			}
+			n, err := strconv.Atoi(numeric)
+			if err != nil {
+				out = append(out, 0)
+				continue
+			}
+			out = append(out, n)
+		}
+		return out
+	}
+
+	aa := parse(a)
+	bb := parse(b)
+	maxLen := len(aa)
+	if len(bb) > maxLen {
+		maxLen = len(bb)
+	}
+	for i := 0; i < maxLen; i++ {
+		var av, bv int
+		if i < len(aa) {
+			av = aa[i]
+		}
+		if i < len(bb) {
+			bv = bb[i]
+		}
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+	}
+	return 0
 }
