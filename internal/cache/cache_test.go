@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saivedant169/AegisFlow/pkg/types"
 	"github.com/alicebob/miniredis/v2"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 func TestBuildKey(t *testing.T) {
@@ -183,6 +183,9 @@ func TestStatsReturnsCorrectCounts(t *testing.T) {
 	}
 	if stats.Evictions < 1 {
 		t.Errorf("expected at least 1 eviction, got %d", stats.Evictions)
+	}
+	if stats.TTL != time.Minute.String() {
+		t.Errorf("expected ttl %q, got %q", time.Minute.String(), stats.TTL)
 	}
 }
 

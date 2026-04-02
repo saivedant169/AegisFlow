@@ -8,16 +8,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/saivedant169/AegisFlow/pkg/types"
 	"github.com/redis/go-redis/v9"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 type CacheStats struct {
-	Hits      int64 `json:"hits"`
-	Misses    int64 `json:"misses"`
-	Size      int   `json:"size"`
-	MaxSize   int   `json:"max_size"`
-	Evictions int64 `json:"evictions"`
+	Hits      int64  `json:"hits"`
+	Misses    int64  `json:"misses"`
+	Size      int    `json:"size"`
+	MaxSize   int    `json:"max_size"`
+	Evictions int64  `json:"evictions"`
+	TTL       string `json:"ttl,omitempty"`
 }
 
 type Cache interface {
@@ -124,6 +125,7 @@ func (c *MemoryCache) Stats() CacheStats {
 		Size:      len(c.entries),
 		MaxSize:   c.maxSize,
 		Evictions: c.evictions,
+		TTL:       c.ttl.String(),
 	}
 }
 
@@ -181,5 +183,5 @@ func (c *RedisCache) Stats() CacheStats {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	size, _ := c.client.DBSize(ctx).Result()
-	return CacheStats{Size: int(size)}
+	return CacheStats{Size: int(size), TTL: c.ttl.String()}
 }

@@ -582,7 +582,7 @@
         Auto-refresh 3s
       </div>
     </div>
-    <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 20px;">
+    <div class="stat-grid" style="grid-template-columns: repeat(6, 1fr); margin-bottom: 20px;">
       <div class="stat-card">
         <div class="stat-glow green"></div>
         <div class="stat-label">Hits</div>
@@ -607,6 +607,11 @@
         <div class="stat-glow orange"></div>
         <div class="stat-label">Evictions</div>
         <div class="stat-value" id="cacheEvictions">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow cyan"></div>
+        <div class="stat-label">TTL</div>
+        <div class="stat-value" id="cacheTTL">--</div>
       </div>
     </div>
     <div class="chart-card" style="margin-bottom:24px;">
@@ -1323,6 +1328,7 @@ async function fetchCache() {
     document.getElementById('cacheHitRate').textContent = rate + '%';
     document.getElementById('cacheSize').textContent = (data.size || 0) + ' / ' + (data.max_size || 0);
     document.getElementById('cacheEvictions').textContent = formatNumber(data.evictions || 0);
+    document.getElementById('cacheTTL').textContent = data.ttl || '--';
 
     // Update chart
     const now = new Date().toLocaleTimeString();
