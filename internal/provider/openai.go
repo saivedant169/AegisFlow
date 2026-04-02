@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -20,6 +22,8 @@ type OpenAIProvider struct {
 	models     []string
 	client     *http.Client
 	maxRetries int
+	retry      retryPolicy
+	sleep      func(time.Duration)
 }
 
 func NewOpenAIProvider(name, baseURL, apiKeyEnv string, models []string, timeout time.Duration, maxRetries int) *OpenAIProvider {
@@ -37,6 +41,8 @@ func NewOpenAIProvider(name, baseURL, apiKeyEnv string, models []string, timeout
 		models:     models,
 		client:     &http.Client{Timeout: timeout},
 		maxRetries: maxRetries,
+		retry:      newRetryPolicy(config.RetryConfig{MaxAttempts: 1}),
+		sleep:      time.Sleep,
 	}
 }
 
@@ -50,24 +56,11 @@ func (o *OpenAIProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+	resp, err := o.doRequest(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
-
-	resp, err := o.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var result types.ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -86,23 +79,9 @@ func (o *OpenAIProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+	resp, err := o.doRequest(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
-
-	resp, err := o.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
+		return nil, err
 	}
 
 	return resp.Body, nil
@@ -143,4 +122,46 @@ func (o *OpenAIProvider) Healthy(ctx context.Context) bool {
 	}
 	resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+func (o *OpenAIProvider) ConfigureRetry(cfg config.RetryConfig) {
+	o.retry = newRetryPolicy(cfg)
+}
+
+func (o *OpenAIProvider) doRequest(ctx context.Context, body []byte) (*http.Response, error) {
+	attempts := o.retry.maxAttempts
+	if attempts <= 0 {
+		attempts = 1
+	}
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("creating request: %w", err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
+
+		resp, err := o.client.Do(httpReq)
+		if err != nil {
+			return nil, fmt.Errorf("sending request: %w", err)
+		}
+		if resp.StatusCode == http.StatusOK {
+			return resp, nil
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		statusErr := &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(respBody), Header: resp.Header.Clone()}
+		if attempt < attempts && o.retry.shouldRetry(resp.StatusCode) {
+			delay := o.retry.delayForAttempt(attempt, resp.Header)
+			log.Printf("provider %s: retry attempt %d/%d after %s due to status %d", o.name, attempt+1, attempts, delay, resp.StatusCode)
+			o.sleep(delay)
+			continue
+		}
+		return nil, statusErr
+	}
+
+	return nil, fmt.Errorf("provider %s exhausted retries", o.name)
 }

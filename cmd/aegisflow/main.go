@@ -412,7 +412,9 @@ func initProviders(cfg *config.Config, registry *provider.Registry) {
 			registry.Register(provider.NewMockProvider(pc.Name, latency))
 			log.Printf("registered provider: %s (type: mock, latency: %s)", pc.Name, latency)
 		case "openai":
-			registry.Register(provider.NewOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout, pc.MaxRetries))
+			p := provider.NewOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout, pc.MaxRetries)
+			p.ConfigureRetry(pc.Retry)
+			registry.Register(p)
 			log.Printf("registered provider: %s (type: openai, base_url: %s)", pc.Name, pc.BaseURL)
 		case "anthropic":
 			registry.Register(provider.NewAnthropicProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout))
@@ -424,16 +426,24 @@ func initProviders(cfg *config.Config, registry *provider.Registry) {
 			registry.Register(provider.NewGeminiProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
 			log.Printf("registered provider: %s (type: gemini)", pc.Name)
 		case "azure_openai":
-			registry.Register(provider.NewAzureOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.APIVersion, pc.Models, pc.Timeout))
+			p := provider.NewAzureOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.APIVersion, pc.Models, pc.Timeout)
+			p.ConfigureRetry(pc.Retry)
+			registry.Register(p)
 			log.Printf("registered provider: %s (type: azure_openai, endpoint: %s)", pc.Name, pc.BaseURL)
 		case "groq":
-			registry.Register(provider.NewGroqProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			p := provider.NewGroqProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout)
+			p.ConfigureRetry(pc.Retry)
+			registry.Register(p)
 			log.Printf("registered provider: %s (type: groq)", pc.Name)
 		case "mistral":
-			registry.Register(provider.NewMistralProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			p := provider.NewMistralProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout)
+			p.ConfigureRetry(pc.Retry)
+			registry.Register(p)
 			log.Printf("registered provider: %s (type: mistral)", pc.Name)
 		case "together":
-			registry.Register(provider.NewTogetherProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout))
+			p := provider.NewTogetherProvider(pc.Name, pc.APIKeyEnv, pc.Models, pc.Timeout)
+			p.ConfigureRetry(pc.Retry)
+			registry.Register(p)
 			log.Printf("registered provider: %s (type: together)", pc.Name)
 		case "bedrock":
 			registry.Register(provider.NewBedrockProvider(pc.Name, pc.Config["region"], pc.APIKeyEnv, pc.Config["secret_key_env"], pc.Models, pc.Timeout))

@@ -910,3 +910,57 @@ federation:
 		t.Errorf("expected sync interval 1m, got %v", cfg.Federation.ControlPlane.SyncInterval)
 	}
 }
+
+func TestProviderRetryDefaults(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+`
+	f, err := os.CreateTemp("", "aegisflow-retry-defaults-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	cfg, err := Load(f.Name())
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	retry := cfg.Providers[0].Retry
+	if retry.MaxAttempts != 1 || retry.InitialBackoff != 200*time.Millisecond || retry.MaxBackoff != 5*time.Second || retry.BackoffMultiplier != 2.0 {
+		t.Fatalf("unexpected retry defaults: %+v", retry)
+	}
+	if len(retry.RetryableStatusCodes) != 5 {
+		t.Fatalf("expected default retryable status codes, got %v", retry.RetryableStatusCodes)
+	}
+}
+
+func TestProviderRetryRejectsInvalidAttempts(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    retry:
+      max_attempts: -1
+`
+	f, err := os.CreateTemp("", "aegisflow-retry-invalid-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	if _, err := Load(f.Name()); err == nil {
+		t.Fatal("expected invalid retry config to be rejected")
+	}
+}
