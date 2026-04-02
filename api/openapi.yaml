@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: AegisFlow API
   description: AI Gateway + Policy + Observability Control Plane
-  version: 0.1.0
+  version: 0.4.0
   license:
     name: Apache 2.0
 
@@ -13,6 +13,32 @@ servers:
     description: Admin API
 
 paths:
+  /:
+    get:
+      summary: Embedded admin dashboard
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: HTML dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /dashboard:
+    get:
+      summary: Embedded admin dashboard
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: HTML dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+
   /health:
     get:
       summary: Health check
@@ -22,11 +48,20 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
+                $ref: "#/components/schemas/HealthResponse"
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Prometheus format metrics
+          content:
+            text/plain:
+              schema:
+                type: string
 
   /v1/chat/completions:
     post:
@@ -46,14 +81,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatCompletionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "403":
           description: Policy violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "429":
           description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "502":
           description: All providers failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /v1/models:
     get:
@@ -76,15 +133,593 @@ paths:
       responses:
         "200":
           description: Usage data per tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/TenantUsage"
 
-  /metrics:
+  /admin/v1/providers:
     get:
-      summary: Prometheus metrics
+      summary: List configured providers
       servers:
         - url: http://localhost:8081
       responses:
         "200":
-          description: Prometheus format metrics
+          description: Providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderInfo"
+
+  /admin/v1/tenants:
+    get:
+      summary: List configured tenants
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Tenants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TenantInfo"
+
+  /admin/v1/policies:
+    get:
+      summary: List configured policies
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PolicyInfo"
+
+  /admin/v1/requests:
+    get:
+      summary: Recent request log entries
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Recent requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RequestEntry"
+
+  /admin/v1/violations:
+    get:
+      summary: Recent policy violations
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Recent policy violations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RequestEntry"
+
+  /admin/v1/cache:
+    get:
+      summary: Cache statistics
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheStats"
+
+  /admin/v1/analytics:
+    get:
+      summary: Analytics summary by dimensions
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dimensions:
+                    type: array
+                    items:
+                      type: string
+                  summary:
+                    type: object
+                    additionalProperties: true
+        "503":
+          description: Analytics disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/analytics/realtime:
+    get:
+      summary: Realtime analytics summary
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Realtime analytics summary
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "503":
+          description: Analytics disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/alerts:
+    get:
+      summary: Recent alerts
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        "503":
+          description: Analytics disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/alerts/{id}/acknowledge:
+    post:
+      summary: Acknowledge an alert
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "404":
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Analytics disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/budgets:
+    get:
+      summary: Budget statuses and forecasts
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Budget data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statuses:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  forecasts:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+
+  /admin/v1/rollouts:
+    get:
+      summary: List rollouts
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Rollouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rollout"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+    post:
+      summary: Create a rollout
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRolloutRequest"
+      responses:
+        "201":
+          description: Rollout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rollout"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Rollout conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/rollouts/{id}:
+    get:
+      summary: Get rollout details and metrics
+      servers:
+        - url: http://localhost:8081
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rollout details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rollout:
+                    $ref: "#/components/schemas/Rollout"
+                  metrics:
+                    $ref: "#/components/schemas/RolloutMetrics"
+        "404":
+          description: Rollout not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/rollouts/{id}/pause:
+    post:
+      summary: Pause a rollout
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rollout paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Invalid rollout state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/rollouts/{id}/resume:
+    post:
+      summary: Resume a rollout
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rollout resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Invalid rollout state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/rollouts/{id}/rollback:
+    post:
+      summary: Roll back a rollout
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rollout rolled back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Invalid rollout state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Rollout manager unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleError"
+
+  /admin/v1/audit:
+    get:
+      summary: Query audit entries
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: actor
+          schema:
+            type: string
+        - in: query
+          name: actor_role
+          schema:
+            type: string
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: tenant_id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /admin/v1/audit/verify:
+    post:
+      summary: Verify audit log integrity
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResult"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /admin/v1/whoami:
+    get:
+      summary: Current authenticated role and tenant
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Current role and tenant context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhoAmIResponse"
+
+  /admin/v1/federation/config:
+    get:
+      summary: Get stripped federation config for a data plane
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Federation config
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+
+  /admin/v1/federation/metrics:
+    post:
+      summary: Push federation metrics from a data plane
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Metrics accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          description: Unauthorized
+
+  /admin/v1/federation/status:
+    post:
+      summary: Push federation status from a data plane
+      servers:
+        - url: http://localhost:8081
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaneStatus"
+      responses:
+        "200":
+          description: Status accepted
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+
+  /admin/v1/federation/planes:
+    get:
+      summary: List federation data plane health
+      servers:
+        - url: http://localhost:8081
+      responses:
+        "200":
+          description: Known data planes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlaneStatus"
 
 components:
   securitySchemes:
@@ -94,6 +729,44 @@ components:
       name: X-API-Key
 
   schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        requests:
+          type: integer
+          format: int64
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            param:
+              type: string
+              nullable: true
+            code:
+              nullable: true
+
+    SimpleError:
+      type: object
+      properties:
+        error:
+          type: string
+
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+
     ChatCompletionRequest:
       type: object
       required: [model, messages]
@@ -184,3 +857,307 @@ components:
           type: string
         provider:
           type: string
+
+    ProviderInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        enabled:
+          type: boolean
+        base_url:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        healthy:
+          type: boolean
+        region:
+          type: string
+
+    TenantInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        key_count:
+          type: integer
+        requests_per_minute:
+          type: integer
+        tokens_per_minute:
+          type: integer
+        allowed_models:
+          type: array
+          items:
+            type: string
+
+    PolicyInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        action:
+          type: string
+        phase:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        patterns:
+          type: array
+          items:
+            type: string
+
+    RequestEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+        tenant_id:
+          type: string
+        model:
+          type: string
+        provider:
+          type: string
+        region:
+          type: string
+        status:
+          type: integer
+        latency_ms:
+          type: integer
+        tokens:
+          type: integer
+        cached:
+          type: boolean
+        policy_hit:
+          type: string
+        quality_score:
+          type: integer
+
+    CacheStats:
+      type: object
+      properties:
+        hits:
+          type: integer
+        misses:
+          type: integer
+        size:
+          type: integer
+        max_size:
+          type: integer
+        evictions:
+          type: integer
+        ttl:
+          type: string
+
+    ModelUsage:
+      type: object
+      properties:
+        model:
+          type: string
+        requests:
+          type: integer
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+        estimated_cost_usd:
+          type: number
+
+    ProviderModelUsage:
+      type: object
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        requests:
+          type: integer
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+        estimated_cost_usd:
+          type: number
+
+    TenantUsage:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        total_requests:
+          type: integer
+        total_tokens:
+          type: integer
+        estimated_cost_usd:
+          type: number
+        by_model:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ModelUsage"
+        by_provider_model:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ProviderModelUsage"
+
+    CreateRolloutRequest:
+      type: object
+      required: [route_model, canary_provider, stages, observation_window, error_threshold, latency_p95_threshold]
+      properties:
+        route_model:
+          type: string
+        canary_provider:
+          type: string
+        stages:
+          type: array
+          items:
+            type: integer
+        observation_window:
+          type: string
+          example: 1m
+        error_threshold:
+          type: number
+        latency_p95_threshold:
+          type: integer
+
+    Rollout:
+      type: object
+      properties:
+        id:
+          type: string
+        route_model:
+          type: string
+        baseline_providers:
+          type: array
+          items:
+            type: string
+        canary_provider:
+          type: string
+        stages:
+          type: array
+          items:
+            type: integer
+        current_stage:
+          type: integer
+        current_percentage:
+          type: integer
+        state:
+          type: string
+        observation_window:
+          type: integer
+        error_threshold:
+          type: number
+        latency_p95_threshold:
+          type: integer
+        stage_started_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        rollback_reason:
+          type: string
+
+    HealthMetrics:
+      type: object
+      properties:
+        error_rate:
+          type: number
+        p95_latency_ms:
+          type: integer
+        requests:
+          type: integer
+
+    RolloutMetrics:
+      type: object
+      properties:
+        baseline:
+          $ref: "#/components/schemas/HealthMetrics"
+        canary:
+          $ref: "#/components/schemas/HealthMetrics"
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        actor_role:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        detail:
+          type: string
+        tenant_id:
+          type: string
+        model:
+          type: string
+        previous_hash:
+          type: string
+        entry_hash:
+          type: string
+
+    VerifyResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        message:
+          type: string
+        total_entries:
+          type: integer
+        error_at:
+          type: integer
+
+    WhoAmIResponse:
+      type: object
+      properties:
+        role:
+          type: string
+        tenant_id:
+          type: string
+        tenant_name:
+          type: string
+
+    PlaneStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        healthy:
+          type: boolean
+        last_seen:
+          type: string
+          format: date-time
+        requests:
+          type: integer
+        error_rate:
+          type: number
