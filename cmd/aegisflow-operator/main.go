@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	v1alpha1 "github.com/aegisflow/aegisflow/api/v1alpha1"
-	"github.com/aegisflow/aegisflow/internal/operator"
+	v1alpha1 "github.com/saivedant169/AegisFlow/api/v1alpha1"
+	"github.com/saivedant169/AegisFlow/internal/operator"
 )
 
 var scheme = runtime.NewScheme()

@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
 
 const maxFederationBodySize = 1024 * 1024 // 1MB

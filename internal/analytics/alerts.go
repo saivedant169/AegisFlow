@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/webhook"
+	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
 type AlertManager struct {

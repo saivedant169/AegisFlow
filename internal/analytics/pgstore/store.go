@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/analytics"
+	"github.com/saivedant169/AegisFlow/internal/analytics"
 )
 
 type AnalyticsStore struct {

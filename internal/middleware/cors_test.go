@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
 
 func corsConfig(enabled bool, origins []string, creds bool) *config.Config {

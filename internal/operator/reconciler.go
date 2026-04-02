@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1alpha1 "github.com/aegisflow/aegisflow/api/v1alpha1"
-	"github.com/aegisflow/aegisflow/internal/config"
+	v1alpha1 "github.com/saivedant169/AegisFlow/api/v1alpha1"
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
 
 // Reconciler watches AegisFlow CRDs and generates a ConfigMap containing aegisflow.yaml.

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // BedrockProvider handles AWS Bedrock's Converse API.

@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // AzureOpenAIProvider handles Azure OpenAI Service which uses a different

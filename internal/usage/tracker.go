@@ -1,7 +1,7 @@
 package usage
 
 import (
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 var costPerMillionTokens = map[string]float64{

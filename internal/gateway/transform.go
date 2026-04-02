@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // TransformConfig holds request transformation rules.

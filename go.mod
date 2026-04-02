@@ -1,4 +1,4 @@
-module github.com/aegisflow/aegisflow
+module github.com/saivedant169/AegisFlow
 
 go 1.26.1
 

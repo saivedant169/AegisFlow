@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/admin"
+	"github.com/saivedant169/AegisFlow/internal/admin"
 )
 
 const minRequestsForDecision = 10

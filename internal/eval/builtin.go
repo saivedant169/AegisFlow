@@ -1,6 +1,6 @@
 package eval
 
-import "github.com/aegisflow/aegisflow/pkg/types"
+import "github.com/saivedant169/AegisFlow/pkg/types"
 
 // BuiltinResult holds the quality score and any detected issues for a response.
 type BuiltinResult struct {

@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 func TestScoreEmptyResponse(t *testing.T) {

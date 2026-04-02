@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
 
 func CORS(cfg *config.Config) func(http.Handler) http.Handler {

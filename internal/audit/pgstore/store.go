@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/aegisflow/aegisflow/internal/audit"
+	"github.com/saivedant169/AegisFlow/internal/audit"
 )
 
 type PostgresStore struct {

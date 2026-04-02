@@ -3,7 +3,7 @@ package operator
 import (
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
 
 // ProviderInput represents the data extracted from an AegisFlowProvider CRD.

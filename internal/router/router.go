@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/config"
-	"github.com/aegisflow/aegisflow/internal/provider"
-	"github.com/aegisflow/aegisflow/internal/rollout"
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/provider"
+	"github.com/saivedant169/AegisFlow/internal/rollout"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 type Region struct {

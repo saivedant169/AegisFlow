@@ -20,7 +20,7 @@
 
 [![CI](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml/badge.svg)](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/saivedant169/AegisFlow)](https://goreportcard.com/report/github.com/saivedant169/AegisFlow)
-[![Go Reference](https://pkg.go.dev/badge/github.com/aegisflow/aegisflow.svg)](https://pkg.go.dev/github.com/aegisflow/aegisflow)
+[![Go Reference](https://pkg.go.dev/badge/github.com/saivedant169/AegisFlow.svg)](https://pkg.go.dev/github.com/saivedant169/AegisFlow)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 

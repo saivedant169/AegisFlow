@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 func TestOpenAIChatCompletion(t *testing.T) {

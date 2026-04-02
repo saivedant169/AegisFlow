@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aegisflow/aegisflow/internal/admin"
+	"github.com/saivedant169/AegisFlow/internal/admin"
 )
 
 func newTestManager(t *testing.T) *Manager {

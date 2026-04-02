@@ -10,7 +10,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	v1alpha1 "github.com/aegisflow/aegisflow/api/v1alpha1"
+	v1alpha1 "github.com/saivedant169/AegisFlow/api/v1alpha1"
 )
 
 func newScheme(t *testing.T) *runtime.Scheme {

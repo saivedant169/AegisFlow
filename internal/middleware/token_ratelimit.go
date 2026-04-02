@@ -7,8 +7,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aegisflow/aegisflow/internal/ratelimit"
-	"github.com/aegisflow/aegisflow/pkg/types"
+	"github.com/saivedant169/AegisFlow/internal/ratelimit"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // TokenRateLimit enforces tokens-per-minute limits by reading the actual

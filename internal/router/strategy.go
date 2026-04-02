@@ -3,7 +3,7 @@ package router
 import (
 	"sync/atomic"
 
-	"github.com/aegisflow/aegisflow/internal/provider"
+	"github.com/saivedant169/AegisFlow/internal/provider"
 )
 
 type Strategy interface {
