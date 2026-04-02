@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +29,23 @@ func main() {
 	gatewayURL := getEnv("AEGISFLOW_GATEWAY_URL", defaultGatewayURL)
 
 	switch os.Args[1] {
+	case "federation":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl federation <status> [args]")
+			os.Exit(1)
+		}
+		var err error
+		switch os.Args[2] {
+		case "status":
+			err = cmdFederationStatus(os.Args[3:], adminURL)
+		default:
+			fmt.Printf("Unknown federation command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "plugin":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: aegisctl plugin <search|info|install|list|remove> [args]")
@@ -90,6 +108,7 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
+  federation  Federation commands (status)
   plugin      Manage WASM plugins (search, info, install, list, remove)
   status      Check gateway and admin health
   usage       Show usage per tenant and model
@@ -335,6 +354,51 @@ func cmdTest(gatewayURL, apiKey, model, message string) {
 	fmt.Printf("Latency:  %s\n", latency.Round(time.Millisecond))
 	fmt.Printf("Tokens:   %d\n", result.Usage.TotalTokens)
 	fmt.Printf("Response: %s\n", result.Choices[0].Message.Content)
+}
+
+func cmdFederationStatus(args []string, adminURL string) error {
+	fs := flag.NewFlagSet("federation status", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	url := fs.String("url", adminURL, "admin URL")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: aegisctl federation status --url %s", adminURL)
+	}
+
+	resp, err := client.Get(strings.TrimRight(*url, "/") + "/admin/v1/federation/planes")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("admin API returned %d", resp.StatusCode)
+	}
+
+	var planes []struct {
+		Name     string    `json:"name"`
+		Healthy  bool      `json:"healthy"`
+		LastSeen time.Time `json:"last_seen"`
+		Requests int64     `json:"requests"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&planes); err != nil {
+		return err
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tHEALTH\tLAST SEEN\tREQUESTS")
+	fmt.Fprintln(w, "────\t──────\t─────────\t────────")
+	for _, plane := range planes {
+		health := "unhealthy"
+		if plane.Healthy {
+			health = "healthy"
+		}
+		lastSeen := "--"
+		if !plane.LastSeen.IsZero() {
+			lastSeen = plane.LastSeen.Local().Format(time.RFC3339)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", plane.Name, health, lastSeen, plane.Requests)
+	}
+	w.Flush()
+	return nil
 }
 
 func checkHealth(url string) bool {
