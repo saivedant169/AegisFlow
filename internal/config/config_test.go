@@ -910,3 +910,69 @@ federation:
 		t.Errorf("expected sync interval 1m, got %v", cfg.Federation.ControlPlane.SyncInterval)
 	}
 }
+
+func TestProviderModelCostsParsing(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    model_costs:
+      gpt-4o:
+        input_per_1m: 2.5
+        output_per_1m: 10.0
+    default_cost:
+      input_per_1m: 1.0
+      output_per_1m: 2.0
+`
+	f, err := os.CreateTemp("", "aegisflow-model-costs-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	cfg, err := Load(f.Name())
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	if len(cfg.Providers) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(cfg.Providers))
+	}
+	cost := cfg.Providers[0].ModelCosts["gpt-4o"]
+	if cost.InputPer1M != 2.5 || cost.OutputPer1M != 10.0 {
+		t.Fatalf("unexpected model cost: %+v", cost)
+	}
+	if cfg.Providers[0].DefaultCost.InputPer1M != 1.0 || cfg.Providers[0].DefaultCost.OutputPer1M != 2.0 {
+		t.Fatalf("unexpected default cost: %+v", cfg.Providers[0].DefaultCost)
+	}
+}
+
+func TestProviderModelCostsRejectNegativeValues(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    model_costs:
+      gpt-4o:
+        input_per_1m: -2.5
+        output_per_1m: 10.0
+`
+	f, err := os.CreateTemp("", "aegisflow-model-costs-negative-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	if _, err := Load(f.Name()); err == nil {
+		t.Fatal("expected negative model cost to be rejected")
+	}
+}

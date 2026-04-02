@@ -169,18 +169,25 @@ type CORSConfig struct {
 }
 
 type ProviderConfig struct {
-	Name       string            `yaml:"name"`
-	Type       string            `yaml:"type"`
-	Enabled    bool              `yaml:"enabled"`
-	Default    bool              `yaml:"default"`
-	BaseURL    string            `yaml:"base_url"`
-	APIKeyEnv  string            `yaml:"api_key_env"`
-	Models     []string          `yaml:"models"`
-	Timeout    time.Duration     `yaml:"timeout"`
-	MaxRetries int               `yaml:"max_retries"`
-	APIVersion string            `yaml:"api_version"`
-	Config     map[string]string `yaml:"config"`
-	Region     string            `yaml:"region"`
+	Name        string               `yaml:"name"`
+	Type        string               `yaml:"type"`
+	Enabled     bool                 `yaml:"enabled"`
+	Default     bool                 `yaml:"default"`
+	BaseURL     string               `yaml:"base_url"`
+	APIKeyEnv   string               `yaml:"api_key_env"`
+	Models      []string             `yaml:"models"`
+	Timeout     time.Duration        `yaml:"timeout"`
+	MaxRetries  int                  `yaml:"max_retries"`
+	APIVersion  string               `yaml:"api_version"`
+	Config      map[string]string    `yaml:"config"`
+	Region      string               `yaml:"region"`
+	ModelCosts  map[string]ModelCost `yaml:"model_costs"`
+	DefaultCost ModelCost            `yaml:"default_cost"`
+}
+
+type ModelCost struct {
+	InputPer1M  float64 `yaml:"input_per_1m"`
+	OutputPer1M float64 `yaml:"output_per_1m"`
 }
 
 type RegionConfig struct {
@@ -313,6 +320,9 @@ func Load(path string) (*Config, error) {
 	}
 
 	setDefaults(cfg)
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -443,4 +453,18 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 		}
 	}
 	return match
+}
+
+func validateConfig(cfg *Config) error {
+	for _, provider := range cfg.Providers {
+		for model, cost := range provider.ModelCosts {
+			if cost.InputPer1M < 0 || cost.OutputPer1M < 0 {
+				return fmt.Errorf("provider %q model_costs[%q] cannot be negative", provider.Name, model)
+			}
+		}
+		if provider.DefaultCost.InputPer1M < 0 || provider.DefaultCost.OutputPer1M < 0 {
+			return fmt.Errorf("provider %q default_cost cannot be negative", provider.Name)
+		}
+	}
+	return nil
 }

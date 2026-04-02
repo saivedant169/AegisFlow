@@ -89,7 +89,7 @@ func main() {
 	rt := router.NewRouter(cfg.Routes, registry)
 	pe := initPolicyEngine(cfg)
 	usageStore := usage.NewStore()
-	ut := usage.NewTracker(usageStore)
+	ut := usage.NewTrackerWithProviders(usageStore, cfg.Providers)
 
 	// Response cache
 	var responseCache cache.Cache
