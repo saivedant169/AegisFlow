@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +30,23 @@ func main() {
 	gatewayURL := getEnv("AEGISFLOW_GATEWAY_URL", defaultGatewayURL)
 
 	switch os.Args[1] {
+	case "audit":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl audit <verify> [args]")
+			os.Exit(1)
+		}
+		var err error
+		switch os.Args[2] {
+		case "verify":
+			err = cmdAuditVerify(os.Args[3:], adminURL)
+		default:
+			fmt.Printf("Unknown audit command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "plugin":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: aegisctl plugin <search|info|install|list|remove> [args]")
@@ -90,6 +109,7 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
+  audit       Audit commands (verify)
   plugin      Manage WASM plugins (search, info, install, list, remove)
   status      Check gateway and admin health
   usage       Show usage per tenant and model
@@ -335,6 +355,65 @@ func cmdTest(gatewayURL, apiKey, model, message string) {
 	fmt.Printf("Latency:  %s\n", latency.Round(time.Millisecond))
 	fmt.Printf("Tokens:   %d\n", result.Usage.TotalTokens)
 	fmt.Printf("Response: %s\n", result.Choices[0].Message.Content)
+}
+
+func cmdAuditVerify(args []string, adminURL string) error {
+	fs := flag.NewFlagSet("audit verify", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	url := fs.String("url", adminURL, "admin URL")
+	key := fs.String("key", getEnv("AEGISFLOW_API_KEY", ""), "admin API key")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("usage: aegisctl audit verify --url %s --key <admin-key>", adminURL)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(*url, "/")+"/admin/v1/audit/verify", nil)
+	if err != nil {
+		return err
+	}
+	if *key != "" {
+		req.Header.Set("X-API-Key", *key)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Valid        bool   `json:"valid"`
+		Message      string `json:"message"`
+		TotalEntries int    `json:"total_entries"`
+		ErrorAt      int    `json:"error_at"`
+		Error        *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		if result.Error != nil && result.Error.Message != "" {
+			return errors.New(result.Error.Message)
+		}
+		return fmt.Errorf("admin API returned %d", resp.StatusCode)
+	}
+
+	status := "VALID"
+	if !result.Valid {
+		status = "INVALID"
+	}
+	fmt.Printf("Audit integrity: %s\n", status)
+	if result.Message != "" {
+		fmt.Printf("Message: %s\n", result.Message)
+	}
+	if result.TotalEntries > 0 {
+		fmt.Printf("Entries: %d\n", result.TotalEntries)
+	}
+	if result.ErrorAt > 0 {
+		fmt.Printf("Error At: %d\n", result.ErrorAt)
+	}
+	return nil
 }
 
 func checkHealth(url string) bool {
