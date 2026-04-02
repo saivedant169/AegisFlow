@@ -197,7 +197,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	// Track usage
 	if h.usage != nil {
-		h.usage.Record(tenantID, req.Model, resp.Usage)
+		h.usage.Record(tenantID, providerName, req.Model, resp.Usage)
 	}
 
 	// Persist to database via buffered worker queue (non-blocking)

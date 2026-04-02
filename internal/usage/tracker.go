@@ -21,9 +21,9 @@ func NewTracker(store *Store) *Tracker {
 	return &Tracker{store: store}
 }
 
-func (t *Tracker) Record(tenantID, model string, usage types.Usage) {
+func (t *Tracker) Record(tenantID, providerName, model string, usage types.Usage) {
 	cost := estimateCost(model, usage.TotalTokens)
-	t.store.Add(tenantID, model, usage, cost)
+	t.store.Add(tenantID, providerName, model, usage, cost)
 }
 
 func (t *Tracker) GetUsage(tenantID string) *TenantUsage {

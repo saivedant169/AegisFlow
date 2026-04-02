@@ -462,6 +462,7 @@
         <tr>
           <th>Tenant</th>
           <th>Model</th>
+          <th>Provider</th>
           <th>Requests</th>
           <th>Token Split</th>
           <th>Total Tokens</th>
@@ -469,7 +470,7 @@
         </tr>
       </thead>
       <tbody id="usageTable">
-        <tr><td colspan="6" class="empty-state"><p>No usage data yet</p><div class="hint">Send a request: curl -X POST http://localhost:8080/v1/chat/completions ...</div></td></tr>
+        <tr><td colspan="7" class="empty-state"><p>No usage data yet</p><div class="hint">Send a request: curl -X POST http://localhost:8080/v1/chat/completions ...</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -975,6 +976,13 @@ function getModelBadgeClass(model) {
   return 'badge-model';
 }
 
+function getProviderBadgeClass(provider) {
+  if (provider === 'openai') return 'badge-openai';
+  if (provider === 'ollama') return 'badge-ollama';
+  if (provider === 'mock') return 'badge-mock';
+  return 'badge-model';
+}
+
 function formatNumber(n) {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
@@ -999,20 +1007,27 @@ async function fetchUsage() {
 
       tenantData[tenantId] = { prompt: 0, completion: 0 };
 
-      for (const [model, m] of Object.entries(tenant.by_model || {})) {
+      const providerModelEntries = Object.values(tenant.by_provider_model || {});
+      const usageEntries = providerModelEntries.length > 0 ? providerModelEntries : Object.values(tenant.by_model || {});
+
+      for (const m of usageEntries) {
+        const model = m.model;
         modelMap[model] = (modelMap[model] || 0) + m.requests;
         totalPrompt += m.prompt_tokens;
         totalCompletion += m.completion_tokens;
         tenantData[tenantId].prompt += m.prompt_tokens;
         tenantData[tenantId].completion += m.completion_tokens;
 
-        let provider = 'mock';
-        if (model.startsWith('gpt')) provider = 'openai';
-        else if (model.startsWith('qwen') || model.startsWith('llama')) provider = 'ollama';
-        else if (model.startsWith('claude')) provider = 'anthropic';
+        let provider = m.provider || 'unknown';
+        if (!m.provider) {
+          if (model.startsWith('gpt')) provider = 'openai';
+          else if (model.startsWith('qwen') || model.startsWith('llama')) provider = 'ollama';
+          else if (model.startsWith('claude')) provider = 'anthropic';
+          else provider = 'mock';
+        }
         providerRequests[provider] = (providerRequests[provider] || 0) + m.requests;
 
-        rows.push({ tenant: tenantId, model, requests: m.requests, promptTokens: m.prompt_tokens, completionTokens: m.completion_tokens, totalTokens: m.total_tokens, cost: m.estimated_cost_usd });
+        rows.push({ tenant: tenantId, model, provider, requests: m.requests, promptTokens: m.prompt_tokens, completionTokens: m.completion_tokens, totalTokens: m.total_tokens, cost: m.estimated_cost_usd });
       }
     }
 
@@ -1079,7 +1094,7 @@ async function fetchUsage() {
     const tbody = document.getElementById('usageTable');
     document.getElementById('rowCount').textContent = rows.length + ' entries';
     if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No usage data yet</p></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><p>No usage data yet</p></td></tr>';
     } else {
       rows.sort((a, b) => b.totalTokens - a.totalTokens);
       tbody.innerHTML = rows.map(r => {
@@ -1089,6 +1104,7 @@ async function fetchUsage() {
         return `<tr>
           <td><span class="badge badge-tenant">${r.tenant}</span></td>
           <td><span class="badge ${getModelBadgeClass(r.model)}">${r.model}</span></td>
+          <td><span class="badge ${getProviderBadgeClass(r.provider)}">${r.provider}</span></td>
           <td>${r.requests.toLocaleString()}</td>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
