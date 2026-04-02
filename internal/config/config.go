@@ -169,18 +169,26 @@ type CORSConfig struct {
 }
 
 type ProviderConfig struct {
-	Name       string            `yaml:"name"`
-	Type       string            `yaml:"type"`
-	Enabled    bool              `yaml:"enabled"`
-	Default    bool              `yaml:"default"`
-	BaseURL    string            `yaml:"base_url"`
-	APIKeyEnv  string            `yaml:"api_key_env"`
-	Models     []string          `yaml:"models"`
-	Timeout    time.Duration     `yaml:"timeout"`
-	MaxRetries int               `yaml:"max_retries"`
-	APIVersion string            `yaml:"api_version"`
-	Config     map[string]string `yaml:"config"`
-	Region     string            `yaml:"region"`
+	Name         string               `yaml:"name"`
+	Type         string               `yaml:"type"`
+	Enabled      bool                 `yaml:"enabled"`
+	Default      bool                 `yaml:"default"`
+	BaseURL      string               `yaml:"base_url"`
+	APIKeyEnv    string               `yaml:"api_key_env"`
+	APIKeys      []ProviderAPIKey     `yaml:"api_keys"`
+	KeySelection string               `yaml:"key_selection"`
+	KeyCooldown  time.Duration        `yaml:"key_cooldown"`
+	Models       []string             `yaml:"models"`
+	Timeout      time.Duration        `yaml:"timeout"`
+	MaxRetries   int                  `yaml:"max_retries"`
+	APIVersion   string               `yaml:"api_version"`
+	Config       map[string]string    `yaml:"config"`
+	Region       string               `yaml:"region"`
+}
+
+type ProviderAPIKey struct {
+	Key    string `yaml:"key"`
+	Weight int    `yaml:"weight"`
 }
 
 type RegionConfig struct {
@@ -313,6 +321,9 @@ func Load(path string) (*Config, error) {
 	}
 
 	setDefaults(cfg)
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -392,6 +403,19 @@ func setDefaults(cfg *Config) {
 	if cfg.Budgets.Global.WarnAt == 0 {
 		cfg.Budgets.Global.WarnAt = 90
 	}
+	for i := range cfg.Providers {
+		if cfg.Providers[i].KeySelection == "" {
+			cfg.Providers[i].KeySelection = "round-robin"
+		}
+		if cfg.Providers[i].KeyCooldown == 0 {
+			cfg.Providers[i].KeyCooldown = 5 * time.Minute
+		}
+		for j := range cfg.Providers[i].APIKeys {
+			if cfg.Providers[i].APIKeys[j].Weight <= 0 {
+				cfg.Providers[i].APIKeys[j].Weight = 1
+			}
+		}
+	}
 
 	// Eval defaults
 	if cfg.Eval.Builtin.MinResponseTokens == 0 {
@@ -443,4 +467,18 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 		}
 	}
 	return match
+}
+
+func validateConfig(cfg *Config) error {
+	for _, provider := range cfg.Providers {
+		if provider.KeySelection != "" && provider.KeySelection != "round-robin" && provider.KeySelection != "random" && provider.KeySelection != "least-used" {
+			return fmt.Errorf("provider %q key_selection must be round-robin, random, or least-used", provider.Name)
+		}
+		for _, apiKey := range provider.APIKeys {
+			if apiKey.Weight < 1 {
+				return fmt.Errorf("provider %q api key weights must be at least 1", provider.Name)
+			}
+		}
+	}
+	return nil
 }

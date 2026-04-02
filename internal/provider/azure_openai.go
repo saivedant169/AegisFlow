@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -25,6 +26,7 @@ type AzureOpenAIProvider struct {
 	apiVersion string
 	models     []string // model names map to deployment names
 	client     *http.Client
+	keys       *keyManager
 }
 
 func NewAzureOpenAIProvider(name, endpoint, apiKeyEnv, apiVersion string, models []string, timeout time.Duration) *AzureOpenAIProvider {
@@ -42,6 +44,7 @@ func NewAzureOpenAIProvider(name, endpoint, apiKeyEnv, apiVersion string, models
 		apiVersion: apiVersion,
 		models:     models,
 		client:     &http.Client{Timeout: timeout},
+		keys:       newKeyManager(apiKey, nil, "round-robin", 5*time.Minute),
 	}
 }
 
@@ -59,25 +62,11 @@ func (a *AzureOpenAIProvider) ChatCompletion(ctx context.Context, req *types.Cha
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	url := a.buildURL(req.Model)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	resp, err := a.doRequest(ctx, req.Model, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("api-key", a.apiKey)
-
-	resp, err := a.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var result types.ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -96,24 +85,9 @@ func (a *AzureOpenAIProvider) ChatCompletionStream(ctx context.Context, req *typ
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	url := a.buildURL(req.Model)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	resp, err := a.doRequest(ctx, req.Model, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("api-key", a.apiKey)
-
-	resp, err := a.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
+		return nil, err
 	}
 
 	return resp.Body, nil
@@ -135,5 +109,44 @@ func (a *AzureOpenAIProvider) EstimateTokens(text string) int {
 }
 
 func (a *AzureOpenAIProvider) Healthy(ctx context.Context) bool {
-	return a.apiKey != ""
+	a.ensureKeyManager()
+	return a.keys != nil && a.keys.healthyCount() > 0
+}
+
+func (a *AzureOpenAIProvider) ConfigureKeys(apiKeys []config.ProviderAPIKey, selection string, cooldown time.Duration) {
+	a.keys = newKeyManager(a.apiKey, apiKeys, selection, cooldown)
+}
+
+func (a *AzureOpenAIProvider) doRequest(ctx context.Context, model string, body []byte) (*http.Response, error) {
+	a.ensureKeyManager()
+	key := a.keys.nextKey()
+	if key == nil {
+		return nil, fmt.Errorf("provider %s has no healthy API keys available", a.name)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.buildURL(model), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("api-key", key.key)
+
+	resp, err := a.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	if resp.StatusCode == http.StatusOK {
+		return resp, nil
+	}
+
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	a.keys.reportStatus(a.name, key.key, resp.StatusCode)
+	return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
+}
+
+func (a *AzureOpenAIProvider) ensureKeyManager() {
+	if a.keys == nil {
+		a.keys = newKeyManager(a.apiKey, nil, "round-robin", 5*time.Minute)
+	}
 }

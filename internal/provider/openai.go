@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -20,6 +21,7 @@ type OpenAIProvider struct {
 	models     []string
 	client     *http.Client
 	maxRetries int
+	keys       *keyManager
 }
 
 func NewOpenAIProvider(name, baseURL, apiKeyEnv string, models []string, timeout time.Duration, maxRetries int) *OpenAIProvider {
@@ -37,6 +39,7 @@ func NewOpenAIProvider(name, baseURL, apiKeyEnv string, models []string, timeout
 		models:     models,
 		client:     &http.Client{Timeout: timeout},
 		maxRetries: maxRetries,
+		keys:       newKeyManager(apiKey, nil, "round-robin", 5*time.Minute),
 	}
 }
 
@@ -50,24 +53,11 @@ func (o *OpenAIProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+	resp, err := o.doRequest(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
-
-	resp, err := o.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
-	}
 
 	var result types.ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -86,23 +76,9 @@ func (o *OpenAIProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+	resp, err := o.doRequest(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
-
-	resp, err := o.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
+		return nil, err
 	}
 
 	return resp.Body, nil
@@ -128,19 +104,63 @@ func (o *OpenAIProvider) EstimateTokens(text string) int {
 }
 
 func (o *OpenAIProvider) Healthy(ctx context.Context) bool {
-	if o.apiKey == "" {
+	o.ensureKeyManager()
+	if o.keys == nil || o.keys.healthyCount() == 0 {
+		return false
+	}
+	key := o.keys.nextKey()
+	if key == nil {
 		return false
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.baseURL+"/models", nil)
 	if err != nil {
 		return false
 	}
-	req.Header.Set("Authorization", "Bearer "+o.apiKey)
+	req.Header.Set("Authorization", "Bearer "+key.key)
 
 	resp, err := o.client.Do(req)
 	if err != nil {
 		return false
 	}
 	resp.Body.Close()
+	o.keys.reportStatus(o.name, key.key, resp.StatusCode)
 	return resp.StatusCode == http.StatusOK
+}
+
+func (o *OpenAIProvider) ConfigureKeys(apiKeys []config.ProviderAPIKey, selection string, cooldown time.Duration) {
+	o.keys = newKeyManager(o.apiKey, apiKeys, selection, cooldown)
+}
+
+func (o *OpenAIProvider) doRequest(ctx context.Context, body []byte) (*http.Response, error) {
+	o.ensureKeyManager()
+	key := o.keys.nextKey()
+	if key == nil {
+		return nil, fmt.Errorf("provider %s has no healthy API keys available", o.name)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+key.key)
+
+	resp, err := o.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	if resp.StatusCode == http.StatusOK {
+		return resp, nil
+	}
+
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	o.keys.reportStatus(o.name, key.key, resp.StatusCode)
+	return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
+}
+
+func (o *OpenAIProvider) ensureKeyManager() {
+	if o.keys == nil {
+		o.keys = newKeyManager(o.apiKey, nil, "round-robin", 5*time.Minute)
+	}
 }

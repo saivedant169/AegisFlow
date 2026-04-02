@@ -910,3 +910,65 @@ federation:
 		t.Errorf("expected sync interval 1m, got %v", cfg.Federation.ControlPlane.SyncInterval)
 	}
 }
+
+func TestProviderAPIKeysParsingAndDefaults(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    api_keys:
+      - key: "sk-key-1"
+      - key: "sk-key-2"
+        weight: 2
+`
+	f, err := os.CreateTemp("", "aegisflow-api-keys-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	cfg, err := Load(f.Name())
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	provider := cfg.Providers[0]
+	if provider.KeySelection != "round-robin" {
+		t.Fatalf("expected default key selection round-robin, got %q", provider.KeySelection)
+	}
+	if provider.KeyCooldown != 5*time.Minute {
+		t.Fatalf("expected default key cooldown 5m, got %v", provider.KeyCooldown)
+	}
+	if provider.APIKeys[0].Weight != 1 || provider.APIKeys[1].Weight != 2 {
+		t.Fatalf("unexpected key weights: %+v", provider.APIKeys)
+	}
+}
+
+func TestProviderAPIKeysRejectInvalidSelection(t *testing.T) {
+	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    key_selection: "invalid"
+    api_keys:
+      - key: "sk-key-1"
+`
+	f, err := os.CreateTemp("", "aegisflow-api-key-selection-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	if _, err := Load(f.Name()); err == nil {
+		t.Fatal("expected invalid key selection to be rejected")
+	}
+}
