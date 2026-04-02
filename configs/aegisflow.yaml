@@ -7,6 +7,10 @@ server:
   graceful_shutdown: 10s
   max_body_size: 10485760
 
+compression:
+  enabled: false
+  min_size_bytes: 1024
+
 providers:
   - name: "mock"
     type: "mock"

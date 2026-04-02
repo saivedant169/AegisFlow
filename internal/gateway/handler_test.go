@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -97,6 +99,98 @@ func TestChatCompletionMissingMessages(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestChatCompletionGzipRequestBody(t *testing.T) {
+	h := setupTestHandler()
+
+	var body bytes.Buffer
+	gzw := gzip.NewWriter(&body)
+	if _, err := gzw.Write([]byte(`{"model":"mock","messages":[{"role":"user","content":"hello"}]}`)); err != nil {
+		t.Fatalf("failed to write gzipped request: %v", err)
+	}
+	if err := gzw.Close(); err != nil {
+		t.Fatalf("failed to close gzip writer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body.Bytes()))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	w := httptest.NewRecorder()
+
+	h.ChatCompletion(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestChatCompletionGzipResponse(t *testing.T) {
+	h := setupTestHandler()
+	h.SetCompression(true, 1)
+
+	reqBody := types.ChatCompletionRequest{
+		Model:    "mock",
+		Messages: []types.Message{{Role: "user", Content: "compress me"}},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+
+	h.ChatCompletion(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if w.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip response, got %q", w.Header().Get("Content-Encoding"))
+	}
+
+	gzr, err := gzip.NewReader(bytes.NewReader(w.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gzr.Close()
+
+	data, err := io.ReadAll(gzr)
+	if err != nil {
+		t.Fatalf("failed to read gzipped response: %v", err)
+	}
+
+	var resp types.ChatCompletionResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		t.Fatalf("failed to decode gzipped response: %v", err)
+	}
+	if len(resp.Choices) != 1 {
+		t.Fatalf("expected 1 choice, got %d", len(resp.Choices))
+	}
+}
+
+func TestChatCompletionStreamDisablesCompression(t *testing.T) {
+	h := setupTestHandler()
+	h.SetCompression(true, 1)
+
+	reqBody := types.ChatCompletionRequest{
+		Model:    "mock",
+		Messages: []types.Message{{Role: "user", Content: "stream me"}},
+		Stream:   true,
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+
+	h.ChatCompletion(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if got := w.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("expected uncompressed stream, got %q", got)
 	}
 }
 

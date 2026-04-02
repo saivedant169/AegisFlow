@@ -14,6 +14,9 @@ func TestLoadConfig(t *testing.T) {
 server:
   port: 9090
   admin_port: 9091
+compression:
+  enabled: true
+  min_size_bytes: 256
 providers:
   - name: "mock"
     type: "mock"
@@ -68,6 +71,9 @@ tenants:
 	}
 	if cfg.Server.Host != "0.0.0.0" {
 		t.Errorf("expected default host '0.0.0.0', got '%s'", cfg.Server.Host)
+	}
+	if !cfg.Compression.Enabled || cfg.Compression.MinSizeBytes != 256 {
+		t.Errorf("expected compression config {true,256}, got {%v,%d}", cfg.Compression.Enabled, cfg.Compression.MinSizeBytes)
 	}
 }
 
@@ -316,6 +322,9 @@ func TestSetDefaultsAllValues(t *testing.T) {
 	}
 	if cfg.Cache.MaxSize != 1000 {
 		t.Errorf("expected cache max size 1000, got %d", cfg.Cache.MaxSize)
+	}
+	if cfg.Compression.MinSizeBytes != 1024 {
+		t.Errorf("expected compression min size 1024, got %d", cfg.Compression.MinSizeBytes)
 	}
 
 	// Analytics

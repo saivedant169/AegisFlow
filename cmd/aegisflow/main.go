@@ -203,6 +203,7 @@ func main() {
 		budgetCheckFn = budgetMgr.CheckFunc()
 	}
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
+	handler.SetCompression(cfg.Compression.Enabled, cfg.Compression.MinSizeBytes)
 
 	// Eval hooks
 	if cfg.Eval.Enabled {

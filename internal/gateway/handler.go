@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"log"
@@ -24,15 +26,15 @@ import (
 )
 
 type Handler struct {
-	registry    *provider.Registry
-	router      *router.Router
-	policy      *policy.Engine
-	usage       *usage.Tracker
-	cache       cache.Cache
-	webhook     *webhook.Notifier
-	store       *storage.PostgresStore
-	dbQueue     chan storage.UsageEvent
-	analytics   *analytics.Collector
+	registry       *provider.Registry
+	router         *router.Router
+	policy         *policy.Engine
+	usage          *usage.Tracker
+	cache          cache.Cache
+	webhook        *webhook.Notifier
+	store          *storage.PostgresStore
+	dbQueue        chan storage.UsageEvent
+	analytics      *analytics.Collector
 	maxBodySize    int64
 	recordSpend    func(tenantID, model string, cost float64)
 	budgetCheck    func(tenantID, model string) (bool, []string, string)
@@ -41,11 +43,22 @@ type Handler struct {
 	evalLatencyMul float64
 	evalWebhook    *eval.WebhookEvaluator
 	auditLog       func(actor, actorRole, action, resource, detail, tenantID, model string)
+	compressBody   bool
+	compressMinB   int
 }
 
 // SetAuditLogger sets the audit logging function on the handler.
 func (h *Handler) SetAuditLogger(logFn func(actor, actorRole, action, resource, detail, tenantID, model string)) {
 	h.auditLog = logFn
+}
+
+// SetCompression configures gzip compression for non-streaming JSON responses.
+func (h *Handler) SetCompression(enabled bool, minSizeBytes int) {
+	h.compressBody = enabled
+	if minSizeBytes <= 0 {
+		minSizeBytes = 1024
+	}
+	h.compressMinB = minSizeBytes
 }
 
 const (
@@ -58,6 +71,7 @@ func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engin
 		maxBodySize = defaultMaxBodySize
 	}
 	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, maxBodySize: maxBodySize, recordSpend: recordSpend, budgetCheck: budgetCheck}
+	h.compressMinB = 1024
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
 		go h.dbWorker()
@@ -93,17 +107,27 @@ func (h *Handler) SetEval(builtinEnabled bool, minTokens int, latencyMul float64
 func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	var req types.ChatCompletionRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, h.maxBodySize)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
+	body := io.LimitReader(r.Body, h.maxBodySize)
+	if strings.Contains(strings.ToLower(r.Header.Get("Content-Encoding")), "gzip") {
+		gzr, err := gzip.NewReader(body)
+		if err != nil {
+			h.writeError(w, r, http.StatusBadRequest, "invalid_request", "failed to parse request body")
+			return
+		}
+		defer gzr.Close()
+		body = io.LimitReader(gzr, h.maxBodySize)
+	}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		h.writeError(w, r, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 		return
 	}
 
 	if req.Model == "" {
-		writeError(w, http.StatusBadRequest, "invalid_request", "model is required")
+		h.writeError(w, r, http.StatusBadRequest, "invalid_request", "model is required")
 		return
 	}
 	if len(req.Messages) == 0 {
-		writeError(w, http.StatusBadRequest, "invalid_request", "messages is required")
+		h.writeError(w, r, http.StatusBadRequest, "invalid_request", "messages is required")
 		return
 	}
 
@@ -117,7 +141,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		allowed, warnings, blockMsg := h.budgetCheck(tenantID, req.Model)
 		if !allowed {
 			h.recordAnalytics(tenantID, req.Model, "", http.StatusTooManyRequests, startTime, 0)
-			writeError(w, http.StatusTooManyRequests, "budget_exceeded", blockMsg)
+			h.writeError(w, r, http.StatusTooManyRequests, "budget_exceeded", blockMsg)
 			return
 		}
 		for _, warning := range warnings {
@@ -139,7 +163,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 					}
 					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, `{"message":"`+v.Message+`","prompt":"`+prompt+`"}`, tenantID, req.Model)
 				}
-				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
+				h.writeError(w, r, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
 			h.fireWebhook("policy_warning", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
@@ -157,9 +181,8 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		cacheKey := cache.BuildKey(tenantID, req.Model, req.Messages)
 		if cached, ok := h.cache.Get(cacheKey); ok {
 			log.Printf("cache hit: %s", cacheKey[:20])
-			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-AegisFlow-Cache", "HIT")
-			json.NewEncoder(w).Encode(cached)
+			h.writeJSON(w, r, http.StatusOK, cached)
 			return
 		}
 	}
@@ -167,7 +190,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	routed, err := h.router.RouteWithProvider(r.Context(), &req)
 	if err != nil {
 		h.recordAnalytics(tenantID, req.Model, "", http.StatusBadGateway, startTime, 0)
-		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
+		h.writeError(w, r, http.StatusBadGateway, "provider_error", err.Error())
 		return
 	}
 	resp := routed.Response
@@ -182,7 +205,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 				if h.auditLog != nil {
 					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, `{"message":"`+v.Message+`","phase":"output"}`, tenantID, req.Model)
 				}
-				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
+				h.writeError(w, r, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
 				return
 			}
 			log.Printf("policy warning (output): %s", policy.FormatViolation(v))
@@ -246,21 +269,20 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	// Record analytics data point
 	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens), qualityScore)
 
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-AegisFlow-Cache", "MISS")
-	json.NewEncoder(w).Encode(resp)
+	h.writeJSON(w, r, http.StatusOK, resp)
 }
 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *types.ChatCompletionRequest, tenantID string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "server_error", "streaming not supported")
+		h.writeError(w, r, http.StatusInternalServerError, "server_error", "streaming not supported")
 		return
 	}
 
 	stream, err := h.router.RouteStream(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
+		h.writeError(w, r, http.StatusBadGateway, "provider_error", err.Error())
 		return
 	}
 	defer stream.Close()
@@ -325,8 +347,7 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 		Object: "list",
 		Data:   models,
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	h.writeJSON(w, r, http.StatusOK, resp)
 }
 
 func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCode int, startTime time.Time, tokens int64, qualityScore ...int) {
@@ -370,8 +391,35 @@ func extractContent(messages []types.Message) string {
 	return strings.Join(parts, " ")
 }
 
-func writeError(w http.ResponseWriter, code int, errType, message string) {
+func acceptsGzip(r *http.Request) bool {
+	return strings.Contains(strings.ToLower(r.Header.Get("Accept-Encoding")), "gzip")
+}
+
+func (h *Handler) writeJSON(w http.ResponseWriter, r *http.Request, status int, payload any) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(w, `{"error":{"message":"failed to encode response","type":"server_error"}}`, http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message))
+	w.Header().Set("Vary", "Accept-Encoding")
+
+	if h.compressBody && acceptsGzip(r) && len(body) >= h.compressMinB {
+		var compressed bytes.Buffer
+		gzw := gzip.NewWriter(&compressed)
+		if _, err := gzw.Write(body); err == nil && gzw.Close() == nil {
+			w.Header().Set("Content-Encoding", "gzip")
+			w.WriteHeader(status)
+			w.Write(compressed.Bytes())
+			return
+		}
+	}
+
+	w.WriteHeader(status)
+	w.Write(body)
+}
+
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, code int, errType, message string) {
+	h.writeJSON(w, r, code, types.NewErrorResponse(code, errType, message))
 }

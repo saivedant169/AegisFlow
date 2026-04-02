@@ -11,24 +11,30 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig     `yaml:"server"`
-	Providers []ProviderConfig `yaml:"providers"`
-	Routes    []RouteConfig    `yaml:"routes"`
-	Tenants   []TenantConfig   `yaml:"tenants"`
-	RateLimit RateLimitConfig  `yaml:"rate_limit"`
-	Policies  PoliciesConfig   `yaml:"policies"`
-	Telemetry TelemetryConfig  `yaml:"telemetry"`
-	Logging   LoggingConfig    `yaml:"logging"`
-	Cache     CacheConfig      `yaml:"cache"`
-	Webhook   WebhookConfig    `yaml:"webhook"`
-	Database  DatabaseConfig   `yaml:"database"`
-	Admin     AdminConfig      `yaml:"admin"`
-	Aliases   AliasConfig      `yaml:"aliases"`
-	Transform TransformConfig  `yaml:"transform"`
-	Analytics AnalyticsConfig  `yaml:"analytics"`
-	Budgets   BudgetsConfig    `yaml:"budgets"`
-	Eval       EvalConfig       `yaml:"eval"`
-	Federation FederationConfig `yaml:"federation"`
+	Server      ServerConfig      `yaml:"server"`
+	Providers   []ProviderConfig  `yaml:"providers"`
+	Routes      []RouteConfig     `yaml:"routes"`
+	Tenants     []TenantConfig    `yaml:"tenants"`
+	RateLimit   RateLimitConfig   `yaml:"rate_limit"`
+	Policies    PoliciesConfig    `yaml:"policies"`
+	Telemetry   TelemetryConfig   `yaml:"telemetry"`
+	Logging     LoggingConfig     `yaml:"logging"`
+	Cache       CacheConfig       `yaml:"cache"`
+	Webhook     WebhookConfig     `yaml:"webhook"`
+	Database    DatabaseConfig    `yaml:"database"`
+	Admin       AdminConfig       `yaml:"admin"`
+	Aliases     AliasConfig       `yaml:"aliases"`
+	Transform   TransformConfig   `yaml:"transform"`
+	Analytics   AnalyticsConfig   `yaml:"analytics"`
+	Budgets     BudgetsConfig     `yaml:"budgets"`
+	Eval        EvalConfig        `yaml:"eval"`
+	Compression CompressionConfig `yaml:"compression"`
+	Federation  FederationConfig  `yaml:"federation"`
+}
+
+type CompressionConfig struct {
+	Enabled      bool `yaml:"enabled"`
+	MinSizeBytes int  `yaml:"min_size_bytes"`
 }
 
 type FederationConfig struct {
@@ -358,6 +364,9 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Cache.MaxSize == 0 {
 		cfg.Cache.MaxSize = 1000
+	}
+	if cfg.Compression.MinSizeBytes == 0 {
+		cfg.Compression.MinSizeBytes = 1024
 	}
 	if cfg.Analytics.RetentionHours == 0 {
 		cfg.Analytics.RetentionHours = 48
