@@ -202,7 +202,12 @@ func main() {
 		recordSpendFn = budgetMgr.RecordSpend
 		budgetCheckFn = budgetMgr.CheckFunc()
 	}
+
+	// Request log for live feed
+	reqLog := admin.NewRequestLog(200)
+
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
+	handler.SetRequestLogger(reqLog, cfg.Federation.ControlPlane.Name)
 
 	// Eval hooks
 	if cfg.Eval.Enabled {
@@ -263,9 +268,6 @@ func main() {
 	r.Get("/health", healthHandler)
 	r.Post("/v1/chat/completions", handler.ChatCompletion)
 	r.Get("/v1/models", handler.ListModels)
-
-	// Request log for live feed
-	reqLog := admin.NewRequestLog(200)
 
 	// Rollout manager
 	var rolloutAdapter admin.RolloutManager
@@ -329,10 +331,10 @@ func main() {
 			federationProvider = cp
 			log.Printf("federation control plane enabled (%d data planes)", len(cfg.Federation.DataPlanes))
 		} else if cfg.Federation.Mode == "data-plane" {
-			dp := federation.NewDataPlane(cfg.Federation.ControlPlane.URL, cfg.Federation.ControlPlane.Token, cfg.Federation.ControlPlane.SyncInterval)
+			dp := federation.NewDataPlane(cfg.Federation.ControlPlane.Name, cfg.Federation.ControlPlane.URL, cfg.Federation.ControlPlane.Token, cfg.Federation.ControlPlane.SyncInterval)
 			dp.Start()
 			defer dp.Stop()
-			log.Printf("federation data plane enabled (control: %s)", cfg.Federation.ControlPlane.URL)
+			log.Printf("federation data plane enabled (name: %s, control: %s)", cfg.Federation.ControlPlane.Name, cfg.Federation.ControlPlane.URL)
 		}
 	}
 

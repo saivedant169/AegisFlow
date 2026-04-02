@@ -10,6 +10,9 @@ import (
 	"context"
 	"time"
 
+	chimw "github.com/go-chi/chi/v5/middleware"
+
+	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/eval"
@@ -24,15 +27,15 @@ import (
 )
 
 type Handler struct {
-	registry    *provider.Registry
-	router      *router.Router
-	policy      *policy.Engine
-	usage       *usage.Tracker
-	cache       cache.Cache
-	webhook     *webhook.Notifier
-	store       *storage.PostgresStore
-	dbQueue     chan storage.UsageEvent
-	analytics   *analytics.Collector
+	registry       *provider.Registry
+	router         *router.Router
+	policy         *policy.Engine
+	usage          *usage.Tracker
+	cache          cache.Cache
+	webhook        *webhook.Notifier
+	store          *storage.PostgresStore
+	dbQueue        chan storage.UsageEvent
+	analytics      *analytics.Collector
 	maxBodySize    int64
 	recordSpend    func(tenantID, model string, cost float64)
 	budgetCheck    func(tenantID, model string) (bool, []string, string)
@@ -41,11 +44,19 @@ type Handler struct {
 	evalLatencyMul float64
 	evalWebhook    *eval.WebhookEvaluator
 	auditLog       func(actor, actorRole, action, resource, detail, tenantID, model string)
+	requestLog     *admin.RequestLog
+	dataPlaneName  string
 }
 
 // SetAuditLogger sets the audit logging function on the handler.
 func (h *Handler) SetAuditLogger(logFn func(actor, actorRole, action, resource, detail, tenantID, model string)) {
 	h.auditLog = logFn
+}
+
+// SetRequestLogger configures live request feed logging on the handler.
+func (h *Handler) SetRequestLogger(reqLog *admin.RequestLog, dataPlaneName string) {
+	h.requestLog = reqLog
+	h.dataPlaneName = dataPlaneName
 }
 
 const (
@@ -159,6 +170,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			log.Printf("cache hit: %s", cacheKey[:20])
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-AegisFlow-Cache", "HIT")
+			h.logRequest(startTime, r, tenantID, req.Model, "cache", http.StatusOK, cached.Usage.TotalTokens, true, "")
 			json.NewEncoder(w).Encode(cached)
 			return
 		}
@@ -167,6 +179,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	routed, err := h.router.RouteWithProvider(r.Context(), &req)
 	if err != nil {
 		h.recordAnalytics(tenantID, req.Model, "", http.StatusBadGateway, startTime, 0)
+		h.logRequest(startTime, r, tenantID, req.Model, "", http.StatusBadGateway, 0, false, "")
 		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
 		return
 	}
@@ -179,6 +192,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
+				h.logRequest(startTime, r, tenantID, req.Model, providerName, http.StatusForbidden, resp.Usage.TotalTokens, false, routed.Region)
 				if h.auditLog != nil {
 					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, `{"message":"`+v.Message+`","phase":"output"}`, tenantID, req.Model)
 				}
@@ -245,6 +259,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	// Record analytics data point
 	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens), qualityScore)
+	h.logRequest(startTime, r, tenantID, req.Model, providerName, http.StatusOK, resp.Usage.TotalTokens, false, routed.Region)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-AegisFlow-Cache", "MISS")
@@ -368,6 +383,26 @@ func extractContent(messages []types.Message) string {
 		parts = append(parts, m.Content)
 	}
 	return strings.Join(parts, " ")
+}
+
+func (h *Handler) logRequest(startTime time.Time, r *http.Request, tenantID, model, providerName string, status int, tokens int, cached bool, region string) {
+	if h.requestLog == nil {
+		return
+	}
+	h.requestLog.Add(admin.RequestEntry{
+		Timestamp:    time.Now(),
+		RequestID:    chimw.GetReqID(r.Context()),
+		TenantID:     tenantID,
+		Model:        model,
+		Provider:     providerName,
+		Region:       region,
+		DataPlane:    h.dataPlaneName,
+		Status:       status,
+		LatencyMs:    time.Since(startTime).Milliseconds(),
+		Tokens:       tokens,
+		Cached:       cached,
+		QualityScore: 0,
+	})
 }
 
 func writeError(w http.ResponseWriter, code int, errType, message string) {
