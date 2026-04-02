@@ -20,4 +20,11 @@ jobs:
         run: go build ./...
 
       - name: Test
-        run: go test ./... -v -race -count=1
+        run: go test ./... -v -race -count=1 -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
