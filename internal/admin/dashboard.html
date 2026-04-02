@@ -865,6 +865,10 @@
     <div class="topbar">
       <h2>Audit Log</h2>
       <div style="display:flex; align-items:center; gap:12px;">
+        <button onclick="downloadAuditCSV()" style="background:var(--gradient-blue); color:white; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download CSV
+        </button>
         <button onclick="verifyAudit()" style="background:var(--gradient-purple); color:white; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px;">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           Verify Integrity
@@ -1755,11 +1759,14 @@ setInterval(() => {
 }, 5000);
 
 // --- Audit Log ---
+let auditEntries = [];
+
 async function fetchAudit() {
   try {
     const resp = await fetch('/admin/v1/audit');
     const data = await resp.json();
     const tbody = document.getElementById('auditTableBody');
+    auditEntries = Array.isArray(data) ? data.slice() : [];
     if (!data || data.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-secondary); padding:40px;">No audit entries</td></tr>';
       return;
@@ -1783,6 +1790,38 @@ async function fetchAudit() {
   } catch (err) {
     console.error('Failed to fetch audit log', err);
   }
+}
+
+function downloadAuditCSV() {
+  if (!auditEntries.length) return;
+  const escapeCSV = (value) => {
+    const text = value == null ? '' : String(value);
+    if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+      return '"' + text.replace(/"/g, '""') + '"';
+    }
+    return text;
+  };
+  const rows = [
+    ['timestamp', 'actor', 'role', 'action', 'resource', 'tenant'],
+    ...auditEntries.map((e) => [
+      e.timestamp || '',
+      e.actor || '',
+      e.actor_role || '',
+      e.action || '',
+      e.resource || '',
+      e.tenant_id || ''
+    ])
+  ];
+  const csv = rows.map((row) => row.map(escapeCSV).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'audit-log.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 async function verifyAudit() {
