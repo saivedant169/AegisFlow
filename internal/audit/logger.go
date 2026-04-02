@@ -38,12 +38,13 @@ type Store interface {
 }
 
 type QueryFilters struct {
-	Actor    string
-	Action   string
-	TenantID string
-	From     time.Time
-	To       time.Time
-	Limit    int
+	Actor     string
+	ActorRole string
+	Action    string
+	TenantID  string
+	From      time.Time
+	To        time.Time
+	Limit     int
 }
 
 func NewLogger(store Store) (*Logger, error) {

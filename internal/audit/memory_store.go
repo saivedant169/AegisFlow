@@ -37,7 +37,30 @@ func (s *MemoryStore) LastHash() (string, error) {
 func (s *MemoryStore) Query(filters QueryFilters) ([]Entry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	result := make([]Entry, len(s.entries))
-	copy(result, s.entries)
+	result := make([]Entry, 0, len(s.entries))
+	for _, entry := range s.entries {
+		if filters.Actor != "" && entry.Actor != filters.Actor {
+			continue
+		}
+		if filters.ActorRole != "" && entry.ActorRole != filters.ActorRole {
+			continue
+		}
+		if filters.Action != "" && entry.Action != filters.Action {
+			continue
+		}
+		if filters.TenantID != "" && entry.TenantID != filters.TenantID {
+			continue
+		}
+		if !filters.From.IsZero() && entry.Timestamp.Before(filters.From) {
+			continue
+		}
+		if !filters.To.IsZero() && entry.Timestamp.After(filters.To) {
+			continue
+		}
+		result = append(result, entry)
+	}
+	if filters.Limit > 0 && len(result) > filters.Limit {
+		result = result[:filters.Limit]
+	}
 	return result, nil
 }

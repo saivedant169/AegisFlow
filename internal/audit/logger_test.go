@@ -241,6 +241,23 @@ func TestMemoryStoreQueryReturnsAllInOrder(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreQueryFiltersActorRole(t *testing.T) {
+	store := NewMemoryStore()
+	_ = store.Insert(Entry{Actor: "alice", ActorRole: "admin", Action: "a1", Detail: "{}"})
+	_ = store.Insert(Entry{Actor: "bob", ActorRole: "viewer", Action: "a2", Detail: "{}"})
+
+	entries, err := store.Query(QueryFilters{ActorRole: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Actor != "alice" {
+		t.Fatalf("expected alice, got %s", entries[0].Actor)
+	}
+}
+
 func TestComputeHashDeterministic(t *testing.T) {
 	e := Entry{
 		Timestamp: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),

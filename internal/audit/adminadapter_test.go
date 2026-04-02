@@ -17,7 +17,7 @@ func TestAdminAdapterQuery(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	adapter := NewAdminAdapter(logger)
-	result, err := adapter.Query("", "", "", 0)
+	result, err := adapter.Query("", "", "", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
