@@ -179,9 +179,19 @@ type ProviderConfig struct {
 	Models     []string          `yaml:"models"`
 	Timeout    time.Duration     `yaml:"timeout"`
 	MaxRetries int               `yaml:"max_retries"`
+	Retry      RetryConfig       `yaml:"retry"`
 	APIVersion string            `yaml:"api_version"`
 	Config     map[string]string `yaml:"config"`
 	Region     string            `yaml:"region"`
+}
+
+type RetryConfig struct {
+	MaxAttempts          int           `yaml:"max_attempts"`
+	InitialBackoff       time.Duration `yaml:"initial_backoff"`
+	MaxBackoff           time.Duration `yaml:"max_backoff"`
+	BackoffMultiplier    float64       `yaml:"backoff_multiplier"`
+	Jitter               bool          `yaml:"jitter"`
+	RetryableStatusCodes []int         `yaml:"retryable_status_codes"`
 }
 
 type RegionConfig struct {
@@ -314,6 +324,9 @@ func Load(path string) (*Config, error) {
 	}
 
 	setDefaults(cfg)
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -393,6 +406,23 @@ func setDefaults(cfg *Config) {
 	if cfg.Budgets.Global.WarnAt == 0 {
 		cfg.Budgets.Global.WarnAt = 90
 	}
+	for i := range cfg.Providers {
+		if cfg.Providers[i].Retry.MaxAttempts == 0 {
+			cfg.Providers[i].Retry.MaxAttempts = 1
+		}
+		if cfg.Providers[i].Retry.InitialBackoff == 0 {
+			cfg.Providers[i].Retry.InitialBackoff = 200 * time.Millisecond
+		}
+		if cfg.Providers[i].Retry.MaxBackoff == 0 {
+			cfg.Providers[i].Retry.MaxBackoff = 5 * time.Second
+		}
+		if cfg.Providers[i].Retry.BackoffMultiplier == 0 {
+			cfg.Providers[i].Retry.BackoffMultiplier = 2.0
+		}
+		if len(cfg.Providers[i].Retry.RetryableStatusCodes) == 0 {
+			cfg.Providers[i].Retry.RetryableStatusCodes = []int{429, 500, 502, 503, 504}
+		}
+	}
 
 	// Eval defaults
 	if cfg.Eval.Builtin.MinResponseTokens == 0 {
@@ -444,4 +474,13 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 		}
 	}
 	return match
+}
+
+func validateConfig(cfg *Config) error {
+	for _, provider := range cfg.Providers {
+		if provider.Retry.MaxAttempts < 1 {
+			return fmt.Errorf("provider %q retry.max_attempts must be at least 1", provider.Name)
+		}
+	}
+	return nil
 }
