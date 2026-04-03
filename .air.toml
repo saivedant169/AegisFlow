@@ -1,0 +1,14 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/aegisflow ./cmd/aegisflow"
+bin = "./tmp/aegisflow"
+full_bin = "./tmp/aegisflow --config configs/aegisflow.yaml"
+include_ext = ["go", "yaml", "yml", "html"]
+exclude_dir = ["tmp", "bin", "plugins", ".git"]
+delay = 500
+stop_on_error = true
+
+[screen]
+clear_on_rebuild = true
