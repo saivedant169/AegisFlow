@@ -40,7 +40,7 @@ type BudgetProvider interface {
 // cycle with the audit package. Use audit.NewAdminAdapter to wrap a
 // *audit.Logger so it satisfies this interface.
 type AuditProvider interface {
-	Query(actor, action, tenantID string, limit int) (interface{}, error)
+	Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error)
 	Verify() (interface{}, error)
 }
 
@@ -495,10 +495,11 @@ func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor := r.URL.Query().Get("actor")
+	actorRole := r.URL.Query().Get("actor_role")
 	action := r.URL.Query().Get("action")
 	tenantID := r.URL.Query().Get("tenant_id")
 	limit := 100 // default
-	result, err := s.auditProvider.Query(actor, action, tenantID, limit)
+	result, err := s.auditProvider.Query(actor, actorRole, action, tenantID, limit)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)

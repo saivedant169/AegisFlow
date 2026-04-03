@@ -70,6 +70,11 @@ func (s *PostgresStore) Query(filters audit.QueryFilters) ([]audit.Entry, error)
 		args = append(args, filters.Actor)
 		argIdx++
 	}
+	if filters.ActorRole != "" {
+		query += fmt.Sprintf(" AND actor_role = $%d", argIdx)
+		args = append(args, filters.ActorRole)
+		argIdx++
+	}
 	if filters.Action != "" {
 		query += fmt.Sprintf(" AND action = $%d", argIdx)
 		args = append(args, filters.Action)

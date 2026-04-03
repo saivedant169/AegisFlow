@@ -9,9 +9,9 @@ func NewAdminAdapter(l *Logger) *AdminAdapter {
 	return &AdminAdapter{logger: l}
 }
 
-func (a *AdminAdapter) Query(actor, action, tenantID string, limit int) (interface{}, error) {
+func (a *AdminAdapter) Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error) {
 	return a.logger.Query(QueryFilters{
-		Actor: actor, Action: action, TenantID: tenantID, Limit: limit,
+		Actor: actor, ActorRole: actorRole, Action: action, TenantID: tenantID, Limit: limit,
 	})
 }
 
