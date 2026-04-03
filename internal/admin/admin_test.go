@@ -34,7 +34,7 @@ func (s *stubRolloutManager) RollbackRollout(id string) error { return nil }
 
 type verifyOnlyAuditProvider struct{}
 
-func (s *verifyOnlyAuditProvider) Query(actor, action, tenantID string, limit int) (interface{}, error) {
+func (s *verifyOnlyAuditProvider) Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error) {
 	return []any{}, nil
 }
 
@@ -55,7 +55,7 @@ func newIntegrationAdminServer() *Server {
 	}
 
 	tracker := usage.NewTracker(usage.NewStore())
-	tracker.Record("viewer-tenant", "mock", types.Usage{PromptTokens: 3, CompletionTokens: 2, TotalTokens: 5})
+	tracker.Record("viewer-tenant", "mock", "mock", types.Usage{PromptTokens: 3, CompletionTokens: 2, TotalTokens: 5})
 	registry := provider.NewRegistry()
 	registry.Register(provider.NewMockProvider("mock", 0))
 
