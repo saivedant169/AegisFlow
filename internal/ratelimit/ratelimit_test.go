@@ -174,7 +174,7 @@ func TestMemoryLimiterVeryLargeCost(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestNewRedisLimiterFailsWithBadAddress(t *testing.T) {
-	_, err := NewRedisLimiter("localhost:1", "", 0, 10, time.Minute)
+	_, err := NewRedisLimiter("localhost:1", "", 0, WithLimit(10), WithPeriod(time.Minute))
 	if err == nil {
 		t.Fatal("expected error when connecting to nonexistent Redis")
 	}
@@ -191,7 +191,7 @@ func TestRedisLimiterAllowAndDeny(t *testing.T) {
 	}
 	defer mr.Close()
 
-	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, 5, time.Minute)
+	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, WithLimit(5), WithPeriod(time.Minute))
 	if err != nil {
 		t.Fatalf("failed to create redis limiter: %v", err)
 	}
@@ -215,6 +215,65 @@ func TestRedisLimiterAllowAndDeny(t *testing.T) {
 	}
 }
 
+func TestRedisLimiterSlidingWindow(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+
+	limiter, err := NewRedisLimiter(mr.Addr(), "", 0,
+		WithLimit(5), WithPeriod(time.Minute), WithMode(ModeSliding))
+	if err != nil {
+		t.Fatalf("failed to create redis limiter: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		allowed, err := limiter.Allow("sw-key", 1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !allowed {
+			t.Errorf("request %d should be allowed", i)
+		}
+	}
+
+	allowed, err := limiter.Allow("sw-key", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if allowed {
+		t.Error("6th request should be denied (sliding window limit is 5)")
+	}
+}
+
+func TestRedisLimiterSlidingWindowAtomicCost(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+
+	limiter, err := NewRedisLimiter(mr.Addr(), "", 0,
+		WithLimit(10), WithPeriod(time.Minute), WithMode(ModeSliding))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, _ := limiter.Allow("c", 3); !ok {
+		t.Fatal("cost 3 should be allowed")
+	}
+	if ok, _ := limiter.Allow("c", 3); !ok {
+		t.Fatal("second cost 3 should be allowed")
+	}
+	if ok, _ := limiter.Allow("c", 3); !ok {
+		t.Fatal("third cost 3 should be allowed (9 in window)")
+	}
+	if ok, _ := limiter.Allow("c", 3); ok {
+		t.Fatal("fourth cost 3 should be denied (would exceed 10)")
+	}
+}
+
 func TestRedisLimiterSeparateKeys(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -222,7 +281,7 @@ func TestRedisLimiterSeparateKeys(t *testing.T) {
 	}
 	defer mr.Close()
 
-	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, 2, time.Minute)
+	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, WithLimit(2), WithPeriod(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +307,7 @@ func TestRedisLimiterCostGreaterThanLimit(t *testing.T) {
 	}
 	defer mr.Close()
 
-	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, 10, time.Minute)
+	limiter, err := NewRedisLimiter(mr.Addr(), "", 0, WithLimit(10), WithPeriod(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
