@@ -3,6 +3,7 @@ package eval
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"math/rand"
 	"net/http"
@@ -34,6 +35,8 @@ type WebhookEvaluator struct {
 	timeout         time.Duration
 	sendFullContent bool
 	client          *http.Client
+	retryDelay      time.Duration
+	sleep           func(time.Duration)
 }
 
 // NewWebhookEvaluator creates a WebhookEvaluator with the given configuration.
@@ -47,6 +50,8 @@ func NewWebhookEvaluator(url string, sampleRate float64, timeout time.Duration, 
 		timeout:         timeout,
 		sendFullContent: sendFullContent,
 		client:          &http.Client{Timeout: timeout},
+		retryDelay:      time.Second,
+		sleep:           time.Sleep,
 	}
 }
 
@@ -69,17 +74,37 @@ func (w *WebhookEvaluator) Evaluate(req WebhookRequest) {
 			log.Printf("eval webhook: marshal error: %v", err)
 			return
 		}
-		resp, err := w.client.Post(w.url, "application/json", bytes.NewReader(data))
-		if err != nil {
-			log.Printf("eval webhook: request error: %v", err)
+		for attempt := 0; attempt < 2; attempt++ {
+			resp, err := w.client.Post(w.url, "application/json", bytes.NewReader(data))
+			if err == nil {
+				if resp.StatusCode < 500 {
+					resp.Body.Close()
+					if resp.StatusCode >= 400 {
+						log.Printf("eval webhook: returned %d", resp.StatusCode)
+					}
+					return
+				}
+				log.Printf("eval webhook: returned %d", resp.StatusCode)
+				resp.Body.Close()
+			} else {
+				log.Printf("eval webhook: request error: %v", err)
+				if !shouldRetryWebhook(err) {
+					return
+				}
+			}
+
+			if attempt == 0 {
+				w.sleep(w.retryDelay)
+				continue
+			}
 			return
 		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode >= 400 {
-			log.Printf("eval webhook: returned %d", resp.StatusCode)
-		}
 	}()
+}
+
+func shouldRetryWebhook(err error) bool {
+	var netErr interface{ Timeout() bool }
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func truncate(s string, maxRunes int) string {
