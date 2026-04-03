@@ -1,0 +1,33 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install hey
+        run: go install github.com/rakyll/hey@latest
+
+      - name: Run benchmark
+        env:
+          BENCH_RESULTS_FILE: benchmark-results.txt
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          bash scripts/benchmark.sh
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.txt

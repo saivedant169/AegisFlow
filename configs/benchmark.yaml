@@ -1,0 +1,82 @@
+server:
+  host: "127.0.0.1"
+  port: 18081
+  admin_port: 18082
+  read_timeout: 30s
+  write_timeout: 120s
+  graceful_shutdown: 10s
+  max_body_size: 10485760
+
+gateway:
+  request_validation: true
+
+compression:
+  enabled: true
+  min_size_bytes: 512
+
+providers:
+  - name: "bench-openai"
+    type: "openai"
+    enabled: true
+    base_url: "http://127.0.0.1:18080/v1"
+    api_keys:
+      - key: "bench-key"
+        weight: 1
+    key_selection: "round-robin"
+    retry:
+      max_attempts: 2
+      initial_backoff: 100ms
+      max_backoff: 500ms
+      backoff_multiplier: 2.0
+      jitter: true
+      retryable_status_codes: [429, 500, 502, 503, 504]
+    models:
+      - "gpt-4o-mini"
+    timeout: 10s
+
+routes:
+  - match:
+      model: "*"
+    providers: ["bench-openai"]
+    strategy: "priority"
+
+tenants:
+  - id: "benchmark"
+    name: "Benchmark Tenant"
+    api_keys:
+      - key: "benchmark-key"
+        role: "admin"
+    rate_limit:
+      requests_per_minute: 10000
+      tokens_per_minute: 10000000
+    allowed_models:
+      - "*"
+
+rate_limit:
+  backend: "memory"
+
+policies:
+  input: []
+  output: []
+
+telemetry:
+  enabled: false
+
+logging:
+  level: "info"
+  format: "json"
+
+cache:
+  enabled: true
+  backend: "memory"
+  ttl: 2m
+  max_size: 1000
+
+webhook:
+  url: ""
+
+database:
+  enabled: false
+
+admin:
+  token: ""

@@ -1,4 +1,4 @@
-.PHONY: build run test lint fmt docker-build docker-up clean
+.PHONY: build run test lint fmt docker-build docker-up benchmark clean
 
 BINARY=aegisflow
 CONFIG=configs/aegisflow.yaml
@@ -24,6 +24,9 @@ docker-build:
 
 docker-up:
 	docker compose -f deployments/docker-compose.yaml up --build
+
+benchmark:
+	bash scripts/benchmark.sh
 
 clean:
 	rm -rf bin/
