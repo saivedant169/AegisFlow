@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
@@ -300,6 +301,91 @@ func TestChatCompletionRecordsAnalytics(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	// If we got here without panic, analytics recording path was exercised
+}
+
+func TestChatCompletionLogsRequestFeedEntry(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{
+		{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"},
+	}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	reqLog := admin.NewRequestLog(10)
+	h := NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, nil, nil)
+	h.SetRequestLogger(reqLog, "plane-a")
+
+	reqBody := types.ChatCompletionRequest{
+		Model:    "mock",
+		Messages: []types.Message{{Role: "user", Content: "request log test"}},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.ChatCompletion(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	entries := reqLog.Recent(1)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 request log entry, got %d", len(entries))
+	}
+	if entries[0].Provider != "mock" {
+		t.Fatalf("expected provider mock, got %q", entries[0].Provider)
+	}
+	if entries[0].DataPlane != "plane-a" {
+		t.Fatalf("expected data plane plane-a, got %q", entries[0].DataPlane)
+	}
+	if entries[0].Status != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", entries[0].Status)
+	}
+}
+
+func TestChatCompletionLogsCacheHits(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{
+		{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"},
+	}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	c := cache.NewMemoryCache(5*time.Minute, 100)
+	reqLog := admin.NewRequestLog(10)
+	h := NewHandler(registry, rt, pe, ut, c, nil, nil, nil, 0, nil, nil)
+	h.SetRequestLogger(reqLog, "plane-a")
+
+	reqBody := types.ChatCompletionRequest{
+		Model:    "mock",
+		Messages: []types.Message{{Role: "user", Content: "cache log test"}},
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req1 := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	h.ChatCompletion(w1, req1)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	h.ChatCompletion(w2, req2)
+
+	entries := reqLog.Recent(2)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 request log entries, got %d", len(entries))
+	}
+	if !entries[0].Cached {
+		t.Fatalf("expected newest entry to be cache hit")
+	}
+	if entries[0].Provider != "cache" {
+		t.Fatalf("expected cache provider marker, got %q", entries[0].Provider)
+	}
 }
 
 func TestListModelsReturnsModels(t *testing.T) {

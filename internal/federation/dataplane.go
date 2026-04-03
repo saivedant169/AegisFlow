@@ -12,6 +12,7 @@ import (
 
 // DataPlane polls a control plane for config and pushes status/metrics.
 type DataPlane struct {
+	name         string
 	controlURL   string
 	token        string
 	syncInterval time.Duration
@@ -20,8 +21,9 @@ type DataPlane struct {
 }
 
 // NewDataPlane creates a data plane that syncs with the given control plane URL.
-func NewDataPlane(controlURL, token string, syncInterval time.Duration) *DataPlane {
+func NewDataPlane(name, controlURL, token string, syncInterval time.Duration) *DataPlane {
 	return &DataPlane{
+		name:         name,
 		controlURL:   controlURL,
 		token:        token,
 		syncInterval: syncInterval,
@@ -33,7 +35,7 @@ func NewDataPlane(controlURL, token string, syncInterval time.Duration) *DataPla
 // Start begins the background sync loop.
 func (dp *DataPlane) Start() {
 	go dp.syncLoop()
-	log.Printf("federation data plane started (control: %s, interval: %s)", dp.controlURL, dp.syncInterval)
+	log.Printf("federation data plane started (name: %s, control: %s, interval: %s)", dp.name, dp.controlURL, dp.syncInterval)
 }
 
 // Stop terminates the background sync loop.
@@ -74,6 +76,7 @@ func (dp *DataPlane) pullConfig() {
 
 func (dp *DataPlane) pushStatus() {
 	status := PlaneStatus{
+		Name:     dp.name,
 		Healthy:  true,
 		LastSeen: time.Now(),
 	}

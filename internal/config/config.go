@@ -11,22 +11,22 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig     `yaml:"server"`
-	Providers []ProviderConfig `yaml:"providers"`
-	Routes    []RouteConfig    `yaml:"routes"`
-	Tenants   []TenantConfig   `yaml:"tenants"`
-	RateLimit RateLimitConfig  `yaml:"rate_limit"`
-	Policies  PoliciesConfig   `yaml:"policies"`
-	Telemetry TelemetryConfig  `yaml:"telemetry"`
-	Logging   LoggingConfig    `yaml:"logging"`
-	Cache     CacheConfig      `yaml:"cache"`
-	Webhook   WebhookConfig    `yaml:"webhook"`
-	Database  DatabaseConfig   `yaml:"database"`
-	Admin     AdminConfig      `yaml:"admin"`
-	Aliases   AliasConfig      `yaml:"aliases"`
-	Transform TransformConfig  `yaml:"transform"`
-	Analytics AnalyticsConfig  `yaml:"analytics"`
-	Budgets   BudgetsConfig    `yaml:"budgets"`
+	Server     ServerConfig     `yaml:"server"`
+	Providers  []ProviderConfig `yaml:"providers"`
+	Routes     []RouteConfig    `yaml:"routes"`
+	Tenants    []TenantConfig   `yaml:"tenants"`
+	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
+	Policies   PoliciesConfig   `yaml:"policies"`
+	Telemetry  TelemetryConfig  `yaml:"telemetry"`
+	Logging    LoggingConfig    `yaml:"logging"`
+	Cache      CacheConfig      `yaml:"cache"`
+	Webhook    WebhookConfig    `yaml:"webhook"`
+	Database   DatabaseConfig   `yaml:"database"`
+	Admin      AdminConfig      `yaml:"admin"`
+	Aliases    AliasConfig      `yaml:"aliases"`
+	Transform  TransformConfig  `yaml:"transform"`
+	Analytics  AnalyticsConfig  `yaml:"analytics"`
+	Budgets    BudgetsConfig    `yaml:"budgets"`
 	Eval       EvalConfig       `yaml:"eval"`
 	Federation FederationConfig `yaml:"federation"`
 }
@@ -45,6 +45,7 @@ type DataPlaneConfig struct {
 }
 
 type ControlPlaneRef struct {
+	Name         string        `yaml:"name"`
 	URL          string        `yaml:"url"`
 	Token        string        `yaml:"token"`
 	SyncInterval time.Duration `yaml:"sync_interval"`

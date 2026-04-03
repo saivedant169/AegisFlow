@@ -9,18 +9,19 @@ import (
 
 // RequestEntry represents a single request in the live feed.
 type RequestEntry struct {
-	Timestamp  time.Time `json:"timestamp"`
-	RequestID  string    `json:"request_id"`
-	TenantID   string    `json:"tenant_id"`
-	Model      string    `json:"model"`
-	Provider   string    `json:"provider,omitempty"`
-	Region     string    `json:"region,omitempty"`
-	Status     int       `json:"status"`
-	LatencyMs  int64     `json:"latency_ms"`
-	Tokens     int       `json:"tokens"`
-	Cached     bool      `json:"cached"`
-	PolicyHit  string    `json:"policy_hit,omitempty"`
-	QualityScore int     `json:"quality_score"`
+	Timestamp    time.Time `json:"timestamp"`
+	RequestID    string    `json:"request_id"`
+	TenantID     string    `json:"tenant_id"`
+	Model        string    `json:"model"`
+	Provider     string    `json:"provider,omitempty"`
+	Region       string    `json:"region,omitempty"`
+	DataPlane    string    `json:"data_plane,omitempty"`
+	Status       int       `json:"status"`
+	LatencyMs    int64     `json:"latency_ms"`
+	Tokens       int       `json:"tokens"`
+	Cached       bool      `json:"cached"`
+	PolicyHit    string    `json:"policy_hit,omitempty"`
+	QualityScore int       `json:"quality_score"`
 }
 
 // RequestLog is a thread-safe ring buffer that stores recent requests for the live feed.

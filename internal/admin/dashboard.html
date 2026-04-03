@@ -659,6 +659,7 @@
             <th>Tenant</th>
             <th>Model</th>
             <th>Region</th>
+            <th>Data Plane</th>
             <th>Status</th>
             <th>Latency</th>
             <th>Tokens</th>
@@ -668,7 +669,7 @@
           </tr>
         </thead>
         <tbody id="feedTable">
-          <tr><td colspan="11" class="empty-state"><p>No requests yet</p><div class="hint">Send a request to see live feed data</div></td></tr>
+          <tr><td colspan="12" class="empty-state"><p>No requests yet</p><div class="hint">Send a request to see live feed data</div></td></tr>
         </tbody>
       </table>
     </div>
@@ -1391,7 +1392,7 @@ async function fetchRequests() {
 
     const tbody = document.getElementById('feedTable');
     if (total === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="empty-state"><p>No requests yet</p></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><p>No requests yet</p></td></tr>';
     } else {
       tbody.innerHTML = entries.map(r => {
         const time = new Date(r.timestamp).toLocaleTimeString();
@@ -1405,6 +1406,7 @@ async function fetchRequests() {
           <td><span class="badge badge-tenant">${r.tenant_id || '-'}</span></td>
           <td><span class="badge ${getModelBadgeClass(r.model || '')}">${r.model || '-'}</span></td>
           <td><span style="font-size:12px;color:var(--text-secondary);">${r.region || '-'}</span></td>
+          <td><span style="font-size:12px;color:var(--text-secondary);">${r.data_plane || '-'}</span></td>
           <td><span style="color:${statusColor};font-weight:600;">${r.status}</span></td>
           <td><span style="color:${latencyColor};font-weight:500;">${r.latency_ms}ms</span></td>
           <td style="font-weight:500;">${formatNumber(r.tokens || 0)}</td>
