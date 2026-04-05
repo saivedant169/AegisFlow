@@ -223,6 +223,42 @@ func main() {
 		log.Printf("eval hooks enabled (builtin: %v, webhook: %v)", cfg.Eval.Builtin.Enabled, cfg.Eval.Webhook.URL != "")
 	}
 
+	// Set up transformations
+	handler.SetTransformConfig(&gateway.TransformConfig{
+		SystemPromptPrefix:  cfg.Transform.SystemPromptPrefix,
+		SystemPromptSuffix:  cfg.Transform.SystemPromptSuffix,
+		DefaultSystemPrompt: cfg.Transform.DefaultSystemPrompt,
+	})
+
+	if cfg.Transform.Response.StripPII || cfg.Transform.Response.ContentPrefix != "" ||
+		cfg.Transform.Response.ContentSuffix != "" || len(cfg.Transform.Response.Replacements) > 0 {
+		handler.SetResponseTransformConfig(&gateway.ResponseTransformConfig{
+			StripPII:      cfg.Transform.Response.StripPII,
+			ContentPrefix: cfg.Transform.Response.ContentPrefix,
+			ContentSuffix: cfg.Transform.Response.ContentSuffix,
+			Replacements:  cfg.Transform.Response.Replacements,
+		})
+	}
+
+	if len(cfg.Aliases.Models) > 0 {
+		handler.SetModelAliases(cfg.Aliases.Models)
+	}
+
+	// Build per-tenant transforms
+	tenantTransforms := make(map[string]*gateway.TransformConfig)
+	for _, t := range cfg.Tenants {
+		if t.Transform != nil {
+			tenantTransforms[t.ID] = &gateway.TransformConfig{
+				SystemPromptPrefix:  t.Transform.SystemPromptPrefix,
+				SystemPromptSuffix:  t.Transform.SystemPromptSuffix,
+				DefaultSystemPrompt: t.Transform.DefaultSystemPrompt,
+			}
+		}
+	}
+	if len(tenantTransforms) > 0 {
+		handler.SetTenantTransforms(tenantTransforms)
+	}
+
 	// Rate limiter
 	// Use the highest tenant rate limit as the global limiter cap
 	maxRPM := 60

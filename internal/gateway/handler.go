@@ -43,9 +43,13 @@ type Handler struct {
 	evalMinTokens  int
 	evalLatencyMul float64
 	evalWebhook    *eval.WebhookEvaluator
-	auditLog       func(actor, actorRole, action, resource, detail, tenantID, model string)
-	requestLog     *admin.RequestLog
-	dataPlaneName  string
+	auditLog             func(actor, actorRole, action, resource, detail, tenantID, model string)
+	requestLog           *admin.RequestLog
+	dataPlaneName        string
+	transformCfg         *TransformConfig
+	responseTransformCfg *ResponseTransformConfig
+	modelAliases         map[string]string
+	tenantTransforms     map[string]*TransformConfig // tenant ID -> transform config
 }
 
 // SetAuditLogger sets the audit logging function on the handler.
@@ -57,6 +61,26 @@ func (h *Handler) SetAuditLogger(logFn func(actor, actorRole, action, resource, 
 func (h *Handler) SetRequestLogger(reqLog *admin.RequestLog, dataPlaneName string) {
 	h.requestLog = reqLog
 	h.dataPlaneName = dataPlaneName
+}
+
+// SetTransformConfig sets the global request transform configuration.
+func (h *Handler) SetTransformConfig(cfg *TransformConfig) {
+	h.transformCfg = cfg
+}
+
+// SetResponseTransformConfig sets the global response transform configuration.
+func (h *Handler) SetResponseTransformConfig(cfg *ResponseTransformConfig) {
+	h.responseTransformCfg = cfg
+}
+
+// SetModelAliases sets the model alias mapping for request rewriting.
+func (h *Handler) SetModelAliases(aliases map[string]string) {
+	h.modelAliases = aliases
+}
+
+// SetTenantTransforms sets per-tenant transform overrides.
+func (h *Handler) SetTenantTransforms(transforms map[string]*TransformConfig) {
+	h.tenantTransforms = transforms
 }
 
 const (
@@ -122,6 +146,18 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	if t := middleware.TenantFromContext(r.Context()); t != nil {
 		tenantID = t.ID
 	}
+
+	// Apply model aliasing
+	if h.modelAliases != nil {
+		ApplyModelAlias(&req, h.modelAliases)
+	}
+
+	// Apply request transformations (per-tenant overrides global)
+	var tenantTransform *TransformConfig
+	if tenantID != "" && h.tenantTransforms != nil {
+		tenantTransform = h.tenantTransforms[tenantID]
+	}
+	TransformRequestWithTenant(&req, h.transformCfg, tenantTransform)
 
 	// Per-model budget check (global/tenant checks run in middleware, model-level here)
 	if h.budgetCheck != nil && tenantID != "" {
@@ -201,6 +237,11 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Printf("policy warning (output): %s", policy.FormatViolation(v))
 		}
+	}
+
+	// Apply response transformations
+	if h.responseTransformCfg != nil {
+		TransformResponse(resp, h.responseTransformCfg)
 	}
 
 	// Cache the response
