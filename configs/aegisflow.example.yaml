@@ -146,3 +146,18 @@ telemetry:
 logging:
   level: "info"                # debug | info | warn | error
   format: "json"               # json | text
+
+# Response cache
+cache:
+  enabled: true
+  backend: "memory"            # memory (default) | redis
+  ttl: 5m
+  max_size: 1000
+  semantic:
+    enabled: false
+    provider: "openai"          # "openai" or any OpenAI-compatible API
+    base_url: ""                # defaults to https://api.openai.com
+    api_key: "${OPENAI_API_KEY}"
+    model: "text-embedding-3-small"
+    threshold: 0.92             # cosine similarity threshold (0.0-1.0)
+    max_size: 1000              # max cached embeddings
