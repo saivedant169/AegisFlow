@@ -22,6 +22,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/audit"
 	auditpg "github.com/saivedant169/AegisFlow/internal/audit/pgstore"
 	"github.com/saivedant169/AegisFlow/internal/budget"
+	"github.com/saivedant169/AegisFlow/internal/costopt"
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/eval"
@@ -338,8 +339,36 @@ func main() {
 		}
 	}
 
+	// Cost optimization engine
+	var costOptAdapter admin.CostOptProvider
+	if cfg.CostOpt.Enabled {
+		costEngine := costopt.NewEngine(
+			costopt.DefaultCostRegistry(),
+			cfg.CostOpt.MinQualityTolerance,
+		)
+		usageFn := func() []costopt.UsageSnapshot {
+			allUsage := ut.GetAllUsage()
+			var snaps []costopt.UsageSnapshot
+			for tenantID, tu := range allUsage {
+				for _, pm := range tu.ByProviderModel {
+					snaps = append(snaps, costopt.UsageSnapshot{
+						TenantID:     tenantID,
+						Model:        pm.Model,
+						Provider:     pm.Provider,
+						RequestCount: int(pm.Requests),
+						TotalTokens:  pm.TotalTokens,
+						TotalCost:    pm.EstimatedCostUSD,
+					})
+				}
+			}
+			return snaps
+		}
+		costOptAdapter = costopt.NewAdminAdapter(costEngine, usageFn)
+		log.Printf("[init] cost optimization engine enabled")
+	}
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

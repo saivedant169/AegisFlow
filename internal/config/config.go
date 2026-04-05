@@ -27,6 +27,7 @@ type Config struct {
 	Transform  TransformConfig  `yaml:"transform"`
 	Analytics  AnalyticsConfig  `yaml:"analytics"`
 	Budgets    BudgetsConfig    `yaml:"budgets"`
+	CostOpt    CostOptConfig    `yaml:"cost_optimization"`
 	Eval       EvalConfig       `yaml:"eval"`
 	Federation FederationConfig `yaml:"federation"`
 }
@@ -146,6 +147,12 @@ type TenantBudget struct {
 	AlertAt int                          `yaml:"alert_at"`
 	WarnAt  int                          `yaml:"warn_at"`
 	Models  map[string]BudgetLimitConfig `yaml:"models"`
+}
+
+type CostOptConfig struct {
+	Enabled             bool `yaml:"enabled"`
+	MinQualityTolerance int  `yaml:"min_quality_tolerance"` // max quality drop %
+	MinRequestVolume    int  `yaml:"min_request_volume"`
 }
 
 type ServerConfig struct {
@@ -405,6 +412,12 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Budgets.Global.WarnAt == 0 {
 		cfg.Budgets.Global.WarnAt = 90
+	}
+	if cfg.CostOpt.MinQualityTolerance == 0 {
+		cfg.CostOpt.MinQualityTolerance = 10
+	}
+	if cfg.CostOpt.MinRequestVolume == 0 {
+		cfg.CostOpt.MinRequestVolume = 10
 	}
 	for i := range cfg.Providers {
 		if cfg.Providers[i].Retry.MaxAttempts == 0 {
