@@ -96,9 +96,17 @@ type AliasConfig struct {
 }
 
 type TransformConfig struct {
-	SystemPromptPrefix  string `yaml:"system_prompt_prefix"`
-	SystemPromptSuffix  string `yaml:"system_prompt_suffix"`
-	DefaultSystemPrompt string `yaml:"default_system_prompt"`
+	SystemPromptPrefix  string                  `yaml:"system_prompt_prefix"`
+	SystemPromptSuffix  string                  `yaml:"system_prompt_suffix"`
+	DefaultSystemPrompt string                  `yaml:"default_system_prompt"`
+	Response            ResponseTransformConfig `yaml:"response"`
+}
+
+type ResponseTransformConfig struct {
+	StripPII      bool              `yaml:"strip_pii"`
+	ContentPrefix string            `yaml:"content_prefix"`
+	ContentSuffix string            `yaml:"content_suffix"`
+	Replacements  map[string]string `yaml:"replacements"`
 }
 
 type AnalyticsConfig struct {
@@ -251,11 +259,12 @@ type TenantMatch struct {
 }
 
 type TenantConfig struct {
-	ID            string          `yaml:"id"`
-	Name          string          `yaml:"name"`
-	APIKeys       []APIKeyEntry   `yaml:"api_keys"`
-	RateLimit     TenantRateLimit `yaml:"rate_limit"`
-	AllowedModels []string        `yaml:"allowed_models"`
+	ID            string           `yaml:"id"`
+	Name          string           `yaml:"name"`
+	APIKeys       []APIKeyEntry    `yaml:"api_keys"`
+	RateLimit     TenantRateLimit  `yaml:"rate_limit"`
+	AllowedModels []string         `yaml:"allowed_models"`
+	Transform     *TransformConfig `yaml:"transform,omitempty"`
 }
 
 type TenantRateLimit struct {

@@ -42,6 +42,49 @@ func TransformRequest(req *types.ChatCompletionRequest, cfg *TransformConfig) {
 	}
 }
 
+// TransformRequestWithTenant applies transforms with tenant overrides.
+// Tenant config fields override global config fields when non-empty.
+func TransformRequestWithTenant(req *types.ChatCompletionRequest, global, tenant *TransformConfig) {
+	effective := mergeTransformConfig(global, tenant)
+	TransformRequest(req, effective)
+}
+
+func mergeTransformConfig(global, tenant *TransformConfig) *TransformConfig {
+	if tenant == nil {
+		return global
+	}
+	if global == nil {
+		return tenant
+	}
+
+	merged := &TransformConfig{}
+
+	merged.SystemPromptPrefix = tenant.SystemPromptPrefix
+	if merged.SystemPromptPrefix == "" {
+		merged.SystemPromptPrefix = global.SystemPromptPrefix
+	}
+
+	merged.SystemPromptSuffix = tenant.SystemPromptSuffix
+	if merged.SystemPromptSuffix == "" {
+		merged.SystemPromptSuffix = global.SystemPromptSuffix
+	}
+
+	merged.DefaultSystemPrompt = tenant.DefaultSystemPrompt
+	if merged.DefaultSystemPrompt == "" {
+		merged.DefaultSystemPrompt = global.DefaultSystemPrompt
+	}
+
+	merged.HeaderInjections = make(map[string]string)
+	for k, v := range global.HeaderInjections {
+		merged.HeaderInjections[k] = v
+	}
+	for k, v := range tenant.HeaderInjections {
+		merged.HeaderInjections[k] = v
+	}
+
+	return merged
+}
+
 // ResponseTransformConfig holds response transformation rules.
 type ResponseTransformConfig struct {
 	StripPII     bool              // Replace PII patterns with placeholders

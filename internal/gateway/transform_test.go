@@ -92,3 +92,72 @@ func TestTransformResponseNilConfig(t *testing.T) {
 		t.Fatal("nil config should be no-op")
 	}
 }
+
+func TestTransformRequestPerTenant(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "gpt-4o",
+		Messages: []types.Message{
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	global := &TransformConfig{
+		DefaultSystemPrompt: "You are a helpful assistant.",
+	}
+	tenant := &TransformConfig{
+		DefaultSystemPrompt: "You are a customer support agent for Acme Corp.",
+	}
+
+	TransformRequestWithTenant(req, global, tenant)
+
+	// Tenant config should override global
+	if req.Messages[0].Role != "system" {
+		t.Fatal("expected system message to be injected")
+	}
+	if req.Messages[0].Content != "You are a customer support agent for Acme Corp." {
+		t.Fatalf("expected tenant override, got: %s", req.Messages[0].Content)
+	}
+}
+
+func TestTransformRequestPerTenantFallsBackToGlobal(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "gpt-4o",
+		Messages: []types.Message{
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	global := &TransformConfig{
+		DefaultSystemPrompt: "You are a helpful assistant.",
+	}
+
+	TransformRequestWithTenant(req, global, nil)
+
+	if req.Messages[0].Content != "You are a helpful assistant." {
+		t.Fatalf("expected global fallback, got: %s", req.Messages[0].Content)
+	}
+}
+
+func TestTransformRequestPerTenantMergesPrefix(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "gpt-4o",
+		Messages: []types.Message{
+			{Role: "system", Content: "base instructions"},
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	global := &TransformConfig{
+		SystemPromptPrefix: "GLOBAL:",
+	}
+	tenant := &TransformConfig{
+		SystemPromptPrefix: "TENANT:",
+	}
+
+	TransformRequestWithTenant(req, global, tenant)
+
+	// Tenant prefix should win
+	if req.Messages[0].Content != "TENANT: base instructions" {
+		t.Fatalf("expected tenant prefix, got: %s", req.Messages[0].Content)
+	}
+}
