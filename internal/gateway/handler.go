@@ -46,6 +46,7 @@ type Handler struct {
 	auditLog       func(actor, actorRole, action, resource, detail, tenantID, model string)
 	requestLog     *admin.RequestLog
 	dataPlaneName  string
+	semanticCache  *cache.SemanticCache
 }
 
 // SetAuditLogger sets the audit logging function on the handler.
@@ -57,6 +58,11 @@ func (h *Handler) SetAuditLogger(logFn func(actor, actorRole, action, resource, 
 func (h *Handler) SetRequestLogger(reqLog *admin.RequestLog, dataPlaneName string) {
 	h.requestLog = reqLog
 	h.dataPlaneName = dataPlaneName
+}
+
+// SetSemanticCache configures the semantic (embedding-based) cache on the handler.
+func (h *Handler) SetSemanticCache(sc *cache.SemanticCache) {
+	h.semanticCache = sc
 }
 
 const (
@@ -163,6 +169,17 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Semantic cache lookup (non-streaming only)
+	if h.semanticCache != nil {
+		if cached, ok := h.semanticCache.GetSemantic(tenantID, &req); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-AegisFlow-Cache", "SEMANTIC-HIT")
+			h.logRequest(startTime, r, tenantID, req.Model, "semantic-cache", http.StatusOK, cached.Usage.TotalTokens, true, "")
+			json.NewEncoder(w).Encode(cached)
+			return
+		}
+	}
+
 	// Check cache (non-streaming only)
 	if h.cache != nil {
 		cacheKey := cache.BuildKey(tenantID, req.Model, req.Messages)
@@ -207,6 +224,9 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	if h.cache != nil {
 		cacheKey := cache.BuildKey(tenantID, req.Model, req.Messages)
 		h.cache.Set(cacheKey, resp)
+	}
+	if h.semanticCache != nil {
+		h.semanticCache.SetSemantic(tenantID, &req, resp)
 	}
 
 	// Track usage

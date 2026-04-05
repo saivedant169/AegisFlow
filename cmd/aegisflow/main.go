@@ -98,6 +98,28 @@ func main() {
 		log.Printf("response cache enabled (backend: %s, ttl: %s, max_size: %d)", cfg.Cache.Backend, cfg.Cache.TTL, cfg.Cache.MaxSize)
 	}
 
+	// Semantic cache
+	var semanticCache *cache.SemanticCache
+	if cfg.Cache.Semantic.Enabled {
+		var embedder cache.Embedder
+		baseURL := cfg.Cache.Semantic.BaseURL
+		if baseURL == "" {
+			baseURL = "https://api.openai.com"
+		}
+		embedder = cache.NewOpenAIEmbedder(
+			baseURL,
+			cfg.Cache.Semantic.APIKey,
+			cfg.Cache.Semantic.Model,
+		)
+		semanticCache = cache.NewSemanticCache(
+			embedder,
+			cfg.Cache.Semantic.Threshold,
+			cfg.Cache.Semantic.MaxSize,
+		)
+		log.Printf("[init] semantic cache enabled (threshold=%.2f, max=%d)",
+			cfg.Cache.Semantic.Threshold, cfg.Cache.Semantic.MaxSize)
+	}
+
 	// PostgreSQL persistent storage
 	var pgStore *storage.PostgresStore
 	if cfg.Database.Enabled {
@@ -208,6 +230,9 @@ func main() {
 
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
 	handler.SetRequestLogger(reqLog, cfg.Federation.ControlPlane.Name)
+	if semanticCache != nil {
+		handler.SetSemanticCache(semanticCache)
+	}
 
 	// Eval hooks
 	if cfg.Eval.Enabled {
