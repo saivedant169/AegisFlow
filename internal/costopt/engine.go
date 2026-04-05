@@ -1,5 +1,7 @@
 package costopt
 
+import "fmt"
+
 // Recommendation suggests a cheaper model for a tenant's workload.
 type Recommendation struct {
 	TenantID              string  `json:"tenant_id"`
@@ -78,4 +80,79 @@ func (cr *CostRegistry) CheaperAlternatives(model string) []string {
 		}
 	}
 	return alts
+}
+
+// UsageSnapshot represents aggregated usage for one tenant+model over a period.
+type UsageSnapshot struct {
+	TenantID     string
+	Model        string
+	Provider     string
+	RequestCount int
+	TotalTokens  int64
+	TotalCost    float64
+	AvgQuality   int // 0-100
+}
+
+// Engine generates cost optimization recommendations.
+type Engine struct {
+	registry            *CostRegistry
+	minQualityTolerance int // max acceptable quality drop in percentage points
+	minRequestVolume    int // minimum requests to generate a recommendation
+	minSavingsPercent   float64
+}
+
+func NewEngine(registry *CostRegistry, minQualityTolerance int) *Engine {
+	return &Engine{
+		registry:            registry,
+		minQualityTolerance: minQualityTolerance,
+		minRequestVolume:    10,
+		minSavingsPercent:   20.0,
+	}
+}
+
+func (e *Engine) Analyze(snapshots []UsageSnapshot) []Recommendation {
+	var recs []Recommendation
+
+	for _, snap := range snapshots {
+		if snap.RequestCount < e.minRequestVolume {
+			continue
+		}
+
+		currentCost, ok := e.registry.CostPerMillionTokens(snap.Model)
+		if !ok {
+			continue
+		}
+
+		alts := e.registry.CheaperAlternatives(snap.Model)
+		for _, alt := range alts {
+			altCost, _ := e.registry.CostPerMillionTokens(alt)
+
+			savingsPercent := (1 - altCost/currentCost) * 100
+			if savingsPercent < e.minSavingsPercent {
+				continue
+			}
+
+			recommendedCostPerDay := snap.TotalCost * (altCost / currentCost)
+
+			rec := Recommendation{
+				TenantID:              snap.TenantID,
+				CurrentModel:          snap.Model,
+				CurrentProvider:       snap.Provider,
+				RecommendedModel:      alt,
+				RecommendedProvider:   snap.Provider, // same provider unless model implies different
+				CurrentCostPerDay:     snap.TotalCost,
+				RecommendedCostPerDay: recommendedCostPerDay,
+				RequestsPerDay:        snap.RequestCount,
+				QualityDelta:          0, // unknown without actual quality data from alt model
+				Reason: fmt.Sprintf(
+					"Switching from %s to %s could save %.0f%% (est. $%.2f/month)",
+					snap.Model, alt, savingsPercent, (snap.TotalCost-recommendedCostPerDay)*30,
+				),
+			}
+			recs = append(recs, rec)
+			break // only recommend the best (cheapest viable) alternative
+		}
+	}
+
+	return recs
 }

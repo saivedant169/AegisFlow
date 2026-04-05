@@ -64,3 +64,82 @@ func TestCostRegistryCheaperAlternatives(t *testing.T) {
 		}
 	}
 }
+
+func TestEngineAnalyzeRecommendsDowngrade(t *testing.T) {
+	snapshots := []UsageSnapshot{
+		{
+			TenantID:     "tenant1",
+			Model:        "gpt-4o",
+			Provider:     "openai",
+			RequestCount: 1000,
+			TotalTokens:  500000,
+			TotalCost:    2.50, // $2.50/day at gpt-4o rates
+			AvgQuality:   72,   // decent but not amazing quality
+		},
+	}
+
+	engine := NewEngine(DefaultCostRegistry(), 10) // min 10% quality delta tolerance
+	recs := engine.Analyze(snapshots)
+
+	if len(recs) == 0 {
+		t.Fatal("expected at least one recommendation")
+	}
+
+	found := false
+	for _, r := range recs {
+		if r.CurrentModel == "gpt-4o" && r.TenantID == "tenant1" {
+			found = true
+			if r.SavingsPercent() <= 0 {
+				t.Fatal("expected positive savings")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected recommendation for tenant1/gpt-4o")
+	}
+}
+
+func TestEngineAnalyzeNoRecommendationForCheapModel(t *testing.T) {
+	snapshots := []UsageSnapshot{
+		{
+			TenantID:     "tenant1",
+			Model:        "gpt-4o-mini",
+			Provider:     "openai",
+			RequestCount: 1000,
+			TotalTokens:  500000,
+			TotalCost:    0.075,
+			AvgQuality:   80,
+		},
+	}
+
+	engine := NewEngine(DefaultCostRegistry(), 10)
+	recs := engine.Analyze(snapshots)
+
+	// gpt-4o-mini is already very cheap -- few alternatives
+	for _, r := range recs {
+		if r.CurrentModel == "gpt-4o-mini" && r.SavingsPercent() < 20 {
+			t.Fatal("should not recommend negligible savings")
+		}
+	}
+}
+
+func TestEngineAnalyzeSkipsLowVolume(t *testing.T) {
+	snapshots := []UsageSnapshot{
+		{
+			TenantID:     "tenant1",
+			Model:        "gpt-4o",
+			Provider:     "openai",
+			RequestCount: 5, // too few requests to recommend
+			TotalTokens:  2500,
+			TotalCost:    0.0125,
+			AvgQuality:   80,
+		},
+	}
+
+	engine := NewEngine(DefaultCostRegistry(), 10)
+	recs := engine.Analyze(snapshots)
+
+	if len(recs) > 0 {
+		t.Fatal("expected no recommendations for low-volume usage")
+	}
+}
