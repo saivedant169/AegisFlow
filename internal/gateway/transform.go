@@ -130,3 +130,13 @@ func TransformResponse(resp *types.ChatCompletionResponse, cfg *ResponseTransfor
 		resp.Choices[i].Message.Content = content
 	}
 }
+
+// ApplyModelAlias rewrites the request model if it matches an alias.
+func ApplyModelAlias(req *types.ChatCompletionRequest, aliases map[string]string) {
+	if aliases == nil {
+		return
+	}
+	if target, ok := aliases[req.Model]; ok {
+		req.Model = target
+	}
+}

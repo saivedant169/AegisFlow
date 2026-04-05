@@ -161,3 +161,52 @@ func TestTransformRequestPerTenantMergesPrefix(t *testing.T) {
 		t.Fatalf("expected tenant prefix, got: %s", req.Messages[0].Content)
 	}
 }
+
+func TestTransformRequestModelAlias(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "our-smart-model",
+		Messages: []types.Message{
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	aliases := map[string]string{
+		"our-smart-model": "gpt-4o",
+		"our-fast-model":  "gpt-4o-mini",
+	}
+
+	ApplyModelAlias(req, aliases)
+
+	if req.Model != "gpt-4o" {
+		t.Fatalf("expected model to be aliased to gpt-4o, got: %s", req.Model)
+	}
+}
+
+func TestTransformRequestModelAliasNoMatch(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "gpt-4o",
+		Messages: []types.Message{
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	aliases := map[string]string{
+		"our-smart-model": "gpt-4o",
+	}
+
+	ApplyModelAlias(req, aliases)
+
+	if req.Model != "gpt-4o" {
+		t.Fatalf("model should remain unchanged, got: %s", req.Model)
+	}
+}
+
+func TestTransformRequestModelAliasNilMap(t *testing.T) {
+	req := &types.ChatCompletionRequest{
+		Model: "gpt-4o",
+	}
+	ApplyModelAlias(req, nil) // should not panic
+	if req.Model != "gpt-4o" {
+		t.Fatal("nil aliases should be no-op")
+	}
+}
