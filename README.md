@@ -137,6 +137,24 @@ Latency (p50): 1.1ms | (p95): 4.2ms | (p99): 7.3ms
 - Admin API for querying usage data
 - Foundation for budget alerts and billing integration
 
+### Semantic Caching
+- Embedding-based similarity cache that catches near-duplicate prompts
+- Cosine similarity matching with configurable threshold
+- OpenAI-compatible embedding provider support
+- Reduces redundant LLM calls and lowers cost
+
+### Cost Optimization Engine
+- Analyzes usage patterns across tenants and models
+- Recommends cheaper model alternatives while maintaining quality
+- Configurable minimum quality tolerance
+- Admin endpoint for retrieving cost recommendations
+
+### Request/Response Transformation
+- PII stripping from responses (email, phone, SSN, credit card)
+- System prompt prefix, suffix, and default injection per request
+- Per-tenant transform overrides for multi-tenant customization
+- Model aliasing (map friendly names to provider-specific models)
+
 ### Multi-Tenant Architecture
 - API key-based tenant identification
 - Per-tenant rate limits, model access controls, and policies
@@ -388,6 +406,63 @@ policies:
       keywords: ["harmful-keyword"]
 ```
 
+### Semantic caching config
+
+```yaml
+cache:
+  enabled: true
+  ttl: 5m
+  max_size: 1000
+  semantic:
+    enabled: true
+    threshold: 0.92          # cosine similarity threshold (0.0 - 1.0)
+    max_size: 5000
+    model: "text-embedding-3-small"
+    base_url: "https://api.openai.com"   # any OpenAI-compatible embedding endpoint
+    api_key: "${OPENAI_API_KEY}"
+```
+
+### Cost optimization config
+
+```yaml
+cost_opt:
+  enabled: true
+  min_quality_tolerance: 0.9   # only suggest models within 90% quality
+```
+
+Query recommendations via the admin API:
+
+```bash
+curl http://localhost:8081/admin/v1/cost-recommendations
+```
+
+### Request/response transformation config
+
+```yaml
+# Global transforms
+transform:
+  system_prompt_prefix: "You are a helpful assistant."
+  system_prompt_suffix: "Always cite your sources."
+  default_system_prompt: "You are AegisFlow's default assistant."
+  response:
+    strip_pii: true            # redacts email, phone, SSN, credit card from responses
+
+# Model aliasing
+aliases:
+  models:
+    "fast": "gpt-4o-mini"
+    "smart": "gpt-4o"
+    "local": "llama3"
+
+# Per-tenant transform overrides
+tenants:
+  - id: "acme"
+    api_keys: ["acme-key-001"]
+    transform:
+      system_prompt_prefix: "You are Acme Corp's assistant."
+      default_system_prompt: "Answer concisely."
+```
+
 ---
 
 ## API Reference
@@ -410,6 +485,7 @@ AegisFlow exposes an **OpenAI-compatible API** on the gateway port (default: 808
 | `GET` | `/metrics` | Prometheus metrics |
 | `GET` | `/admin/v1/usage` | Usage statistics per tenant |
 | `GET` | `/admin/v1/config` | Current running configuration |
+| `GET` | `/admin/v1/cost-recommendations` | Cost optimization recommendations based on usage |
 
 ### Request format
 
@@ -494,8 +570,10 @@ aegisflow/
 ├── cmd/aegisflow/          # Application entry point
 ├── internal/
 │   ├── admin/              # Admin API server
+│   ├── cache/              # Response cache + semantic (embedding) cache
 │   ├── config/             # YAML configuration loading
-│   ├── gateway/            # Core request handler + streaming
+│   ├── costopt/            # Cost optimization engine + model registry
+│   ├── gateway/            # Core request handler + streaming + transforms
 │   ├── middleware/          # Auth, rate limiting, logging, metrics
 │   ├── policy/             # Input/output policy engine + filters
 │   ├── provider/           # Provider interface + adapters (OpenAI, Anthropic, Ollama, Mock)
@@ -576,6 +654,12 @@ Every request produces a trace span with:
 - [x] AI evaluation hooks (built-in quality scoring + webhook sampling)
 - [x] Plugin marketplace (aegisctl CLI with registry, SHA-256 verification)
 - [x] Multi-cluster federation (control plane + data plane architecture)
+
+### Phase 5 (complete)
+- [x] Semantic caching (embedding-based similarity cache with configurable cosine threshold)
+- [x] Cost optimization engine (usage analysis + cheaper model recommendations)
+- [x] Request/response transformation (PII stripping, model aliasing, system prompt injection)
+- [x] Per-tenant transform overrides
 
 ---
 

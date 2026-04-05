@@ -6,6 +6,7 @@ bin/
 *.so
 *.dylib
 /aegisflow
+/aegisflow-operator
 
 # Test
 *.test

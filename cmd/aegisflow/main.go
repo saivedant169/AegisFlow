@@ -28,6 +28,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/federation"
 	"github.com/saivedant169/AegisFlow/internal/gateway"
+	"github.com/saivedant169/AegisFlow/internal/loadshed"
 	"github.com/saivedant169/AegisFlow/internal/logger"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
@@ -42,7 +43,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
-const version = "v0.4.0"
+const version = "v0.5.0"
 
 var totalRequests uint64
 
@@ -321,6 +322,16 @@ func main() {
 	r.Use(middleware.Auth(cfg))
 	r.Use(middleware.RateLimit(limiter))
 	r.Use(middleware.TokenRateLimit(tokenLimiter))
+	if cfg.LoadShed.Enabled {
+		shedder := loadshed.New(loadshed.Config{
+			MaxConcurrent: cfg.LoadShed.MaxConcurrent,
+			QueueSize:     cfg.LoadShed.QueueSize,
+			QueueTimeout:  cfg.LoadShed.QueueTimeout,
+		})
+		r.Use(middleware.LoadShed(shedder))
+		log.Printf("load shedding enabled (max_concurrent: %d, queue_size: %d, queue_timeout: %s)",
+			cfg.LoadShed.MaxConcurrent, cfg.LoadShed.QueueSize, cfg.LoadShed.QueueTimeout)
+	}
 	if budgetMgr != nil {
 		r.Use(middleware.BudgetCheck(budgetMgr.CheckFunc()))
 	}
@@ -330,6 +341,16 @@ func main() {
 	r.Get("/health", healthHandler)
 	r.Post("/v1/chat/completions", handler.ChatCompletion)
 	r.Get("/v1/models", handler.ListModels)
+
+	// WebSocket endpoint
+	if cfg.WebSocket.Enabled {
+		wsHandler := handler.WebSocket(cfg, gateway.WebSocketConfig{
+			Enabled:      true,
+			PingInterval: cfg.WebSocket.PingInterval,
+		})
+		r.Get("/v1/ws", wsHandler.ServeHTTP)
+		log.Printf("websocket endpoint enabled at /v1/ws (ping_interval: %s)", cfg.WebSocket.PingInterval)
+	}
 
 	// Rollout manager
 	var rolloutAdapter admin.RolloutManager

@@ -63,6 +63,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Register validating webhooks
+	v1alpha1.SetupWebhooksWithManager(scheme, mgr.GetWebhookServer())
+
 	log.Printf("aegisflow-operator starting (namespace: %s)", *namespace)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Fatalf("unable to start manager: %v", err)

@@ -1,0 +1,79 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: aegisflow-validating-webhooks
+webhooks:
+  - name: validate-gateway.aegisflow.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aegisflow-operator-webhook
+        namespace: aegisflow-system
+        path: /validate-aegisflow-io-v1alpha1-aegisflowgateway
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["aegisflow.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["aegisflowgateways"]
+    failurePolicy: Fail
+
+  - name: validate-provider.aegisflow.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aegisflow-operator-webhook
+        namespace: aegisflow-system
+        path: /validate-aegisflow-io-v1alpha1-aegisflowprovider
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["aegisflow.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["aegisflowproviders"]
+    failurePolicy: Fail
+
+  - name: validate-route.aegisflow.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aegisflow-operator-webhook
+        namespace: aegisflow-system
+        path: /validate-aegisflow-io-v1alpha1-aegisflowroute
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["aegisflow.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["aegisflowroutes"]
+    failurePolicy: Fail
+
+  - name: validate-tenant.aegisflow.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aegisflow-operator-webhook
+        namespace: aegisflow-system
+        path: /validate-aegisflow-io-v1alpha1-aegisflowtenant
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["aegisflow.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["aegisflowtenants"]
+    failurePolicy: Fail
+
+  - name: validate-policy.aegisflow.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aegisflow-operator-webhook
+        namespace: aegisflow-system
+        path: /validate-aegisflow-io-v1alpha1-aegisflowpolicy
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["aegisflow.io"]
+        apiVersions: ["v1alpha1"]
+        resources: ["aegisflowpolicies"]
+    failurePolicy: Fail

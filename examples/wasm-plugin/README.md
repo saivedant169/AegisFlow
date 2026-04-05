@@ -40,6 +40,16 @@ Your WASM module must export these functions:
 
 The action in config always overrides the plugin's action.
 
+## Using the SDK (recommended)
+
+For new plugins, consider using the WASM Plugin SDK instead of implementing
+the ABI by hand. The SDK handles memory management and JSON serialization
+for you:
+
+    examples/wasm-plugin-sdk/   -- the SDK package
+    examples/wasm-plugins/      -- example plugins built with the SDK
+    docs/wasm-plugin-guide.md   -- full tutorial and ABI reference
+
 ## Supported Languages
 
 Any language compiling to WASM/WASI: Go, TinyGo, Rust, AssemblyScript.

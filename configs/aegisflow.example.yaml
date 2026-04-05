@@ -95,6 +95,18 @@ tenants:
     allowed_models:
       - "*"
 
+# Load shedding
+# Protects the gateway from overload with priority-based admission control.
+# Priority is read from the X-Priority header ("high", "normal", "low").
+# High priority: admitted directly up to max_concurrent, never queued.
+# Normal priority: queued when at capacity, shed when queue is full.
+# Low priority: shed immediately at 80% capacity.
+load_shed:
+  enabled: false
+  max_concurrent: 100            # Hard limit on simultaneous in-flight requests
+  queue_size: 50                 # Max requests waiting in queue
+  queue_timeout: 10s             # Max time a queued request waits before 503
+
 # Rate limiting backend
 rate_limit:
   backend: "memory"            # memory (default) | redis
@@ -175,6 +187,19 @@ transform:
 #     transform:
 #       default_system_prompt: "You are Acme Corp's AI assistant. Be professional."
 #       system_prompt_suffix: "Always mention our return policy."
+
+# Admin API settings
+admin:
+  token: ""                       # Optional bearer token for admin endpoints
+  graphql:
+    enabled: false                # Enable the GraphQL admin API at /admin/v1/graphql
+
+# WebSocket endpoint
+# Enables persistent WebSocket connections at /v1/ws for chat completions.
+# Clients authenticate via ?api_key= query param or an initial "auth" message.
+websocket:
+  enabled: false
+  ping_interval: 30s             # Server-to-client ping interval for keepalive
 
 # Response cache
 cache:

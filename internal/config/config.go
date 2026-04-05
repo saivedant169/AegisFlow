@@ -30,6 +30,20 @@ type Config struct {
 	CostOpt    CostOptConfig    `yaml:"cost_optimization"`
 	Eval       EvalConfig       `yaml:"eval"`
 	Federation FederationConfig `yaml:"federation"`
+	LoadShed   LoadShedConfig   `yaml:"load_shed"`
+	WebSocket  WebSocketConfig  `yaml:"websocket"`
+}
+
+type LoadShedConfig struct {
+	Enabled       bool          `yaml:"enabled"`
+	MaxConcurrent int64         `yaml:"max_concurrent"`
+	QueueSize     int           `yaml:"queue_size"`
+	QueueTimeout  time.Duration `yaml:"queue_timeout"`
+}
+
+type WebSocketConfig struct {
+	Enabled      bool          `yaml:"enabled"`
+	PingInterval time.Duration `yaml:"ping_interval"`
 }
 
 type FederationConfig struct {
@@ -100,7 +114,10 @@ type DatabaseConfig struct {
 }
 
 type AdminConfig struct {
-	Token string `yaml:"token"`
+	Token   string `yaml:"token"`
+	GraphQL struct {
+		Enabled bool `yaml:"enabled"`
+	} `yaml:"graphql"`
 }
 
 type AliasConfig struct {
@@ -475,6 +492,22 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Eval.Webhook.Timeout == 0 {
 		cfg.Eval.Webhook.Timeout = 5 * time.Second
+	}
+
+	// Load shedding defaults
+	if cfg.LoadShed.MaxConcurrent == 0 {
+		cfg.LoadShed.MaxConcurrent = 100
+	}
+	if cfg.LoadShed.QueueSize == 0 {
+		cfg.LoadShed.QueueSize = 50
+	}
+	if cfg.LoadShed.QueueTimeout == 0 {
+		cfg.LoadShed.QueueTimeout = 10 * time.Second
+	}
+
+	// WebSocket defaults
+	if cfg.WebSocket.PingInterval == 0 {
+		cfg.WebSocket.PingInterval = 30 * time.Second
 	}
 
 	// Federation defaults

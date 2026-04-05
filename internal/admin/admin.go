@@ -123,6 +123,14 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
 	r.Get("/admin/v1/whoami", s.whoamiHandler)
+	// GraphQL endpoint (reuses the same provider interfaces as REST)
+	if s.cfg.Admin.GraphQL.Enabled {
+		schema, err := s.buildSchema()
+		if err == nil {
+			r.Post("/admin/v1/graphql", s.graphqlHandler(schema))
+		}
+	}
+
 	if s.federationProvider != nil {
 		r.Get("/admin/v1/federation/config", s.federationProvider.ConfigHandler)
 		r.Post("/admin/v1/federation/metrics", s.federationProvider.MetricsHandler)
