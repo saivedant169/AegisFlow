@@ -142,6 +142,13 @@ telemetry:
     enabled: true
     path: "/metrics"           # Prometheus metrics path on admin port
 
+# Cost Optimization
+# Analyzes usage patterns and recommends cheaper model alternatives.
+cost_optimization:
+  enabled: false
+  min_quality_tolerance: 10    # accept up to 10% quality drop
+  min_request_volume: 10       # minimum daily requests to generate recommendation
+
 # Logging
 logging:
   level: "info"                # debug | info | warn | error
