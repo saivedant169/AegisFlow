@@ -139,7 +139,7 @@ func main() {
 	}
 
 	// Webhook notifier
-	wh := webhook.NewNotifier(cfg.Webhook.URL)
+	wh := webhook.NewNotifier(cfg.Webhook.URL, cfg.Webhook.Secret)
 	if wh != nil {
 		log.Printf("webhook notifications enabled: %s", cfg.Webhook.URL)
 	}

@@ -105,7 +105,8 @@ type SemanticCacheConfig struct {
 }
 
 type WebhookConfig struct {
-	URL string `yaml:"url"`
+	URL    string `yaml:"url"`
+	Secret string `yaml:"secret"`
 }
 
 type DatabaseConfig struct {
