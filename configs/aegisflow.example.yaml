@@ -146,3 +146,25 @@ telemetry:
 logging:
   level: "info"                # debug | info | warn | error
   format: "json"               # json | text
+
+# Request/Response Transformation
+transform:
+  system_prompt_prefix: ""
+  system_prompt_suffix: ""
+  default_system_prompt: ""
+  response:
+    strip_pii: false                # Replace emails, phones, SSNs, credit cards with placeholders
+    content_prefix: ""              # Prepend to all response content
+    content_suffix: ""              # Append to all response content
+    replacements: {}                # Literal string replacements in responses
+
+# Per-tenant transforms (in tenants section):
+# tenants:
+#   - id: acme-corp
+#     name: Acme Corp
+#     api_keys:
+#       - key: "acme-key-1"
+#         role: operator
+#     transform:
+#       default_system_prompt: "You are Acme Corp's AI assistant. Be professional."
+#       system_prompt_suffix: "Always mention our return policy."
