@@ -53,6 +53,13 @@ type FederationProvider interface {
 	PlanesHandler(w http.ResponseWriter, r *http.Request)
 }
 
+// CostOptProvider is the interface consumed by the admin API to avoid an
+// import cycle with the costopt package. Use costopt.NewAdminAdapter to
+// wrap a *costopt.Engine so it satisfies this interface.
+type CostOptProvider interface {
+	Recommendations() interface{}
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -79,10 +86,11 @@ type Server struct {
 	budgetProvider     BudgetProvider
 	auditProvider      AuditProvider
 	federationProvider FederationProvider
+	costOptProvider    CostOptProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop}
 }
 
 func (s *Server) Router() http.Handler {
@@ -111,6 +119,7 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/analytics/realtime", s.analyticsRealtimeHandler)
 	r.Get("/admin/v1/alerts", s.alertsHandler)
 	r.Get("/admin/v1/budgets", s.budgetsHandler)
+	r.Get("/admin/v1/cost-recommendations", s.handleCostRecommendations)
 	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
 	r.Get("/admin/v1/whoami", s.whoamiHandler)
@@ -428,6 +437,18 @@ func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
 		"statuses":  s.budgetProvider.AllStatuses(),
 		"forecasts": s.budgetProvider.ForecastAll(),
 	})
+}
+
+// --- Cost optimization handlers ---
+
+func (s *Server) handleCostRecommendations(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.costOptProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": []interface{}{}})
+		return
+	}
+	recs := s.costOptProvider.Recommendations()
+	json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": recs})
 }
 
 // --- Analytics handlers ---
