@@ -71,11 +71,22 @@ type WebhookEvalConfig struct {
 }
 
 type CacheConfig struct {
-	Enabled bool          `yaml:"enabled"`
-	Backend string        `yaml:"backend"`
-	TTL     time.Duration `yaml:"ttl"`
-	MaxSize int           `yaml:"max_size"`
-	Redis   RedisConfig   `yaml:"redis"`
+	Enabled  bool                `yaml:"enabled"`
+	Backend  string              `yaml:"backend"`
+	TTL      time.Duration       `yaml:"ttl"`
+	MaxSize  int                 `yaml:"max_size"`
+	Redis    RedisConfig         `yaml:"redis"`
+	Semantic SemanticCacheConfig `yaml:"semantic"`
+}
+
+type SemanticCacheConfig struct {
+	Enabled   bool    `yaml:"enabled"`
+	Provider  string  `yaml:"provider"`  // "openai" or "ollama"
+	BaseURL   string  `yaml:"base_url"`  // embedding API base URL
+	APIKey    string  `yaml:"api_key"`   // embedding API key
+	Model     string  `yaml:"model"`     // embedding model name
+	Threshold float64 `yaml:"threshold"` // similarity threshold (0.0-1.0)
+	MaxSize   int     `yaml:"max_size"`  // max cached embeddings
 }
 
 type WebhookConfig struct {
@@ -381,6 +392,15 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Cache.MaxSize == 0 {
 		cfg.Cache.MaxSize = 1000
+	}
+	if cfg.Cache.Semantic.Threshold == 0 {
+		cfg.Cache.Semantic.Threshold = 0.92
+	}
+	if cfg.Cache.Semantic.MaxSize == 0 {
+		cfg.Cache.Semantic.MaxSize = 1000
+	}
+	if cfg.Cache.Semantic.Model == "" {
+		cfg.Cache.Semantic.Model = "text-embedding-3-small"
 	}
 	if cfg.Analytics.RetentionHours == 0 {
 		cfg.Analytics.RetentionHours = 48

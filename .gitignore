@@ -48,4 +48,5 @@ examples/wasm-plugin/plugin.wasm
 # Internal docs
 docs/specs/
 docs/plans/
+docs/superpowers/
 Awesome-LLMOps
