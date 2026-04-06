@@ -503,8 +503,28 @@ func main() {
 		log.Printf("[init] credential broker enabled (%d providers)", len(cfg.Credentials.Providers))
 	}
 
+	// Tool policy engine for admin test-action endpoint
+	var toolPolicyOpt admin.ServerOption
+	{
+		tpEngine := toolpolicy.NewEngine(nil, cfg.ToolPolicies.DefaultDecision)
+		if cfg.ToolPolicies.Enabled {
+			rules := make([]toolpolicy.ToolRule, len(cfg.ToolPolicies.Rules))
+			for i, r := range cfg.ToolPolicies.Rules {
+				rules[i] = toolpolicy.ToolRule{
+					Protocol:   r.Protocol,
+					Tool:       r.Tool,
+					Target:     r.Target,
+					Capability: r.Capability,
+					Decision:   r.Decision,
+				}
+			}
+			tpEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
+		}
+		toolPolicyOpt = admin.WithToolPolicyProvider(toolpolicy.NewAdminAdapter(tpEngine))
+	}
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, toolPolicyOpt)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

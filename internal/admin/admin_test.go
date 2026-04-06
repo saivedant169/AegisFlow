@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/provider"
 	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/pkg/types"
@@ -75,6 +76,108 @@ func newIntegrationAdminServer() *Server {
 		nil,
 		nil,
 	)
+}
+
+// stubToolPolicyProvider is a simple ToolPolicyProvider for testing.
+type stubToolPolicyProvider struct {
+	decision string
+}
+
+func (s *stubToolPolicyProvider) Evaluate(env *envelope.ActionEnvelope) string {
+	return s.decision
+}
+
+func TestHandleTestAction_Allow(t *testing.T) {
+	server := newIntegrationAdminServer()
+	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "allow"}
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"mcp","tool":"list_repos","target":"github.com/org","capability":"read"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	var body map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["decision"] != "allow" {
+		t.Fatalf("expected allow decision, got %v", body["decision"])
+	}
+	if body["envelope_id"] == nil || body["envelope_id"] == "" {
+		t.Fatal("expected non-empty envelope_id")
+	}
+	if body["evidence_hash"] == nil || body["evidence_hash"] == "" {
+		t.Fatal("expected non-empty evidence_hash")
+	}
+}
+
+func TestHandleTestAction_Block(t *testing.T) {
+	server := newIntegrationAdminServer()
+	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "block"}
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"shell","tool":"rm","target":"/etc","capability":"delete"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["decision"] != "block" {
+		t.Fatalf("expected block decision, got %v", body["decision"])
+	}
+}
+
+func TestHandleTestAction_Review(t *testing.T) {
+	server := newIntegrationAdminServer()
+	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "review"}
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"git","tool":"push","target":"main","capability":"deploy"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["decision"] != "review" {
+		t.Fatalf("expected review decision, got %v", body["decision"])
+	}
+	if body["message"] != "Action requires human review" {
+		t.Fatalf("expected review message, got %v", body["message"])
+	}
+}
+
+func TestHandleTestAction_MissingFields(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"mcp"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
 }
 
 func TestAdminRBACIntegration(t *testing.T) {

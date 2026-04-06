@@ -7,6 +7,7 @@ bin/
 *.dylib
 /aegisflow
 /aegisflow-operator
+/aegisctl
 
 # Test
 *.test
