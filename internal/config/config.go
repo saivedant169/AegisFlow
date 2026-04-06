@@ -33,6 +33,7 @@ type Config struct {
 	LoadShed     LoadShedConfig   `yaml:"load_shed"`
 	WebSocket    WebSocketConfig  `yaml:"websocket"`
 	ToolPolicies ToolPolicyConfig `yaml:"tool_policies"`
+	MCPGateway   MCPGatewayConfig `yaml:"mcp_gateway"`
 }
 
 type LoadShedConfig struct {
@@ -59,6 +60,18 @@ type ToolPolicyRule struct {
 	Target     string `yaml:"target"`
 	Capability string `yaml:"capability"`
 	Decision   string `yaml:"decision"`
+}
+
+type MCPGatewayConfig struct {
+	Enabled   bool                `yaml:"enabled"`
+	Port      int                 `yaml:"port"`
+	Upstreams []MCPUpstreamConfig `yaml:"upstreams"`
+}
+
+type MCPUpstreamConfig struct {
+	Name  string   `yaml:"name"`
+	URL   string   `yaml:"url"`
+	Tools []string `yaml:"tools"`
 }
 
 type FederationConfig struct {
@@ -539,6 +552,10 @@ func setDefaults(cfg *Config) {
 	// Tool policy defaults
 	if cfg.ToolPolicies.DefaultDecision == "" {
 		cfg.ToolPolicies.DefaultDecision = "block"
+	}
+
+	if cfg.MCPGateway.Port == 0 {
+		cfg.MCPGateway.Port = 8082
 	}
 
 	// CORS defaults

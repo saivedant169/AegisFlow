@@ -41,6 +41,8 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
 	"github.com/saivedant169/AegisFlow/internal/approval"
 	"github.com/saivedant169/AegisFlow/internal/usage"
+	"github.com/saivedant169/AegisFlow/internal/mcpgw"
+	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
@@ -473,6 +475,48 @@ func main() {
 		Handler:      adminSvr.Router(),
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	// MCP Gateway
+	if cfg.MCPGateway.Enabled {
+		upstreams := make([]mcpgw.UpstreamConfig, len(cfg.MCPGateway.Upstreams))
+		for i, u := range cfg.MCPGateway.Upstreams {
+			upstreams[i] = mcpgw.UpstreamConfig{
+				Name:  u.Name,
+				URL:   u.URL,
+				Tools: u.Tools,
+			}
+		}
+		toolPolicyEngine := toolpolicy.NewEngine(nil, cfg.ToolPolicies.DefaultDecision)
+		if cfg.ToolPolicies.Enabled {
+			rules := make([]toolpolicy.ToolRule, len(cfg.ToolPolicies.Rules))
+			for i, r := range cfg.ToolPolicies.Rules {
+				rules[i] = toolpolicy.ToolRule{
+					Protocol:   r.Protocol,
+					Tool:       r.Tool,
+					Target:     r.Target,
+					Capability: r.Capability,
+					Decision:   r.Decision,
+				}
+			}
+			toolPolicyEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
+		}
+		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, nil, nil, upstreams)
+		mcpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.MCPGateway.Port)
+		mcpSrv := &http.Server{
+			Addr:         mcpAddr,
+			Handler:      mcpGateway,
+			ReadTimeout:  cfg.Server.ReadTimeout,
+			WriteTimeout: cfg.Server.WriteTimeout,
+		}
+		go func() {
+			log.Printf("MCP gateway listening on %s", mcpAddr)
+			if err := mcpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("MCP gateway server error: %v", err)
+			}
+		}()
+		defer mcpSrv.Shutdown(context.Background())
+		log.Printf("[init] MCP gateway enabled (%d upstreams, port %d)", len(upstreams), cfg.MCPGateway.Port)
 	}
 
 	// Log initialization summary
