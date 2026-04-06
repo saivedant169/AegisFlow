@@ -93,9 +93,12 @@ curl -s -X POST "$ADMIN_URL/admin/v1/test-action" \
   -d '{"protocol":"sql","tool":"sql.drop_table","target":"production_db","capability":"delete"}' | jq .
 pause
 
-echo -e "${BOLD}9. Verify evidence chain integrity${NC}"
+echo -e "${BOLD}9. Verify audit chain integrity${NC}"
 echo ""
 curl -s -X POST "$ADMIN_URL/admin/v1/audit/verify" -H "X-API-Key: demo-key-001" | jq .
+echo ""
+echo -e "   ${BOLD}Approval history:${NC}"
+curl -s "$ADMIN_URL/admin/v1/approvals/history" | jq '.history | length | "   \(.) actions reviewed"'
 pause
 
 echo ""
