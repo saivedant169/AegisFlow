@@ -154,6 +154,22 @@ func main() {
 			fmt.Printf("Unknown manifest command: %s\n", os.Args[2])
 			os.Exit(1)
 		}
+	case "supply-chain":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl supply-chain <list|sign|verify> [args]")
+			os.Exit(1)
+		}
+		switch os.Args[2] {
+		case "list":
+			cmdSupplyChainList(adminURL)
+		case "sign":
+			cmdSupplyChainSign(os.Args[3:])
+		case "verify":
+			cmdSupplyChainVerify(os.Args[3:])
+		default:
+			fmt.Printf("Unknown supply-chain command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
 	case "test-action":
 		cmdTestAction(adminURL, os.Args[2:])
 	case "test":
@@ -198,6 +214,7 @@ Commands:
   why         Show decision trace for a past action: aegisctl why <envelope-id>
   diff-policy Diff two policy files: aegisctl diff-policy <old.yaml> <new.yaml>
   manifest    Manage task manifests and drift detection (create, list, drift)
+  supply-chain Manage supply chain trust (list, sign, verify)
   test-action Simulate an agent action through governance pipeline
   test [msg]  Send a test chat completion
   version     Show version

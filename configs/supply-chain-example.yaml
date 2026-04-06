@@ -1,0 +1,26 @@
+# AegisFlow Supply Chain Configuration Example
+#
+# Controls signature verification for policy packs, WASM plugins, and connectors.
+# When strict_mode is enabled, any unsigned or tampered extension will be rejected
+# at load time. In permissive mode (default), unsigned extensions load with a
+# warning and are tracked as "unverified" in the admin API.
+
+supply_chain:
+  enabled: true
+  strict_mode: false   # set to true in production to reject unsigned extensions
+  signing_key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # 32-byte hex-encoded HMAC key
+
+# Usage:
+#   # Sign a policy pack
+#   aegisctl supply-chain sign configs/policy-packs/coding-agent-strict.yaml \
+#     --key 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+#     --name coding-agent-strict --version 1.0.0 --type policy_pack
+#
+#   # Verify a signed bundle
+#   aegisctl supply-chain verify configs/policy-packs/coding-agent-strict.yaml \
+#     --signature configs/policy-packs/coding-agent-strict.yaml.sig \
+#     --key 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+#
+#   # List loaded assets via admin API
+#   aegisctl supply-chain list
+#   # or: curl http://localhost:8081/admin/v1/supply-chain
