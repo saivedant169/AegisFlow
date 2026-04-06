@@ -412,10 +412,10 @@ AegisFlow/
 - [x] **Phase 1-4**: Full AI gateway with routing, caching, policies, RBAC, audit, federation, K8s operator
 - [x] **Phase 5**: Semantic caching, cost optimization, request/response transforms, load shedding, WebSocket, GraphQL, WASM SDK
 
-### Next: Agent Execution Governance
+### Agent Execution Governance
 - [x] **Phase 6**: MCP remote gateway + tool allowlist/denylist + review decision path + approval queue
-- [ ] **Phase 7**: Task-scoped credential broker (GitHub App, AWS STS, Vault)
-- [ ] **Phase 8**: Evidence export + verification CLI + policy packs for coding agents
+- [x] **Phase 7**: Task-scoped credential broker (static + GitHub App providers, admin API, periodic cleanup)
+- [x] **Phase 8**: Evidence export + verification CLI (`aegisctl verify`, `aegisctl evidence`) + 3 coding-agent policy packs
 
 ---
 
