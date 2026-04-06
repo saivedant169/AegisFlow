@@ -90,6 +90,44 @@ func main() {
 			comment = strings.Join(os.Args[3:], " ")
 		}
 		cmdDeny(adminURL, os.Args[2], comment)
+	case "verify":
+		cmdVerify(adminURL, os.Args[2:])
+	case "evidence":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl evidence <sessions|export> [args]")
+			os.Exit(1)
+		}
+		switch os.Args[2] {
+		case "sessions":
+			cmdEvidenceSessions(adminURL)
+		case "export":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: aegisctl evidence export <session-id> [--file output.json]")
+				os.Exit(1)
+			}
+			cmdEvidenceExport(adminURL, os.Args[3], os.Args[4:])
+		default:
+			fmt.Printf("Unknown evidence command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
+	case "policy-pack":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl policy-pack <list|show> [args]")
+			os.Exit(1)
+		}
+		switch os.Args[2] {
+		case "list":
+			cmdPolicyPackList(os.Args[3:])
+		case "show":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: aegisctl policy-pack show <name> [--dir DIR]")
+				os.Exit(1)
+			}
+			cmdPolicyPackShow(os.Args[3], os.Args[4:])
+		default:
+			fmt.Printf("Unknown policy-pack command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
 	case "test":
 		apiKey := "aegis-test-default-001"
 		model := "mock"
@@ -115,6 +153,9 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
+  verify      Verify evidence chain integrity (--session <id> for specific session)
+  evidence    Evidence management (sessions, export)
+  policy-pack Manage policy packs (list, show)
   plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
   status      Check gateway and admin health
   usage       Show usage per tenant and model
