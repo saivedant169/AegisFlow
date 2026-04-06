@@ -1,0 +1,93 @@
+server:
+  port: 8080
+  admin_port: 8081
+
+providers:
+  - name: "mock"
+    type: "mock"
+    enabled: true
+    default: true
+
+tenants:
+  - id: "realworld-agent"
+    name: "Real-world Test Agent"
+    api_keys:
+      - key: "realworld-key-001"
+        role: "admin"
+    rate_limit:
+      requests_per_minute: 120
+      tokens_per_minute: 200000
+
+routes:
+  - match:
+      model: "*"
+    providers: ["mock"]
+    strategy: "priority"
+
+# Tool policies: reads allowed, writes need review, deletes blocked
+tool_policies:
+  enabled: true
+  default_decision: "block"
+  rules:
+    # GitHub - reads allowed
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+
+    # GitHub - branch creation allowed
+    - protocol: "git"
+      tool: "github.create_branch"
+      decision: "allow"
+
+    # GitHub - writes need review
+    - protocol: "git"
+      tool: "github.create_pull_request"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.merge_pull_request"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.create_issue"
+      decision: "review"
+
+    # GitHub - destructive actions blocked
+    - protocol: "git"
+      tool: "github.delete_*"
+      decision: "block"
+    - protocol: "git"
+      tool: "github.update_branch_protection"
+      decision: "block"
+
+    # Block all deletes globally
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"
+
+policies:
+  governance_mode: "governance"
+  input:
+    - name: "block-jailbreak"
+      type: "keyword"
+      action: "block"
+      keywords:
+        - "ignore previous instructions"
+
+shell_gate:
+  enabled: true
+  block_dangerous: true
+
+sql_gate:
+  enabled: true
+  block_dangerous: true
+
+mcp_gateway:
+  enabled: true
+  port: 8082
+  upstreams:
+    - name: "github-mock"
+      url: "http://mock-mcp:3000"
+      transport: "streamable-http"

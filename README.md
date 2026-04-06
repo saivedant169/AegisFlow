@@ -183,6 +183,32 @@ To run with Docker instead:
 docker compose -f deployments/docker-compose.demo.yaml up --build
 ```
 
+### Real-world MCP testing
+
+Test AegisFlow's governance pipeline end-to-end with a mock MCP server that
+responds to realistic GitHub tool calls. The setup uses Docker Compose to run
+AegisFlow alongside a mock MCP server, exercising allow/review/block decisions
+with real HTTP-based MCP protocol traffic.
+
+```bash
+# Start AegisFlow + mock MCP server
+docker compose -f deployments/docker-compose.realworld.yaml up --build -d
+
+# Run the interactive demo
+./scripts/realworld_demo.sh
+```
+
+The demo sends MCP tool calls through AegisFlow and demonstrates:
+- **Allowed reads**: `github.list_repos`, `github.list_pull_requests` pass through
+- **Review required**: `github.create_pull_request` enters the approval queue
+- **Blocked destructive ops**: `github.delete_repo` is rejected
+- **Evidence chain**: all decisions are recorded and verifiable
+
+See [`configs/realworld.yaml`](configs/realworld.yaml) for the policy
+configuration, [`scripts/mock-mcp-server.js`](scripts/mock-mcp-server.js) for
+the mock server, and [`scripts/realworld_demo.sh`](scripts/realworld_demo.sh)
+for the full test script.
+
 ---
 
 ## Features

@@ -1,0 +1,35 @@
+services:
+  aegisflow:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
+    volumes:
+      - ../configs/realworld.yaml:/app/configs/aegisflow.yaml
+    depends_on:
+      mock-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  mock-mcp:
+    image: node:20-alpine
+    working_dir: /app
+    command: node mock-mcp-server.js
+    volumes:
+      - ../scripts/mock-mcp-server.js:/app/mock-mcp-server.js
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
