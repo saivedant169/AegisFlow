@@ -13,6 +13,7 @@ import (
 
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/provider"
 	"github.com/saivedant169/AegisFlow/internal/usage"
@@ -88,6 +89,13 @@ type EvidenceProvider interface {
 	ListSessions() interface{}
 }
 
+// ToolPolicyProvider is the interface consumed by the admin API to avoid an
+// import cycle with the toolpolicy package. Implementations evaluate
+// ActionEnvelopes against tool policy rules.
+type ToolPolicyProvider interface {
+	Evaluate(env *envelope.ActionEnvelope) string // returns "allow", "review", or "block"
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -118,10 +126,25 @@ type Server struct {
 	evidenceProvider   EvidenceProvider
 	approvalProvider   ApprovalProvider
 	credentialProvider CredentialProvider
+	toolPolicyProvider ToolPolicyProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop, evidenceProvider: ep, approvalProvider: apvp, credentialProvider: crp}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
+	s := &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop, evidenceProvider: ep, approvalProvider: apvp, credentialProvider: crp}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// ServerOption is a functional option for configuring Server.
+type ServerOption func(*Server)
+
+// WithToolPolicyProvider sets the tool policy provider on the admin server.
+func WithToolPolicyProvider(tp ToolPolicyProvider) ServerOption {
+	return func(s *Server) {
+		s.toolPolicyProvider = tp
+	}
 }
 
 func (s *Server) Router() http.Handler {
@@ -161,6 +184,7 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
 	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
 	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
+	r.Post("/admin/v1/test-action", s.handleTestAction)
 	// GraphQL endpoint (reuses the same provider interfaces as REST)
 	if s.cfg.Admin.GraphQL.Enabled {
 		schema, err := s.buildSchema()
@@ -783,4 +807,86 @@ func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(item)
+}
+
+// --- Test Action handler ---
+
+type testActionRequest struct {
+	Protocol   string            `json:"protocol"`
+	Tool       string            `json:"tool"`
+	Target     string            `json:"target"`
+	Capability string            `json:"capability"`
+	Params     map[string]string `json:"params"`
+}
+
+type testActionResponse struct {
+	Decision     string `json:"decision"`
+	EnvelopeID   string `json:"envelope_id"`
+	EvidenceHash string `json:"evidence_hash"`
+	Message      string `json:"message"`
+	ApprovalID   string `json:"approval_id,omitempty"`
+}
+
+func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
+	var req testActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		return
+	}
+
+	if req.Protocol == "" || req.Tool == "" || req.Target == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "protocol, tool, and target are required"})
+		return
+	}
+
+	// Default capability
+	cap := envelope.Capability(req.Capability)
+	if cap == "" {
+		cap = envelope.CapExecute
+	}
+
+	// Create the action envelope
+	actor := envelope.ActorInfo{
+		Type:      "agent",
+		ID:        "aegisctl-test",
+		SessionID: "test-session",
+		TenantID:  "test-tenant",
+	}
+	env := envelope.NewEnvelope(actor, "test-action", envelope.Protocol(req.Protocol), req.Tool, req.Target, cap)
+	for k, v := range req.Params {
+		env.Parameters[k] = v
+	}
+
+	// Evaluate via tool policy provider
+	decision := "block"
+	if s.toolPolicyProvider != nil {
+		decision = s.toolPolicyProvider.Evaluate(env)
+	}
+	env.PolicyDecision = envelope.Decision(decision)
+	env.EvidenceHash = env.Hash()
+
+	resp := testActionResponse{
+		Decision:     decision,
+		EnvelopeID:   env.ID,
+		EvidenceHash: env.EvidenceHash,
+	}
+
+	switch envelope.Decision(decision) {
+	case envelope.DecisionAllow:
+		resp.Message = "Action is allowed by policy"
+	case envelope.DecisionReview:
+		resp.Message = "Action requires human review"
+		if s.approvalProvider != nil {
+			resp.ApprovalID = env.ID
+		}
+	case envelope.DecisionBlock:
+		resp.Message = "Action is blocked by policy"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }

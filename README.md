@@ -152,6 +152,27 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 # Returns: 403 Forbidden - policy violation
 ```
 
+### Run the governance demo
+
+```bash
+# Start AegisFlow with demo config
+make run CONFIG=configs/demo.yaml
+
+# In another terminal, run the interactive demo
+./scripts/demo.sh
+```
+
+The demo walks through the full agent governance flow: allowed reads, blocked
+destructive operations, human-in-the-loop approval for writes, and evidence
+chain verification. See [`configs/demo.yaml`](configs/demo.yaml) for the
+policy configuration and [`scripts/demo.sh`](scripts/demo.sh) for the script.
+
+To run with Docker instead:
+
+```bash
+docker compose -f deployments/docker-compose.demo.yaml up --build
+```
+
 ---
 
 ## Features

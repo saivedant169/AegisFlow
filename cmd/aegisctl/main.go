@@ -128,6 +128,8 @@ func main() {
 			fmt.Printf("Unknown policy-pack command: %s\n", os.Args[2])
 			os.Exit(1)
 		}
+	case "test-action":
+		cmdTestAction(adminURL, os.Args[2:])
 	case "test":
 		apiKey := "aegis-test-default-001"
 		model := "mock"
@@ -166,6 +168,7 @@ Commands:
   pending     List pending approval items
   approve     Approve a pending item: aegisctl approve <id> [comment]
   deny        Deny a pending item: aegisctl deny <id> [comment]
+  test-action Simulate an agent action through governance pipeline
   test [msg]  Send a test chat completion
   version     Show version
   help        Show this help

@@ -1,0 +1,123 @@
+server:
+  port: 8080
+  admin_port: 8081
+
+providers:
+  - name: "mock"
+    type: "mock"
+    enabled: true
+    default: true
+
+tenants:
+  - id: "demo-agent"
+    name: "Demo Coding Agent"
+    api_keys:
+      - key: "demo-key-001"
+        role: "operator"
+    rate_limit:
+      requests_per_minute: 120
+      tokens_per_minute: 200000
+
+routes:
+  - match:
+      model: "*"
+    providers: ["mock"]
+    strategy: "priority"
+
+# Strict coding agent policies
+tool_policies:
+  enabled: true
+  default_decision: "block"
+  rules:
+    # GitHub - reads allowed, writes need review, deletes blocked
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.create_branch"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.create_pull_request"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.merge_pull_request"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.delete_*"
+      decision: "block"
+
+    # Shell - safe commands allowed, dangerous blocked, others review
+    - protocol: "shell"
+      tool: "shell.pytest"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.ls"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.cat"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.grep"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.rm"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.kubectl"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.terraform"
+      decision: "review"
+
+    # SQL - reads allowed, writes review, drops blocked
+    - protocol: "sql"
+      tool: "sql.select"
+      decision: "allow"
+    - protocol: "sql"
+      tool: "sql.insert"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.update"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.delete"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.drop_*"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.truncate"
+      decision: "block"
+
+    # Block all deletes globally
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"
+
+policies:
+  governance_mode: "governance"
+  input:
+    - name: "block-jailbreak"
+      type: "keyword"
+      action: "block"
+      keywords:
+        - "ignore previous instructions"
+
+shell_gate:
+  enabled: true
+  block_dangerous: true
+
+sql_gate:
+  enabled: true
+  block_dangerous: true
+
+mcp_gateway:
+  enabled: true
+  port: 8082
