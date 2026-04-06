@@ -32,25 +32,21 @@ Agents are no longer just generating text. They are using tools, writing code, q
 AegisFlow sits at the boundary between agents and the tools they use. Every action passes through AegisFlow as a normalized `ActionEnvelope` before execution. AegisFlow decides: **allow**, **review** (human approval), or **block**.
 
 ```
-                                    AegisFlow
- ┌──────────────┐    ┌────────────────────────────────────────────┐    ┌──────────────┐
- │              │    │                                            │    │              │
- │ Coding Agent │    │  ┌────────────┐    ┌───────────────────┐  │    │  GitHub API   │
- │              │    │  │            │    │                   │  │    │              │
- │ Claude Code  ├───►│  │   Policy   │    │    Credential     │  │───►│  Shell / CLI  │
- │ Cursor       │    │  │   Engine   │    │    Broker         │  │    │              │
- │ Copilot      │    │  │            │    │    (short-lived,  │  │    │  PostgreSQL   │
- │              │◄───│  │  allow /   │    │     task-scoped)  │  │◄───│              │
- │ MCP Client   │    │  │  review /  │    │                   │  │    │  HTTP APIs    │
- │              │    │  │  block     │    └───────────────────┘  │    │              │
- │              │    │  │            │    ┌───────────────────┐  │    │  Cloud APIs   │
- │              │    │  └────────────┘    │                   │  │    │              │
- │              │    │                    │  Evidence Chain    │  │    │              │
- │              │    │                    │  (tamper-evident,  │  │    │              │
- │              │    │                    │   hash-linked)     │  │    │              │
- │              │    │                    │                   │  │    │              │
- │              │    │                    └───────────────────┘  │    │              │
- └──────────────┘    └────────────────────────────────────────────┘    └──────────────┘
++----------------+          +----------------------------------+          +----------------+
+|                |          |           AegisFlow               |          |                |
+|  Coding Agent  |          |                                  |          |  GitHub API    |
+|                |  ------> |  +----------+  +---------------+ |  ------> |  Shell / CLI   |
+|  Claude Code   |          |  | Policy   |  | Credential    | |          |  PostgreSQL    |
+|  Cursor        |          |  | Engine   |  | Broker        | |          |  HTTP APIs     |
+|  Copilot       |  <------ |  |          |  | (short-lived, | |  <------ |  Cloud APIs    |
+|                |          |  | allow    |  |  task-scoped) | |          |                |
+|  MCP Client    |          |  | review   |  +---------------+ |          |                |
+|                |          |  | block    |  +---------------+ |          |                |
+|                |          |  +----------+  | Evidence      | |          |                |
+|                |          |                | Chain         | |          |                |
+|                |          |                | (hash-linked) | |          |                |
+|                |          |                +---------------+ |          |                |
++----------------+          +----------------------------------+          +----------------+
 ```
 
 ### What AegisFlow controls
