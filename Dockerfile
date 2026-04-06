@@ -1,15 +1,19 @@
 FROM golang:1.26-alpine AS builder
-RUN apk add --no-cache git ca-certificates
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /aegisflow ./cmd/aegisflow
+RUN CGO_ENABLED=0 go build -o aegisflow ./cmd/aegisflow
+RUN CGO_ENABLED=0 go build -o aegisctl ./cmd/aegisctl
 
-FROM gcr.io/distroless/static:nonroot
-COPY --from=builder /aegisflow /aegisflow
-COPY --from=builder /app/configs/aegisflow.yaml /etc/aegisflow/aegisflow.yaml
-EXPOSE 8080 8081
-USER nonroot:nonroot
-ENTRYPOINT ["/aegisflow"]
-CMD ["--config", "/etc/aegisflow/aegisflow.yaml"]
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates curl jq bash
+WORKDIR /app
+COPY --from=builder /app/aegisflow .
+COPY --from=builder /app/aegisctl /usr/local/bin/
+COPY configs/demo.yaml /app/configs/aegisflow.yaml
+COPY configs/policy-packs/ /app/configs/policy-packs/
+COPY scripts/demo.sh /app/scripts/
+RUN chmod +x /app/scripts/*.sh
+EXPOSE 8080 8081 8082
+ENTRYPOINT ["./aegisflow", "--config", "configs/aegisflow.yaml"]

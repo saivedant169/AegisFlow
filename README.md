@@ -103,7 +103,17 @@ type ActionEnvelope struct {
 
 ## Quickstart
 
-### Option 1: Docker Compose (recommended)
+### One-click demo
+
+```bash
+git clone https://github.com/saivedant169/AegisFlow.git
+cd AegisFlow
+./scripts/quickstart.sh
+# Then in another terminal:
+./scripts/demo.sh
+```
+
+### Option 1: Docker Compose
 
 ```bash
 git clone https://github.com/saivedant169/AegisFlow.git

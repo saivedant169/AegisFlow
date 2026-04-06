@@ -1,17 +1,15 @@
-version: "3.8"
 services:
   aegisflow:
     build:
-      context: ../
+      context: ..
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
       - "8081:8081"
       - "8082:8082"
-    volumes:
-      - ../configs/demo.yaml:/app/configs/aegisflow.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
