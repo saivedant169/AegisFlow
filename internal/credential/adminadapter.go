@@ -1,6 +1,10 @@
 package credential
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"time"
+)
 
 // AdminAdapter exposes credential registry operations for the admin API.
 type AdminAdapter struct {
@@ -56,4 +60,21 @@ func (a *AdminAdapter) RevokeCredential(id string) error {
 		return fmt.Errorf("credential ID is required")
 	}
 	return a.registry.Revoke(nil, id)
+}
+
+// IssueCredential issues a credential via the named provider and returns
+// the provenance metadata (never the secret). The provenance links the
+// credential to the given envelope ID for evidence chain traceability.
+func (a *AdminAdapter) IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error) {
+	req := CredentialRequest{
+		TaskID:     taskID,
+		Target:     target,
+		Capability: capability,
+		TTL:        15 * time.Minute,
+	}
+	_, prov, err := a.registry.Issue(context.Background(), providerName, req, envelopeID)
+	if err != nil {
+		return nil, err
+	}
+	return prov, nil
 }

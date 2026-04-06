@@ -86,11 +86,17 @@ type CredentialConfig struct {
 
 type CredentialProviderCfg struct {
 	Name            string        `yaml:"name"`
-	Type            string        `yaml:"type"` // "static", "github_app"
+	Type            string        `yaml:"type"` // "static", "github_app", "vault", "aws_sts"
 	Token           string        `yaml:"token"` // for static
 	GitHubAppID     int64         `yaml:"github_app_id"`
 	GitHubKeyPath   string        `yaml:"github_key_path"`
 	GitHubInstallID int64         `yaml:"github_install_id"`
+	VaultAddr       string        `yaml:"vault_addr"`
+	VaultToken      string        `yaml:"vault_token"`
+	VaultSecretPath string        `yaml:"vault_secret_path"`
+	AWSRoleARN      string        `yaml:"aws_role_arn"`
+	AWSRegion       string        `yaml:"aws_region"`
+	AWSExternalID   string        `yaml:"aws_external_id"`
 	DefaultTTL      time.Duration `yaml:"default_ttl"`
 }
 

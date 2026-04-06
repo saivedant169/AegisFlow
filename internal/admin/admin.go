@@ -81,6 +81,10 @@ type ApprovalProvider interface {
 type CredentialProvider interface {
 	ActiveCredentials() interface{}
 	RevokeCredential(id string) error
+	// IssueCredential issues a credential and returns its provenance metadata
+	// (never the secret). The provenance is suitable for embedding in evidence
+	// records and API responses.
+	IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error)
 }
 
 // EvidenceProvider is the interface consumed by the admin API to avoid an
@@ -823,11 +827,12 @@ type testActionRequest struct {
 }
 
 type testActionResponse struct {
-	Decision     string `json:"decision"`
-	EnvelopeID   string `json:"envelope_id"`
-	EvidenceHash string `json:"evidence_hash"`
-	Message      string `json:"message"`
-	ApprovalID   string `json:"approval_id,omitempty"`
+	Decision              string      `json:"decision"`
+	EnvelopeID            string      `json:"envelope_id"`
+	EvidenceHash          string      `json:"evidence_hash"`
+	Message               string      `json:"message"`
+	ApprovalID            string      `json:"approval_id,omitempty"`
+	CredentialProvenance  interface{} `json:"credential_provenance,omitempty"`
 }
 
 func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
@@ -881,6 +886,14 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	switch envelope.Decision(decision) {
 	case envelope.DecisionAllow:
 		resp.Message = "Action is allowed by policy"
+		// Issue a credential and record provenance in the envelope parameters.
+		if s.credentialProvider != nil {
+			prov, err := s.credentialProvider.IssueCredential("static", "test-action", req.Target, string(cap), env.ID)
+			if err == nil && prov != nil {
+				env.Parameters["credential_provenance"] = prov
+				resp.CredentialProvenance = prov
+			}
+		}
 	case envelope.DecisionReview:
 		resp.Message = "Action requires human review"
 		if s.approvalProvider != nil {

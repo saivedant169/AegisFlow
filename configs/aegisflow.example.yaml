@@ -316,6 +316,20 @@ credentials:
       github_install_id: 7890123
       default_ttl: 1h                  # Max 1 hour for GitHub App tokens
 
+    - name: "vault-db"
+      type: "vault"                     # Issues short-lived DB creds via Vault database secrets engine
+      vault_addr: "https://vault.example.com"
+      vault_token: "${VAULT_TOKEN}"     # Vault authentication token (use env var reference)
+      vault_secret_path: "database"     # Vault mount path for the database secrets engine
+      default_ttl: 30m                  # Credential lifetime (capped by Vault lease)
+
+    - name: "aws-agent-role"
+      type: "aws_sts"                   # Issues short-lived AWS creds via STS AssumeRole
+      aws_role_arn: "arn:aws:iam::123456789012:role/AegisFlowAgentRole"
+      aws_region: "us-east-1"           # STS endpoint region
+      aws_external_id: ""               # Optional external ID for cross-account trust
+      default_ttl: 1h                   # Session duration (min 15m, max 12h)
+
 # HTTP API interceptor proxy
 # Acts as a reverse proxy that intercepts HTTP API calls from agents to external
 # services, evaluates them against tool policies, and records in the evidence chain.

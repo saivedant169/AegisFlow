@@ -2,11 +2,18 @@ package credential
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -146,8 +153,128 @@ func (b *GitHubAppBroker) getJWT() (string, error) {
 	if b.jwtFn != nil {
 		return b.jwtFn()
 	}
-	// In production, this would read the private key from b.keyPath and
-	// generate a signed JWT with the app ID. For now, return an error
-	// indicating that a real key is needed.
-	return "", fmt.Errorf("GitHub App JWT generation requires a private key at %s (not yet implemented — use WithJWTFunc for testing)", b.keyPath)
+	return b.signJWT()
 }
+
+// signJWT reads the PEM private key from disk and produces an RS256 JWT
+// suitable for GitHub App authentication.
+func (b *GitHubAppBroker) signJWT() (string, error) {
+	keyData, err := os.ReadFile(b.keyPath)
+	if err != nil {
+		return "", fmt.Errorf("reading private key file %s: %w", b.keyPath, err)
+	}
+
+	key, err := parseRSAPrivateKeyFromPEM(keyData)
+	if err != nil {
+		return "", fmt.Errorf("parsing private key: %w", err)
+	}
+
+	now := time.Now()
+	return buildRS256JWT(key, b.appID, now.Add(-60*time.Second), now.Add(10*time.Minute))
+}
+
+// parseRSAPrivateKeyFromPEM decodes and parses an RSA private key from PEM bytes.
+// Supports both PKCS#1 (RSA PRIVATE KEY) and PKCS#8 (PRIVATE KEY) formats.
+func parseRSAPrivateKeyFromPEM(pemData []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found in key data")
+	}
+
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
+	case "PRIVATE KEY":
+		parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		rsaKey, ok := parsed.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("PKCS#8 key is not RSA")
+		}
+		return rsaKey, nil
+	default:
+		return nil, fmt.Errorf("unsupported PEM block type %q", block.Type)
+	}
+}
+
+// buildRS256JWT constructs and signs a minimal JWT with RS256 (RFC 7518).
+// The token contains iss (app ID), iat, and exp claims.
+func buildRS256JWT(key *rsa.PrivateKey, appID int64, iat, exp time.Time) (string, error) {
+	header := base64URLEncode([]byte(`{"alg":"RS256","typ":"JWT"}`))
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"iss": fmt.Sprintf("%d", appID),
+		"iat": iat.Unix(),
+		"exp": exp.Unix(),
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshalling JWT claims: %w", err)
+	}
+	encodedPayload := base64URLEncode(payload)
+
+	signingInput := header + "." + encodedPayload
+
+	hash := sha256.Sum256([]byte(signingInput))
+	sig, err := rsa.SignPKCS1v15(nil, key, crypto.SHA256, hash[:])
+	if err != nil {
+		return "", fmt.Errorf("signing JWT: %w", err)
+	}
+
+	return signingInput + "." + base64URLEncode(sig), nil
+}
+
+// base64URLEncode performs base64url encoding without padding (per RFC 7515).
+func base64URLEncode(data []byte) string {
+	return base64.RawURLEncoding.EncodeToString(data)
+}
+
+// VerifyRS256JWT is exported for testing: it verifies an RS256 JWT signature
+// and returns the decoded claims. Not intended for production use.
+func VerifyRS256JWT(token string, pub *rsa.PublicKey) (map[string]interface{}, error) {
+	parts := splitJWT(token)
+	if parts == nil {
+		return nil, fmt.Errorf("malformed JWT: expected 3 parts")
+	}
+
+	signingInput := parts[0] + "." + parts[1]
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("decoding signature: %w", err)
+	}
+
+	hash := sha256.Sum256([]byte(signingInput))
+	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, hash[:], sig); err != nil {
+		return nil, fmt.Errorf("invalid signature: %w", err)
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("decoding payload: %w", err)
+	}
+
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil, fmt.Errorf("parsing claims: %w", err)
+	}
+	return claims, nil
+}
+
+// splitJWT splits a JWT into its three dot-separated parts, or returns nil.
+func splitJWT(token string) []string {
+	var parts []string
+	start := 0
+	for i := 0; i < len(token); i++ {
+		if token[i] == '.' {
+			parts = append(parts, token[start:i])
+			start = i + 1
+		}
+	}
+	parts = append(parts, token[start:])
+	if len(parts) != 3 {
+		return nil
+	}
+	return parts
+}
+

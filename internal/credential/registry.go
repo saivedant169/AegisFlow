@@ -29,24 +29,29 @@ func (r *Registry) Register(name string, broker Broker) {
 }
 
 // Issue delegates credential issuance to the named broker and tracks the result.
-func (r *Registry) Issue(ctx context.Context, providerName string, req CredentialRequest) (*Credential, error) {
+// It returns the credential along with a CredentialProvenance that captures
+// non-secret metadata suitable for embedding in the evidence chain.
+// The envelopeID parameter links the provenance to the action envelope that
+// triggered the issuance; pass "" if unknown at call time.
+func (r *Registry) Issue(ctx context.Context, providerName string, req CredentialRequest, envelopeID string) (*Credential, *CredentialProvenance, error) {
 	r.mu.RLock()
 	broker, ok := r.brokers[providerName]
 	r.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("credential broker %q not registered", providerName)
+		return nil, nil, fmt.Errorf("credential broker %q not registered", providerName)
 	}
 
 	cred, err := broker.Issue(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("broker %q issue: %w", providerName, err)
+		return nil, nil, fmt.Errorf("broker %q issue: %w", providerName, err)
 	}
 
 	r.mu.Lock()
 	r.active[cred.ID] = cred
 	r.mu.Unlock()
 
-	return cred, nil
+	prov := ToProvenance(cred, providerName, envelopeID)
+	return cred, prov, nil
 }
 
 // Revoke invalidates a credential by ID, delegating to each registered broker.
