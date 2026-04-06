@@ -275,6 +275,30 @@ tool_policies:
       capability: "delete"
       decision: "block"
 
+# Shell command interceptor
+# Intercepts shell commands from agents, evaluates them against tool policies,
+# and records them in the evidence chain before execution.
+shell_gate:
+  enabled: false
+  block_dangerous: true            # Auto-block known dangerous commands (rm -rf /, fork bombs, etc.)
+  default_decision: "block"        # Decision for commands not matching any rule: allow | review | block
+
+# SQL query interceptor
+# Intercepts SQL queries from agents, classifies by operation type,
+# evaluates against tool policies, and records in the evidence chain.
+sql_gate:
+  enabled: false
+  block_dangerous: true             # Auto-block DROP, TRUNCATE, DELETE/UPDATE without WHERE
+  default_decision: "block"         # Decision for queries not matching any rule: allow | review | block
+
+# GitHub operation interceptor
+# Intercepts GitHub API calls from agents, classifies operations by risk level
+# (low/medium/high/critical), evaluates against tool policies, and records in
+# the evidence chain. Works independently of MCP — intercepts direct API calls.
+github_gate:
+  enabled: false
+  default_decision: "block"         # Decision for operations not matching any rule: allow | review | block
+
 # Task-scoped credential broker
 # Issues short-lived, task-scoped credentials instead of sharing full user tokens.
 credentials:
@@ -291,3 +315,17 @@ credentials:
       github_key_path: "/etc/aegisflow/github-app.pem"
       github_install_id: 7890123
       default_ttl: 1h                  # Max 1 hour for GitHub App tokens
+
+# HTTP API interceptor proxy
+# Acts as a reverse proxy that intercepts HTTP API calls from agents to external
+# services, evaluates them against tool policies, and records in the evidence chain.
+http_gate:
+  enabled: false
+  port: 8083
+  services:
+    - name: "stripe"
+      upstream_url: "https://api.stripe.com"
+      path_prefix: "/stripe"
+    - name: "slack"
+      upstream_url: "https://slack.com/api"
+      path_prefix: "/slack"

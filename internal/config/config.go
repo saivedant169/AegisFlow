@@ -35,6 +35,22 @@ type Config struct {
 	ToolPolicies ToolPolicyConfig `yaml:"tool_policies"`
 	MCPGateway   MCPGatewayConfig   `yaml:"mcp_gateway"`
 	Credentials  CredentialConfig   `yaml:"credentials"`
+	ShellGate    ShellGateConfig    `yaml:"shell_gate"`
+	SQLGate      SQLGateConfig      `yaml:"sql_gate"`
+	GitHubGate   GitHubGateConfig   `yaml:"github_gate"`
+	HTTPGate     HTTPGateConfig     `yaml:"http_gate"`
+}
+
+type HTTPGateConfig struct {
+	Enabled  bool                `yaml:"enabled"`
+	Port     int                 `yaml:"port"`
+	Services []HTTPServiceConfig `yaml:"services"`
+}
+
+type HTTPServiceConfig struct {
+	Name        string `yaml:"name"`
+	UpstreamURL string `yaml:"upstream_url"`
+	PathPrefix  string `yaml:"path_prefix"`
 }
 
 type LoadShedConfig struct {
@@ -78,6 +94,23 @@ type CredentialProviderCfg struct {
 	DefaultTTL      time.Duration `yaml:"default_ttl"`
 }
 
+type ShellGateConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	BlockDangerous  bool   `yaml:"block_dangerous"`  // auto-block known dangerous commands
+	DefaultDecision string `yaml:"default_decision"` // for commands not matching any rule
+}
+
+type SQLGateConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	BlockDangerous  bool   `yaml:"block_dangerous"`  // auto-block DROP, TRUNCATE, WHERE-less DELETE/UPDATE
+	DefaultDecision string `yaml:"default_decision"`
+}
+
+
+type GitHubGateConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	DefaultDecision string `yaml:"default_decision"` // "allow", "review", "block"
+}
 type MCPGatewayConfig struct {
 	Enabled   bool                `yaml:"enabled"`
 	Port      int                 `yaml:"port"`
@@ -570,8 +603,23 @@ func setDefaults(cfg *Config) {
 		cfg.ToolPolicies.DefaultDecision = "block"
 	}
 
+	// Shell gate defaults
+	if cfg.ShellGate.DefaultDecision == "" {
+		cfg.ShellGate.DefaultDecision = "block"
+	}
+
+	// SQL gate defaults
+	if cfg.SQLGate.DefaultDecision == "" {
+		cfg.SQLGate.DefaultDecision = "block"
+	}
+
 	if cfg.MCPGateway.Port == 0 {
 		cfg.MCPGateway.Port = 8082
+	}
+
+	// HTTP gate defaults
+	if cfg.HTTPGate.Port == 0 {
+		cfg.HTTPGate.Port = 8083
 	}
 
 	// CORS defaults
