@@ -33,7 +33,7 @@ AegisFlow sits at the boundary between agents and the tools they use. Every acti
 
 ```
 +----------------+          +----------------------------------+          +----------------+
-|                |          |           AegisFlow               |          |                |
+|                |          |           AegisFlow              |          |                |
 |  Coding Agent  |          |                                  |          |  GitHub API    |
 |                |  ------> |  +----------+  +---------------+ |  ------> |  Shell / CLI   |
 |  Claude Code   |          |  | Policy   |  | Credential    | |          |  PostgreSQL    |
