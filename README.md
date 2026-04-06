@@ -437,7 +437,7 @@ AegisFlow/
 
 ### Agent Execution Governance
 - [x] **Phase 6**: MCP remote gateway + tool allowlist/denylist + review decision path + approval queue
-- [x] **Phase 7**: Task-scoped credential broker (static + GitHub App providers, admin API, periodic cleanup)
+- [x] **Phase 7**: Task-scoped credential broker (GitHub App JWT, AWS STS SigV4, Vault DB secrets, credential provenance in evidence chain)
 - [x] **Phase 8**: Evidence export + verification CLI (`aegisctl verify`, `aegisctl evidence`) + 3 coding-agent policy packs
 
 ---
