@@ -95,7 +95,7 @@ pause
 
 echo -e "${BOLD}9. Verify evidence chain integrity${NC}"
 echo ""
-curl -s -X POST "$ADMIN_URL/admin/v1/audit/verify" | jq .
+curl -s -X POST "$ADMIN_URL/admin/v1/audit/verify" -H "X-API-Key: demo-key-001" | jq .
 pause
 
 echo ""
