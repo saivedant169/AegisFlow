@@ -35,7 +35,7 @@ func TestOpenAIEstimateTokens(t *testing.T) {
 }
 
 func TestOpenAIHealthyNoKey(t *testing.T) {
-	p := &OpenAIProvider{apiKey: "", client: &http.Client{Timeout: time.Second}}
+	p := &OpenAIProvider{keys: NewKeyRotator([]string{}, "round-robin", 0), client: &http.Client{Timeout: time.Second}}
 	if p.Healthy(context.Background()) {
 		t.Error("should be unhealthy without api key")
 	}
@@ -48,7 +48,7 @@ func TestOpenAIHealthyWithKey(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := &OpenAIProvider{apiKey: "key", baseURL: srv.URL, client: srv.Client()}
+	p := &OpenAIProvider{keys: NewKeyRotator([]string{"key"}, "round-robin", 0), baseURL: srv.URL, client: srv.Client()}
 	if !p.Healthy(context.Background()) {
 		t.Error("should be healthy")
 	}
@@ -71,7 +71,7 @@ func TestOpenAIStreamError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := &OpenAIProvider{name: "test", baseURL: srv.URL, apiKey: "key", client: srv.Client()}
+	p := &OpenAIProvider{name: "test", baseURL: srv.URL, keys: NewKeyRotator([]string{"key"}, "round-robin", 0), client: srv.Client()}
 	_, err := p.ChatCompletionStream(context.Background(), &types.ChatCompletionRequest{
 		Model: "gpt-4o", Messages: []types.Message{{Role: "user", Content: "hi"}},
 	})

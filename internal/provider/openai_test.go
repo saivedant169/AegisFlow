@@ -12,6 +12,16 @@ import (
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
+func newTestOpenAIProvider(srv *httptest.Server, key string) *OpenAIProvider {
+	return &OpenAIProvider{
+		name:    "openai-test",
+		baseURL: srv.URL,
+		keys:    NewKeyRotator([]string{key}, "round-robin", 0),
+		models:  []string{"gpt-4o"},
+		client:  srv.Client(),
+	}
+}
+
 func TestOpenAIChatCompletion(t *testing.T) {
 	mockResp := types.ChatCompletionResponse{
 		ID:      "chatcmpl-test",
@@ -47,13 +57,7 @@ func TestOpenAIChatCompletion(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := &OpenAIProvider{
-		name:    "openai-test",
-		baseURL: srv.URL,
-		apiKey:  "test-key",
-		models:  []string{"gpt-4o"},
-		client:  srv.Client(),
-	}
+	p := newTestOpenAIProvider(srv, "test-key")
 
 	req := &types.ChatCompletionRequest{
 		Model:    "gpt-4o",
@@ -91,13 +95,7 @@ data: [DONE]
 	}))
 	defer srv.Close()
 
-	p := &OpenAIProvider{
-		name:    "openai-test",
-		baseURL: srv.URL,
-		apiKey:  "test-key",
-		models:  []string{"gpt-4o"},
-		client:  srv.Client(),
-	}
+	p := newTestOpenAIProvider(srv, "test-key")
 
 	req := &types.ChatCompletionRequest{
 		Model:    "gpt-4o",
@@ -129,12 +127,7 @@ func TestOpenAIProviderError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := &OpenAIProvider{
-		name:    "openai-test",
-		baseURL: srv.URL,
-		apiKey:  "test-key",
-		client:  srv.Client(),
-	}
+	p := newTestOpenAIProvider(srv, "test-key")
 
 	req := &types.ChatCompletionRequest{
 		Model:    "gpt-4o",
@@ -150,9 +143,97 @@ func TestOpenAIProviderError(t *testing.T) {
 	}
 }
 
+func TestOpenAIKeyMarkedRateLimitedOn429(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"error":{"message":"rate limited"}}`))
+	}))
+	defer srv.Close()
+
+	kr := NewKeyRotator([]string{"key-1"}, "round-robin", 0)
+	p := &OpenAIProvider{
+		name:    "openai-test",
+		baseURL: srv.URL,
+		keys:    kr,
+		client:  srv.Client(),
+	}
+
+	req := &types.ChatCompletionRequest{
+		Model:    "gpt-4o",
+		Messages: []types.Message{{Role: "user", Content: "Hello"}},
+	}
+
+	p.ChatCompletion(context.Background(), req) //nolint:errcheck
+
+	// key-1 should now be rate-limited and unavailable.
+	if kr.Available() {
+		t.Error("key should be marked rate-limited after 429 response")
+	}
+}
+
+func TestOpenAIKeyMarkedFailedOn401(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"message":"invalid api key"}}`))
+	}))
+	defer srv.Close()
+
+	kr := NewKeyRotator([]string{"bad-key"}, "round-robin", 0)
+	p := &OpenAIProvider{
+		name:    "openai-test",
+		baseURL: srv.URL,
+		keys:    kr,
+		client:  srv.Client(),
+	}
+
+	req := &types.ChatCompletionRequest{
+		Model:    "gpt-4o",
+		Messages: []types.Message{{Role: "user", Content: "Hello"}},
+	}
+
+	p.ChatCompletion(context.Background(), req) //nolint:errcheck
+
+	// bad-key should now be permanently failed.
+	if kr.Available() {
+		t.Error("key should be permanently failed after 401 response")
+	}
+	_, ok := kr.Pick()
+	if ok {
+		t.Error("failed key should never be picked again")
+	}
+}
+
+func TestOpenAINoKeysAvailable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	p := &OpenAIProvider{
+		name:    "openai-test",
+		baseURL: srv.URL,
+		keys:    NewKeyRotator([]string{}, "round-robin", 0),
+		client:  srv.Client(),
+	}
+
+	req := &types.ChatCompletionRequest{
+		Model:    "gpt-4o",
+		Messages: []types.Message{{Role: "user", Content: "Hello"}},
+	}
+
+	_, err := p.ChatCompletion(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected error when no keys are available")
+	}
+	if !strings.Contains(err.Error(), "no available API keys") {
+		t.Errorf("error should mention no available API keys: %v", err)
+	}
+}
+
 func TestOpenAIModels(t *testing.T) {
 	p := &OpenAIProvider{
 		name:   "openai-test",
+		keys:   NewKeyRotator([]string{"k"}, "round-robin", 0),
 		models: []string{"gpt-4o", "gpt-4o-mini"},
 	}
 
