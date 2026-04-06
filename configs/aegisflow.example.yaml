@@ -343,3 +343,147 @@ http_gate:
     - name: "slack"
       upstream_url: "https://slack.com/api"
       path_prefix: "/slack"
+
+# Execution sandboxes
+# Architectural safety constraints that go beyond regex pattern matching.
+# Each sandbox enforces structural rules on what agents can do.
+sandbox:
+  # Shell command sandbox
+  shell:
+    allowed_binaries:               # Only these binaries can run (empty = no restriction)
+      - "ls"
+      - "cat"
+      - "grep"
+      - "find"
+      - "git"
+      - "curl"
+      - "jq"
+    blocked_binaries:               # These binaries are always blocked
+      - "rm"
+      - "dd"
+      - "mkfs"
+      - "shutdown"
+      - "reboot"
+    allowed_paths:                  # Filesystem access restricted to these directories
+      - "/home/agent/workspace"
+      - "/tmp"
+    blocked_paths:                  # These paths are always blocked
+      - "/etc/shadow"
+      - "/etc/passwd"
+      - "/root"
+    network_policy:
+      allow_egress: false           # Default: no outbound network access
+      allowed_hosts:                # If egress allowed, only these hosts
+        - "api.github.com"
+      blocked_hosts:                # Always blocked
+        - "metadata.google.internal"
+        - "169.254.169.254"
+      blocked_ports:                # Always blocked ports
+        - 22
+        - 3389
+    max_duration: "30s"             # Kill command after this duration
+    max_output_bytes: 1048576       # Cap output to 1MB
+    env_redactions:                 # Environment variables to redact
+      - "AWS_SECRET_*"
+      - "GITHUB_TOKEN"
+      - "DATABASE_PASSWORD"
+      - "*_API_KEY"
+
+  # SQL query sandbox
+  sql:
+    read_only: false                # Force read-only mode (only SELECTs allowed)
+    allowed_schemas:                # Restrict to these schemas (empty = no restriction)
+      - "public"
+      - "app"
+    blocked_tables:                 # These tables are always blocked
+      - "secrets"
+      - "credentials"
+      - "api_keys"
+    max_rows_return: 1000           # Cap SELECT results
+    block_ddl: true                 # Block CREATE/ALTER/DROP/TRUNCATE
+    block_grant: true               # Block GRANT/REVOKE
+    require_where: true             # DELETE/UPDATE must have WHERE clause
+
+  # HTTP request sandbox
+  http:
+    allowed_hosts:                  # Only these hosts (empty = no restriction)
+      - "api.stripe.com"
+      - "*.slack.com"
+    blocked_hosts:                  # Always blocked
+      - "*.internal.corp"
+      - "metadata.google.internal"
+      - "169.254.169.254"
+    allowed_methods:                # Only these HTTP methods
+      - "GET"
+      - "POST"
+    max_payload_bytes: 1048576      # Cap request body to 1MB
+    blocked_paths:                  # Path patterns always blocked
+      - "/admin"
+      - "/internal"
+    require_https: true             # Block plain HTTP requests
+
+  # Git/GitHub sandbox
+  git:
+    allowed_repos:                  # Glob patterns for allowed repos
+      - "myorg/*"
+    allowed_branches:               # Branches the agent can write to
+      - "agent/*"
+      - "bot/*"
+    protected_paths:                # Files that cannot be modified
+      - ".github/workflows/*"
+      - "Makefile"
+      - "go.mod"
+      - "go.sum"
+    block_force_push: true          # Cannot force push
+    block_main_merge: true          # Cannot merge to main/master
+    block_workflow_edit: true        # Cannot edit workflow files
+
+# Resource-level policies
+# Typed, hierarchical rules that understand what resource is being touched,
+# at what scope, in what environment. Replaces flat tool-name matching with
+# resource-aware policy evaluation.
+#
+# Rule evaluation:
+#   - Rules sorted by priority (lower number = higher priority)
+#   - Deny overrides: if any matching rule blocks, the action is blocked
+#   - Environment inheritance: prod rules inherit to staging unless overridden
+#   - Sensitivity threshold: matches resources at or above the given level
+resource_policies:
+  enabled: false
+  default_decision: "block"         # "allow", "review", "block"
+  rules:
+    # Block all delete operations in production
+    - environment: "prod"
+      verb: "delete"
+      decision: "block"
+      priority: 1
+
+    # Require review for confidential data access
+    - sensitivity: "confidential"
+      verb: "read"
+      decision: "review"
+      priority: 10
+
+    # Allow read access to GitHub repos in dev
+    - resource_type: "repo"
+      provider: "github"
+      environment: "dev"
+      verb: "read"
+      decision: "allow"
+      priority: 20
+
+    # Block all access to production databases
+    - resource_type: "database"
+      provider: "postgres"
+      environment: "prod"
+      decision: "block"
+      priority: 5
+
+    # Allow read on specific path pattern
+    - resource_type: "table"
+      provider: "postgres"
+      path_pattern: "mydb/public/*"
+      environment: "dev"
+      verb: "read"
+      decision: "allow"
+      priority: 30

@@ -39,6 +39,32 @@ type Config struct {
 	SQLGate      SQLGateConfig      `yaml:"sql_gate"`
 	GitHubGate   GitHubGateConfig   `yaml:"github_gate"`
 	HTTPGate     HTTPGateConfig     `yaml:"http_gate"`
+	Sandbox          SandboxConfig        `yaml:"sandbox"`
+	Capability       CapabilityConfig     `yaml:"capability"`
+	ResourcePolicies ResourcePolicyConfig `yaml:"resource_policies"`
+}
+
+type CapabilityConfig struct {
+	Enabled    bool          `yaml:"enabled"`
+	SigningKey string        `yaml:"signing_key"` // hex-encoded HMAC key
+	DefaultTTL time.Duration `yaml:"default_ttl"`
+}
+
+type ResourcePolicyConfig struct {
+	Enabled         bool                 `yaml:"enabled"`
+	DefaultDecision string               `yaml:"default_decision"` // "allow", "review", "block"
+	Rules           []ResourcePolicyRule `yaml:"rules"`
+}
+
+type ResourcePolicyRule struct {
+	ResourceType string `yaml:"resource_type"` // "repo", "table", "endpoint", "*"
+	Provider     string `yaml:"provider"`      // "github", "postgres", "aws", "*"
+	Environment  string `yaml:"environment"`   // "prod", "staging", "dev", "*"
+	PathPattern  string `yaml:"path_pattern"`  // glob pattern on joined path
+	Sensitivity  string `yaml:"sensitivity"`   // threshold: "public", "internal", "confidential", "secret"
+	Verb         string `yaml:"verb"`          // "read", "create", "update", "delete", "*"
+	Decision     string `yaml:"decision"`      // "allow", "review", "block"
+	Priority     int    `yaml:"priority"`      // lower = higher priority
 }
 
 type HTTPGateConfig struct {
@@ -112,6 +138,60 @@ type SQLGateConfig struct {
 	DefaultDecision string `yaml:"default_decision"`
 }
 
+
+// SandboxConfig holds architectural safety constraints for all protocol gates.
+type SandboxConfig struct {
+	Shell ShellSandboxConfig `yaml:"shell"`
+	SQL   SQLSandboxConfig   `yaml:"sql"`
+	HTTP  HTTPSandboxConfig  `yaml:"http"`
+	Git   GitSandboxConfig   `yaml:"git"`
+}
+
+type ShellSandboxConfig struct {
+	AllowedBinaries []string             `yaml:"allowed_binaries"`
+	BlockedBinaries []string             `yaml:"blocked_binaries"`
+	AllowedPaths    []string             `yaml:"allowed_paths"`
+	BlockedPaths    []string             `yaml:"blocked_paths"`
+	NetworkPolicy   NetworkPolicyConfig  `yaml:"network_policy"`
+	MaxDuration     string               `yaml:"max_duration"`
+	MaxOutputBytes  int64                `yaml:"max_output_bytes"`
+	EnvRedactions   []string             `yaml:"env_redactions"`
+}
+
+type NetworkPolicyConfig struct {
+	AllowEgress  bool     `yaml:"allow_egress"`
+	AllowedHosts []string `yaml:"allowed_hosts"`
+	BlockedHosts []string `yaml:"blocked_hosts"`
+	BlockedPorts []int    `yaml:"blocked_ports"`
+}
+
+type SQLSandboxConfig struct {
+	ReadOnly       bool     `yaml:"read_only"`
+	AllowedSchemas []string `yaml:"allowed_schemas"`
+	BlockedTables  []string `yaml:"blocked_tables"`
+	MaxRowsReturn  int      `yaml:"max_rows_return"`
+	BlockDDL       bool     `yaml:"block_ddl"`
+	BlockGrant     bool     `yaml:"block_grant"`
+	RequireWhere   bool     `yaml:"require_where"`
+}
+
+type HTTPSandboxConfig struct {
+	AllowedHosts    []string `yaml:"allowed_hosts"`
+	BlockedHosts    []string `yaml:"blocked_hosts"`
+	AllowedMethods  []string `yaml:"allowed_methods"`
+	MaxPayloadBytes int64    `yaml:"max_payload_bytes"`
+	BlockedPaths    []string `yaml:"blocked_paths"`
+	RequireHTTPS    bool     `yaml:"require_https"`
+}
+
+type GitSandboxConfig struct {
+	AllowedRepos      []string `yaml:"allowed_repos"`
+	AllowedBranches   []string `yaml:"allowed_branches"`
+	ProtectedPaths    []string `yaml:"protected_paths"`
+	BlockForcePush    bool     `yaml:"block_force_push"`
+	BlockMainMerge    bool     `yaml:"block_main_merge"`
+	BlockWorkflowEdit bool     `yaml:"block_workflow_edit"`
+}
 
 type GitHubGateConfig struct {
 	Enabled         bool   `yaml:"enabled"`
@@ -623,9 +703,19 @@ func setDefaults(cfg *Config) {
 		cfg.MCPGateway.Port = 8082
 	}
 
+	// Capability defaults
+	if cfg.Capability.DefaultTTL == 0 {
+		cfg.Capability.DefaultTTL = 5 * time.Minute
+	}
+
 	// HTTP gate defaults
 	if cfg.HTTPGate.Port == 0 {
 		cfg.HTTPGate.Port = 8083
+	}
+
+	// Resource policy defaults
+	if cfg.ResourcePolicies.DefaultDecision == "" {
+		cfg.ResourcePolicies.DefaultDecision = "block"
 	}
 
 	// CORS defaults
