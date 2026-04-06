@@ -42,6 +42,13 @@ type Config struct {
 	Sandbox          SandboxConfig        `yaml:"sandbox"`
 	Capability       CapabilityConfig     `yaml:"capability"`
 	ResourcePolicies ResourcePolicyConfig `yaml:"resource_policies"`
+	Manifests        ManifestConfig       `yaml:"manifests"`
+}
+
+type ManifestConfig struct {
+	Enabled           bool   `yaml:"enabled"`
+	DefaultExpiration string `yaml:"default_expiration"` // e.g., "1h", "24h"
+	DefaultRiskTier   string `yaml:"default_risk_tier"`  // low, medium, high
 }
 
 type CapabilityConfig struct {
@@ -716,6 +723,14 @@ func setDefaults(cfg *Config) {
 	// Resource policy defaults
 	if cfg.ResourcePolicies.DefaultDecision == "" {
 		cfg.ResourcePolicies.DefaultDecision = "block"
+	}
+
+	// Manifest defaults
+	if cfg.Manifests.DefaultExpiration == "" {
+		cfg.Manifests.DefaultExpiration = "1h"
+	}
+	if cfg.Manifests.DefaultRiskTier == "" {
+		cfg.Manifests.DefaultRiskTier = "medium"
 	}
 
 	// CORS defaults

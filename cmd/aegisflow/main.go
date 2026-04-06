@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -40,8 +41,10 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/capability"
 	"github.com/saivedant169/AegisFlow/internal/credential"
 	"github.com/saivedant169/AegisFlow/internal/usage"
+	"github.com/saivedant169/AegisFlow/internal/manifest"
 	"github.com/saivedant169/AegisFlow/internal/mcpgw"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 	"github.com/saivedant169/AegisFlow/internal/webhook"
@@ -554,8 +557,46 @@ func main() {
 		toolPolicyOpt = admin.WithToolPolicyProvider(toolpolicy.NewAdminAdapter(tpEngine))
 	}
 
+	// Manifest store and drift detector
+	manifestStore := manifest.NewStore()
+	manifestDetector := manifest.NewDriftDetector()
+	manifestAdapter := manifest.NewAdminAdapter(manifestStore, manifestDetector)
+	manifestOpt := admin.WithManifestProvider(manifestAdapter)
+	log.Printf("[init] manifest drift detection enabled")
+
+	// Capability ticket issuer
+	var capabilityOpt admin.ServerOption
+	if cfg.Capability.Enabled {
+		signingKey, err := hex.DecodeString(cfg.Capability.SigningKey)
+		if err != nil {
+			log.Fatalf("invalid capability signing key (must be hex-encoded): %v", err)
+		}
+		capIssuer := capability.NewIssuer(signingKey)
+		capabilityOpt = admin.WithCapabilityProvider(capability.NewAdminAdapter(capIssuer))
+		// Periodic cleanup of expired tickets.
+		capCleanupStop := make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(1 * time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-capCleanupStop:
+					return
+				case <-ticker.C:
+					capIssuer.Store().CleanupExpired()
+				}
+			}
+		}()
+		defer close(capCleanupStop)
+		log.Printf("[init] capability tickets enabled (ttl: %s)", cfg.Capability.DefaultTTL)
+	}
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, toolPolicyOpt)
+	adminOpts := []admin.ServerOption{toolPolicyOpt, manifestOpt}
+	if capabilityOpt != nil {
+		adminOpts = append(adminOpts, capabilityOpt)
+	}
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, adminOpts...)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

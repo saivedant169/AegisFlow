@@ -177,6 +177,11 @@ aliases:
     local: "qwen2.5:0.5b"
     cheap: "mock"
 
+capability:
+  enabled: false
+  # signing_key: "hex-encoded-32-byte-hmac-key"
+  # default_ttl: 5m
+
 transform:
   default_system_prompt: ""
   system_prompt_prefix: ""
