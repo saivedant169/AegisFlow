@@ -623,7 +623,16 @@ func initPolicyEngine(cfg *config.Config) *policy.Engine {
 	}
 
 	log.Printf("loaded %d input policies, %d output policies", len(inputFilters), len(outputFilters))
-	return policy.NewEngine(inputFilters, outputFilters)
+
+	var opts []policy.EngineOption
+	if cfg.Policies.GovernanceMode != "" {
+		opts = append(opts, policy.WithGovernanceMode(policy.GovernanceMode(cfg.Policies.GovernanceMode)))
+	}
+	if cfg.Policies.BreakGlass {
+		opts = append(opts, policy.WithBreakGlass(true))
+	}
+
+	return policy.NewEngine(inputFilters, outputFilters, opts...)
 }
 
 func loadEnvFile(path string) {

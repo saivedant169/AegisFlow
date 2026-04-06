@@ -119,7 +119,14 @@ rate_limit:
 # Input policies run before the request reaches a provider.
 # Output policies run on the provider's response.
 # Actions: block (reject request), warn (log and allow), log (record only)
+#
+# governance_mode controls behavior when a policy filter encounters an error:
+#   "governance" (default) — fail-closed: filter errors block the request
+#   "permissive"           — fail-open: filter errors are logged, request passes
+# break_glass temporarily overrides governance mode to permissive (for emergencies).
 policies:
+  governance_mode: "governance"  # "governance" (fail-closed) or "permissive" (fail-open)
+  break_glass: false             # set true to temporarily override to permissive
   input:
     - name: "block-jailbreak"
       type: "keyword"           # keyword | regex | pii

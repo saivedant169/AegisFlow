@@ -181,7 +181,14 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	// Policy check: input
 	if h.policy != nil {
 		inputContent := extractContent(req.Messages)
-		if v, _ := h.policy.CheckInput(inputContent); v != nil {
+		v, err := h.policy.CheckInput(inputContent)
+		if err != nil {
+			log.Printf("policy engine input check error: %v", err)
+			h.recordAnalytics(tenantID, req.Model, "", http.StatusInternalServerError, startTime, 0)
+			writeError(w, http.StatusInternalServerError, "policy_error", "policy engine error")
+			return
+		}
+		if v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, "", http.StatusForbidden, startTime, 0)
@@ -241,7 +248,14 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	// Policy check: output
 	if h.policy != nil && len(resp.Choices) > 0 {
-		if v, _ := h.policy.CheckOutput(resp.Choices[0].Message.Content); v != nil {
+		v, err := h.policy.CheckOutput(resp.Choices[0].Message.Content)
+		if err != nil {
+			log.Printf("policy engine output check error: %v", err)
+			h.recordAnalytics(tenantID, req.Model, providerName, http.StatusInternalServerError, startTime, 0)
+			writeError(w, http.StatusInternalServerError, "policy_error", "policy engine error")
+			return
+		}
+		if v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
@@ -366,7 +380,9 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 				bytesScanned += n
 
 				if bytesScanned >= checkInterval {
-					if v, _ := h.policy.CheckOutput(accumulated.String()); v != nil {
+					if v, checkErr := h.policy.CheckOutput(accumulated.String()); checkErr != nil {
+						log.Printf("policy engine stream check error: %v", checkErr)
+					} else if v != nil {
 						if v.Action == policy.ActionBlock {
 							h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 							// Send error event in SSE format to terminate stream

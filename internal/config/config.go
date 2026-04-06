@@ -320,8 +320,10 @@ type RedisConfig struct {
 }
 
 type PoliciesConfig struct {
-	Input  []PolicyConfig `yaml:"input"`
-	Output []PolicyConfig `yaml:"output"`
+	GovernanceMode string         `yaml:"governance_mode"` // "governance" (fail-closed) or "permissive" (fail-open); default "governance"
+	BreakGlass     bool           `yaml:"break_glass"`     // when true, temporarily overrides to permissive mode
+	Input          []PolicyConfig `yaml:"input"`
+	Output         []PolicyConfig `yaml:"output"`
 }
 
 type PolicyConfig struct {
@@ -396,6 +398,9 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.RateLimit.Backend == "" {
 		cfg.RateLimit.Backend = "memory"
+	}
+	if cfg.Policies.GovernanceMode == "" {
+		cfg.Policies.GovernanceMode = "governance"
 	}
 	if cfg.Logging.Level == "" {
 		cfg.Logging.Level = "info"

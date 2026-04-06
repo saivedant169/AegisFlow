@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -312,6 +313,83 @@ func TestRegexFilterNameAndAction(t *testing.T) {
 	}
 	if f.Action() != ActionLog {
 		t.Errorf("expected action 'log', got %q", f.Action())
+	}
+}
+
+// errorFilter is a test filter that always returns an error from CheckE.
+type errorFilter struct {
+	name string
+}
+
+func (f *errorFilter) Name() string       { return f.name }
+func (f *errorFilter) Action() Action     { return ActionBlock }
+func (f *errorFilter) Check(string) *Violation { return nil }
+func (f *errorFilter) CheckE(string) (*Violation, error) {
+	return nil, fmt.Errorf("simulated filter failure")
+}
+
+func TestGovernanceModeBlocksOnFilterError(t *testing.T) {
+	filters := []Filter{&errorFilter{name: "failing-filter"}}
+	engine := NewEngine(filters, nil, WithGovernanceMode(ModeGovernance))
+
+	v, err := engine.CheckInput("anything")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v == nil {
+		t.Fatal("expected violation in governance mode when filter errors")
+	}
+	if v.Action != ActionBlock {
+		t.Errorf("expected block action, got %s", v.Action)
+	}
+	if v.PolicyName != "failing-filter" {
+		t.Errorf("expected policy name 'failing-filter', got %q", v.PolicyName)
+	}
+}
+
+func TestPermissiveModePassesOnFilterError(t *testing.T) {
+	filters := []Filter{&errorFilter{name: "failing-filter"}}
+	engine := NewEngine(filters, nil, WithGovernanceMode(ModePermissive))
+
+	v, err := engine.CheckInput("anything")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != nil {
+		t.Error("expected no violation in permissive mode when filter errors")
+	}
+}
+
+func TestBreakGlassOverridesToPermissive(t *testing.T) {
+	filters := []Filter{&errorFilter{name: "failing-filter"}}
+	engine := NewEngine(filters, nil, WithGovernanceMode(ModeGovernance), WithBreakGlass(true))
+
+	v, err := engine.CheckInput("anything")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != nil {
+		t.Error("expected no violation when break-glass overrides governance to permissive")
+	}
+}
+
+func TestEmptyFiltersAllowInGovernanceMode(t *testing.T) {
+	engine := NewEngine(nil, nil, WithGovernanceMode(ModeGovernance))
+
+	v, err := engine.CheckInput("anything at all")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != nil {
+		t.Error("expected no violation with empty filters in governance mode")
+	}
+
+	v2, err2 := engine.CheckOutput("anything at all")
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if v2 != nil {
+		t.Error("expected no violation with empty output filters in governance mode")
 	}
 }
 
