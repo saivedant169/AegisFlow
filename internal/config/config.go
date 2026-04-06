@@ -30,8 +30,9 @@ type Config struct {
 	CostOpt    CostOptConfig    `yaml:"cost_optimization"`
 	Eval       EvalConfig       `yaml:"eval"`
 	Federation FederationConfig `yaml:"federation"`
-	LoadShed   LoadShedConfig   `yaml:"load_shed"`
-	WebSocket  WebSocketConfig  `yaml:"websocket"`
+	LoadShed     LoadShedConfig   `yaml:"load_shed"`
+	WebSocket    WebSocketConfig  `yaml:"websocket"`
+	ToolPolicies ToolPolicyConfig `yaml:"tool_policies"`
 }
 
 type LoadShedConfig struct {
@@ -44,6 +45,20 @@ type LoadShedConfig struct {
 type WebSocketConfig struct {
 	Enabled      bool          `yaml:"enabled"`
 	PingInterval time.Duration `yaml:"ping_interval"`
+}
+
+type ToolPolicyConfig struct {
+	Enabled         bool             `yaml:"enabled"`
+	DefaultDecision string           `yaml:"default_decision"` // "allow", "review", "block"
+	Rules           []ToolPolicyRule `yaml:"rules"`
+}
+
+type ToolPolicyRule struct {
+	Protocol   string `yaml:"protocol"`
+	Tool       string `yaml:"tool"`
+	Target     string `yaml:"target"`
+	Capability string `yaml:"capability"`
+	Decision   string `yaml:"decision"`
 }
 
 type FederationConfig struct {
@@ -519,6 +534,11 @@ func setDefaults(cfg *Config) {
 	// Federation defaults
 	if cfg.Federation.ControlPlane.SyncInterval == 0 {
 		cfg.Federation.ControlPlane.SyncInterval = 30 * time.Second
+	}
+
+	// Tool policy defaults
+	if cfg.ToolPolicies.DefaultDecision == "" {
+		cfg.ToolPolicies.DefaultDecision = "block"
 	}
 
 	// CORS defaults

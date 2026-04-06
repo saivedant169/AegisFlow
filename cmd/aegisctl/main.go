@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -67,6 +68,28 @@ func main() {
 		cmdPolicies(adminURL)
 	case "tenants":
 		cmdTenants(adminURL)
+	case "pending":
+		cmdPending(adminURL)
+	case "approve":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl approve <id> [comment]")
+			os.Exit(1)
+		}
+		comment := ""
+		if len(os.Args) > 3 {
+			comment = strings.Join(os.Args[3:], " ")
+		}
+		cmdApprove(adminURL, os.Args[2], comment)
+	case "deny":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl deny <id> [comment]")
+			os.Exit(1)
+		}
+		comment := ""
+		if len(os.Args) > 3 {
+			comment = strings.Join(os.Args[3:], " ")
+		}
+		cmdDeny(adminURL, os.Args[2], comment)
 	case "test":
 		apiKey := "aegis-test-default-001"
 		model := "mock"
@@ -99,6 +122,9 @@ Commands:
   providers   List configured providers with health
   policies    List configured policies
   tenants     List tenants with rate limits
+  pending     List pending approval items
+  approve     Approve a pending item: aegisctl approve <id> [comment]
+  deny        Deny a pending item: aegisctl deny <id> [comment]
   test [msg]  Send a test chat completion
   version     Show version
   help        Show this help
@@ -385,4 +411,65 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func cmdPending(adminURL string) {
+	resp, err := client.Get(adminURL + "/admin/v1/approvals")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	pending, _ := result["pending"].([]interface{})
+	if len(pending) == 0 {
+		fmt.Println("No pending approvals.")
+		return
+	}
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "ID\tTOOL\tPROTOCOL\tACTOR\tSUBMITTED\n")
+	for _, p := range pending {
+		item, _ := p.(map[string]interface{})
+		env, _ := item["envelope"].(map[string]interface{})
+		actor, _ := env["actor"].(map[string]interface{})
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			item["id"], env["tool"], env["protocol"], actor["id"], item["submitted_at"])
+	}
+	tw.Flush()
+}
+
+func cmdApprove(adminURL, id, comment string) {
+	body, _ := json.Marshal(map[string]string{"reviewer": "aegisctl", "comment": comment})
+	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/approve", "application/json", bytes.NewReader(body))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		var result map[string]string
+		json.NewDecoder(resp.Body).Decode(&result)
+		fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		os.Exit(1)
+	}
+	fmt.Printf("Approved: %s\n", id)
+}
+
+func cmdDeny(adminURL, id, comment string) {
+	body, _ := json.Marshal(map[string]string{"reviewer": "aegisctl", "comment": comment})
+	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/deny", "application/json", bytes.NewReader(body))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		var result map[string]string
+		json.NewDecoder(resp.Body).Decode(&result)
+		fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		os.Exit(1)
+	}
+	fmt.Printf("Denied: %s\n", id)
 }

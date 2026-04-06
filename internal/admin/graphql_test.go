@@ -54,6 +54,8 @@ func newGraphQLTestServer() *Server {
 		&verifyOnlyAuditProvider{}, // audit
 		nil,                       // federation
 		nil,                       // costopt
+		nil,                       // evidence
+		nil,                       // approval
 	)
 }
 

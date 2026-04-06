@@ -71,6 +71,8 @@ func newIntegrationAdminServer() *Server {
 		&verifyOnlyAuditProvider{},
 		nil,
 		nil,
+		nil,
+		nil,
 	)
 }
 

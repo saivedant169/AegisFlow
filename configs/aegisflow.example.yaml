@@ -222,3 +222,55 @@ cache:
     model: "text-embedding-3-small"
     threshold: 0.92             # cosine similarity threshold (0.0-1.0)
     max_size: 1000              # max cached embeddings
+
+# Tool-level policies for agent action governance
+tool_policies:
+  enabled: true
+  default_decision: "block"          # default when no rule matches: allow | review | block
+  rules:
+    # GitHub - read operations allowed, writes need review, merges blocked
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.create_branch"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.create_pull_request"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.merge_pull_request"
+      decision: "block"
+
+    # Shell - safe commands allowed, dangerous blocked
+    - protocol: "shell"
+      tool: "shell.exec"
+      target: "pytest"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.exec"
+      target: "rm *"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.exec"
+      decision: "review"
+
+    # SQL - reads allowed, writes need review, drops blocked
+    - protocol: "sql"
+      tool: "*"
+      capability: "read"
+      decision: "allow"
+    - protocol: "sql"
+      tool: "*"
+      capability: "write"
+      decision: "review"
+    - protocol: "sql"
+      tool: "*"
+      capability: "delete"
+      decision: "block"
+
+    # Block all delete operations across all protocols
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"

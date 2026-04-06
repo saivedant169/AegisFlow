@@ -60,6 +60,26 @@ type CostOptProvider interface {
 	Recommendations() interface{}
 }
 
+// ApprovalProvider is the interface consumed by the admin API to avoid an
+// import cycle with the approval package. Use approval.NewAdminAdapter to
+// wrap a *approval.Queue so it satisfies this interface.
+type ApprovalProvider interface {
+	Pending() interface{}
+	History(limit int) interface{}
+	Get(id string) (interface{}, error)
+	Approve(id, reviewer, comment string) (interface{}, error)
+	Deny(id, reviewer, comment string) (interface{}, error)
+}
+
+// EvidenceProvider is the interface consumed by the admin API to avoid an
+// import cycle with the evidence package. Implementations provide session
+// evidence chain export and verification.
+type EvidenceProvider interface {
+	ExportSession(sessionID string) (interface{}, error)
+	VerifySession(sessionID string) (interface{}, error)
+	ListSessions() interface{}
+}
+
 // RolloutManager is the interface consumed by the admin API to avoid an import
 // cycle with the rollout package. Use rollout.NewAdminAdapter to wrap a
 // *rollout.Manager so it satisfies this interface.
@@ -87,10 +107,12 @@ type Server struct {
 	auditProvider      AuditProvider
 	federationProvider FederationProvider
 	costOptProvider    CostOptProvider
+	evidenceProvider   EvidenceProvider
+	approvalProvider   ApprovalProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop, evidenceProvider: ep, approvalProvider: apvp}
 }
 
 func (s *Server) Router() http.Handler {
@@ -123,6 +145,12 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
 	r.Get("/admin/v1/whoami", s.whoamiHandler)
+	r.Get("/admin/v1/approvals", s.handleApprovalsPending)
+	r.Get("/admin/v1/approvals/history", s.handleApprovalsHistory)
+	r.Get("/admin/v1/approvals/{id}", s.handleApprovalGet)
+	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
+	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
+	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
 	// GraphQL endpoint (reuses the same provider interfaces as REST)
 	if s.cfg.Admin.GraphQL.Enabled {
 		schema, err := s.buildSchema()
@@ -146,6 +174,8 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
 		r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
 		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
+		r.Post("/admin/v1/approvals/{id}/approve", s.handleApprovalApprove)
+		r.Post("/admin/v1/approvals/{id}/deny", s.handleApprovalDeny)
 		r.Get("/admin/v1/audit", s.auditHandler)
 	})
 
@@ -568,4 +598,149 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// --- Evidence handlers ---
+
+func (s *Server) evidenceUnavailable(w http.ResponseWriter) bool {
+	if s.evidenceProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "evidence provider not available"})
+		return true
+	}
+	return false
+}
+
+func (s *Server) handleEvidenceSessions(w http.ResponseWriter, r *http.Request) {
+	if s.evidenceUnavailable(w) {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.evidenceProvider.ListSessions())
+}
+
+func (s *Server) handleEvidenceExport(w http.ResponseWriter, r *http.Request) {
+	if s.evidenceUnavailable(w) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	result, err := s.evidenceProvider.ExportSession(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
+	if s.evidenceUnavailable(w) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	result, err := s.evidenceProvider.VerifySession(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// --- Approval handlers ---
+
+func (s *Server) handleApprovalsPending(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.approvalProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"pending": []interface{}{}})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"pending": s.approvalProvider.Pending()})
+}
+
+func (s *Server) handleApprovalsHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.approvalProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"history": s.approvalProvider.History(100)})
+}
+
+func (s *Server) handleApprovalGet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.approvalProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+		return
+	}
+	item, err := s.approvalProvider.Get(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(item)
+}
+
+func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.approvalProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "approvals not enabled"})
+		return
+	}
+	var body struct {
+		Reviewer string `json:"reviewer"`
+		Comment  string `json:"comment"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Reviewer == "" {
+		body.Reviewer = "admin"
+	}
+	item, err := s.approvalProvider.Approve(id, body.Reviewer, body.Comment)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(item)
+}
+
+func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.approvalProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "approvals not enabled"})
+		return
+	}
+	var body struct {
+		Reviewer string `json:"reviewer"`
+		Comment  string `json:"comment"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Reviewer == "" {
+		body.Reviewer = "admin"
+	}
+	item, err := s.approvalProvider.Deny(id, body.Reviewer, body.Comment)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(item)
 }

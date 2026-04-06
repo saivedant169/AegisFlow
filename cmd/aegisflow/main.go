@@ -39,6 +39,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/router"
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
+	"github.com/saivedant169/AegisFlow/internal/approval"
 	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
@@ -449,8 +450,13 @@ func main() {
 		log.Printf("[init] cost optimization engine enabled")
 	}
 
+	// Approval queue
+	approvalQueue := approval.NewQueue(1000)
+	approvalAdapter := approval.NewAdminAdapter(approvalQueue)
+	log.Printf("[init] approval queue enabled (max_size=1000)")
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
