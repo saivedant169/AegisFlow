@@ -73,6 +73,8 @@ func newIntegrationAdminServer() *Server {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
 	)
 }
 

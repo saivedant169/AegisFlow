@@ -56,6 +56,7 @@ func newGraphQLTestServer() *Server {
 		nil,                       // costopt
 		nil,                       // evidence
 		nil,                       // approval
+		nil,                       // credential
 	)
 }
 
