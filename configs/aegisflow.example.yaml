@@ -344,6 +344,14 @@ http_gate:
       upstream_url: "https://slack.com/api"
       path_prefix: "/slack"
 
+# Task Manifests & Intent-to-Execution Drift Detection
+# Agents declare what they intend to do via a TaskManifest. AegisFlow then
+# detects when actual execution drifts from the declared intent.
+manifests:
+  enabled: true
+  default_expiration: "1h"           # How long manifests are valid by default
+  default_risk_tier: "medium"        # low, medium, high
+
 # Execution sandboxes
 # Architectural safety constraints that go beyond regex pattern matching.
 # Each sandbox enforces structural rules on what agents can do.
