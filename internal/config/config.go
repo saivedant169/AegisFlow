@@ -33,7 +33,8 @@ type Config struct {
 	LoadShed     LoadShedConfig   `yaml:"load_shed"`
 	WebSocket    WebSocketConfig  `yaml:"websocket"`
 	ToolPolicies ToolPolicyConfig `yaml:"tool_policies"`
-	MCPGateway   MCPGatewayConfig `yaml:"mcp_gateway"`
+	MCPGateway   MCPGatewayConfig   `yaml:"mcp_gateway"`
+	Credentials  CredentialConfig   `yaml:"credentials"`
 }
 
 type LoadShedConfig struct {
@@ -60,6 +61,21 @@ type ToolPolicyRule struct {
 	Target     string `yaml:"target"`
 	Capability string `yaml:"capability"`
 	Decision   string `yaml:"decision"`
+}
+
+type CredentialConfig struct {
+	Enabled   bool                    `yaml:"enabled"`
+	Providers []CredentialProviderCfg `yaml:"providers"`
+}
+
+type CredentialProviderCfg struct {
+	Name            string        `yaml:"name"`
+	Type            string        `yaml:"type"` // "static", "github_app"
+	Token           string        `yaml:"token"` // for static
+	GitHubAppID     int64         `yaml:"github_app_id"`
+	GitHubKeyPath   string        `yaml:"github_key_path"`
+	GitHubInstallID int64         `yaml:"github_install_id"`
+	DefaultTTL      time.Duration `yaml:"default_ttl"`
 }
 
 type MCPGatewayConfig struct {

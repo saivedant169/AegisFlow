@@ -71,6 +71,14 @@ type ApprovalProvider interface {
 	Deny(id, reviewer, comment string) (interface{}, error)
 }
 
+// CredentialProvider is the interface consumed by the admin API to avoid an
+// import cycle with the credential package. Use credential.NewAdminAdapter to
+// wrap a *credential.Registry so it satisfies this interface.
+type CredentialProvider interface {
+	ActiveCredentials() interface{}
+	RevokeCredential(id string) error
+}
+
 // EvidenceProvider is the interface consumed by the admin API to avoid an
 // import cycle with the evidence package. Implementations provide session
 // evidence chain export and verification.
@@ -109,10 +117,11 @@ type Server struct {
 	costOptProvider    CostOptProvider
 	evidenceProvider   EvidenceProvider
 	approvalProvider   ApprovalProvider
+	credentialProvider CredentialProvider
 }
 
-func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider) *Server {
-	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop, evidenceProvider: ep, approvalProvider: apvp}
+func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider) *Server {
+	return &Server{tracker: tracker, cfg: cfg, registry: registry, requestLog: reqLog, cache: c, rolloutMgr: rm, analyticsProvider: ap, budgetProvider: bp, auditProvider: aup, federationProvider: fp, costOptProvider: cop, evidenceProvider: ep, approvalProvider: apvp, credentialProvider: crp}
 }
 
 func (s *Server) Router() http.Handler {
@@ -148,6 +157,7 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/approvals", s.handleApprovalsPending)
 	r.Get("/admin/v1/approvals/history", s.handleApprovalsHistory)
 	r.Get("/admin/v1/approvals/{id}", s.handleApprovalGet)
+	r.Get("/admin/v1/credentials", s.handleCredentialsList)
 	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
 	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
 	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
@@ -176,6 +186,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
 		r.Post("/admin/v1/approvals/{id}/approve", s.handleApprovalApprove)
 		r.Post("/admin/v1/approvals/{id}/deny", s.handleApprovalDeny)
+		r.Post("/admin/v1/credentials/{id}/revoke", s.handleCredentialRevoke)
 		r.Get("/admin/v1/audit", s.auditHandler)
 	})
 
@@ -650,6 +661,35 @@ func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+// --- Credential handlers ---
+
+func (s *Server) handleCredentialsList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.credentialProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"credentials": []interface{}{}})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"credentials": s.credentialProvider.ActiveCredentials()})
+}
+
+func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.credentialProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "credential broker not enabled"})
+		return
+	}
+	if err := s.credentialProvider.RevokeCredential(id); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // --- Approval handlers ---

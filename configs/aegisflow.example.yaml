@@ -274,3 +274,20 @@ tool_policies:
       tool: "*"
       capability: "delete"
       decision: "block"
+
+# Task-scoped credential broker
+# Issues short-lived, task-scoped credentials instead of sharing full user tokens.
+credentials:
+  enabled: false
+  providers:
+    - name: "fallback-static"
+      type: "static"                    # Wraps a pre-configured token (degraded mode)
+      token: "${STATIC_FALLBACK_TOKEN}" # Token value (use env var reference)
+      default_ttl: 30m                  # Credential lifetime
+
+    - name: "github"
+      type: "github_app"               # Issues GitHub App installation access tokens
+      github_app_id: 123456
+      github_key_path: "/etc/aegisflow/github-app.pem"
+      github_install_id: 7890123
+      default_ttl: 1h                  # Max 1 hour for GitHub App tokens

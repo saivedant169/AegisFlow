@@ -40,6 +40,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/credential"
 	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/internal/mcpgw"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
@@ -457,8 +458,53 @@ func main() {
 	approvalAdapter := approval.NewAdminAdapter(approvalQueue)
 	log.Printf("[init] approval queue enabled (max_size=1000)")
 
+	// Credential broker
+	var credentialAdapter admin.CredentialProvider
+	if cfg.Credentials.Enabled {
+		credRegistry := credential.NewRegistry()
+		for _, pc := range cfg.Credentials.Providers {
+			switch pc.Type {
+			case "static":
+				ttl := pc.DefaultTTL
+				if ttl == 0 {
+					ttl = 1 * time.Hour
+				}
+				broker := credential.NewStaticBroker(pc.Name, pc.Token, ttl)
+				credRegistry.Register(pc.Name, broker)
+				log.Printf("[init] registered static credential broker: %s", pc.Name)
+			case "github_app":
+				ttl := pc.DefaultTTL
+				if ttl == 0 {
+					ttl = 1 * time.Hour
+				}
+				broker := credential.NewGitHubAppBroker(pc.Name, pc.GitHubAppID, pc.GitHubKeyPath, pc.GitHubInstallID, ttl)
+				credRegistry.Register(pc.Name, broker)
+				log.Printf("[init] registered GitHub App credential broker: %s (app_id: %d, install_id: %d)", pc.Name, pc.GitHubAppID, pc.GitHubInstallID)
+			default:
+				log.Printf("[init] skipping unsupported credential provider type: %s", pc.Type)
+			}
+		}
+		credentialAdapter = credential.NewAdminAdapter(credRegistry)
+		// Start periodic cleanup of expired credentials.
+		credCleanupStop := make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(1 * time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-credCleanupStop:
+					return
+				case <-ticker.C:
+					credRegistry.CleanupExpired()
+				}
+			}
+		}()
+		defer close(credCleanupStop)
+		log.Printf("[init] credential broker enabled (%d providers)", len(cfg.Credentials.Providers))
+	}
+
 	// Admin server
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
