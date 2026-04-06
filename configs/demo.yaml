@@ -13,7 +13,7 @@ tenants:
     name: "Demo Coding Agent"
     api_keys:
       - key: "demo-key-001"
-        role: "operator"
+        role: "admin"
     rate_limit:
       requests_per_minute: 120
       tokens_per_minute: 200000
