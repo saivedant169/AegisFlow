@@ -43,6 +43,9 @@ func (s *verifyOnlyAuditProvider) Verify() (interface{}, error) {
 	return map[string]any{"valid": true, "message": "ok"}, nil
 }
 
+func (s *verifyOnlyAuditProvider) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
+}
+
 func newIntegrationAdminServer() *Server {
 	cfg := &config.Config{
 		Tenants: []config.TenantConfig{

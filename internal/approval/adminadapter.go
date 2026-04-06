@@ -1,5 +1,7 @@
 package approval
 
+import "github.com/saivedant169/AegisFlow/internal/envelope"
+
 // AdminAdapter bridges the Queue to the admin API.
 type AdminAdapter struct {
 	queue *Queue
@@ -27,4 +29,12 @@ func (a *AdminAdapter) Approve(id, reviewer, comment string) (interface{}, error
 
 func (a *AdminAdapter) Deny(id, reviewer, comment string) (interface{}, error) {
 	return a.queue.Deny(id, reviewer, comment)
+}
+
+func (a *AdminAdapter) Submit(env interface{}) (string, error) {
+	e, ok := env.(*envelope.ActionEnvelope)
+	if !ok {
+		return "", nil
+	}
+	return a.queue.Submit(e)
 }

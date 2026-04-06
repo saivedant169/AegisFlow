@@ -3,6 +3,7 @@ package admin
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -43,6 +44,7 @@ type BudgetProvider interface {
 type AuditProvider interface {
 	Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error)
 	Verify() (interface{}, error)
+	Log(actor, actorRole, action, resource, detail, tenantID, model string)
 }
 
 // FederationProvider is the interface consumed by the admin API to avoid an
@@ -70,6 +72,7 @@ type ApprovalProvider interface {
 	Get(id string) (interface{}, error)
 	Approve(id, reviewer, comment string) (interface{}, error)
 	Deny(id, reviewer, comment string) (interface{}, error)
+	Submit(env interface{}) (string, error)
 }
 
 // CredentialProvider is the interface consumed by the admin API to avoid an
@@ -881,10 +884,17 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	case envelope.DecisionReview:
 		resp.Message = "Action requires human review"
 		if s.approvalProvider != nil {
+			s.approvalProvider.Submit(env)
 			resp.ApprovalID = env.ID
 		}
 	case envelope.DecisionBlock:
 		resp.Message = "Action is blocked by policy"
+	}
+
+	// Record in audit log
+	if s.auditProvider != nil {
+		detail := fmt.Sprintf(`{"tool":"%s","target":"%s","capability":"%s","decision":"%s"}`, req.Tool, req.Target, req.Capability, decision)
+		s.auditProvider.Log("agent", "agent", "test-action."+decision, "tool:"+req.Tool, detail, "test-tenant", "")
 	}
 
 	w.Header().Set("Content-Type", "application/json")

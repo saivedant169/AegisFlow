@@ -18,3 +18,7 @@ func (a *AdminAdapter) Query(actor, actorRole, action, tenantID string, limit in
 func (a *AdminAdapter) Verify() (interface{}, error) {
 	return a.logger.Verify()
 }
+
+func (a *AdminAdapter) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
+	a.logger.Log(actor, actorRole, action, resource, detail, tenantID, model)
+}
