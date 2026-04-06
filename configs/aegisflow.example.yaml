@@ -542,3 +542,12 @@ identity:
                 - id: "rec-prod"
                   name: "prod"
                   risk_tier: "high"
+
+# Behavioral session policy engine
+# Detects risky agent behavior across action sequences, not just single steps.
+# Patterns detected: data exfiltration, privilege escalation, credential abuse,
+# destructive sequences, suspicious fan-out, and repeated escalation attempts.
+behavioral:
+  enabled: true
+  kill_switch_score: 80             # Auto-block session when cumulative risk exceeds this
+  window_minutes: 30                # Analysis window (minutes); 0 = unlimited
