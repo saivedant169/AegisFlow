@@ -139,6 +139,20 @@ type RolloutManager interface {
 	RollbackRollout(id string) error
 }
 
+// SupplyChainProvider is the interface consumed by the admin API to list
+// loaded supply chain assets and their trust status.
+type SupplyChainProvider interface {
+	ListAssets() interface{}
+}
+
+// BehavioralProvider is the interface consumed by the admin API to avoid an
+// import cycle with the behavioral package. Use behavioral.NewAdminAdapter to
+// wrap a *behavioral.Registry so it satisfies this interface.
+type BehavioralProvider interface {
+	SessionRisk(sessionID string) (interface{}, error)
+	ListSessions() interface{}
+}
+
 //go:embed dashboard.html
 var dashboardHTML []byte
 
@@ -157,9 +171,11 @@ type Server struct {
 	evidenceProvider   EvidenceProvider
 	approvalProvider   ApprovalProvider
 	credentialProvider CredentialProvider
-	toolPolicyProvider  ToolPolicyProvider
-	manifestProvider    ManifestProvider
-	capabilityProvider  CapabilityProvider
+	toolPolicyProvider   ToolPolicyProvider
+	manifestProvider     ManifestProvider
+	capabilityProvider   CapabilityProvider
+	supplyChainProvider  SupplyChainProvider
+	behavioralProvider   BehavioralProvider
 }
 
 func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
@@ -191,6 +207,20 @@ func WithManifestProvider(mp ManifestProvider) ServerOption {
 func WithCapabilityProvider(cp CapabilityProvider) ServerOption {
 	return func(s *Server) {
 		s.capabilityProvider = cp
+	}
+}
+
+// WithSupplyChainProvider sets the supply chain asset provider on the admin server.
+func WithSupplyChainProvider(scp SupplyChainProvider) ServerOption {
+	return func(s *Server) {
+		s.supplyChainProvider = scp
+	}
+}
+
+// WithBehavioralProvider sets the behavioral analysis provider on the admin server.
+func WithBehavioralProvider(bp BehavioralProvider) ServerOption {
+	return func(s *Server) {
+		s.behavioralProvider = bp
 	}
 }
 
@@ -241,6 +271,8 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/manifests/{id}/drift", s.handleManifestDrift)
 	r.Post("/admin/v1/manifests", s.handleManifestCreate)
 	r.Delete("/admin/v1/manifests/{id}", s.handleManifestDeactivate)
+	r.Get("/admin/v1/supply-chain", s.handleSupplyChain)
+	r.Get("/admin/v1/sessions/{id}/risk", s.handleSessionRisk)
 	// GraphQL endpoint (reuses the same provider interfaces as REST)
 	if s.cfg.Admin.GraphQL.Enabled {
 		schema, err := s.buildSchema()
@@ -1232,5 +1264,51 @@ func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleSupplyChain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.supplyChainProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"enabled": false,
+			"assets":  []interface{}{},
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled": true,
+		"assets":  s.supplyChainProvider.ListAssets(),
+	})
+}
+
+func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	sessionID := chi.URLParam(r, "id")
+	if sessionID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "session id required"})
+		return
+	}
+	if s.behavioralProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"enabled":    false,
+			"session_id": sessionID,
+			"risk_score": 0,
+			"alerts":     []interface{}{},
+		})
+		return
+	}
+	result, err := s.behavioralProvider.SessionRisk(sessionID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if result == nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "session not found"})
+		return
+	}
 	json.NewEncoder(w).Encode(result)
 }
