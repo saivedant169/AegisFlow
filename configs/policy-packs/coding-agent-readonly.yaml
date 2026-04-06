@@ -1,0 +1,99 @@
+# AegisFlow Policy Pack: Coding Agent (Read-Only)
+# Allows only read operations, blocks everything else.
+name: coding-agent-readonly
+description: "Read-only policy for coding agents: allow reads, block everything else"
+default_decision: block
+
+rules:
+  # === ALLOW: Read-only operations ===
+  - protocol: "*"
+    tool: "list_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "get_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "search_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "read_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "view_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "describe_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "show_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "select_*"
+    decision: allow
+
+  - protocol: "sql"
+    tool: "*"
+    capability: read
+    decision: allow
+
+  - protocol: "git"
+    tool: "git.log"
+    decision: allow
+
+  - protocol: "git"
+    tool: "git.status"
+    decision: allow
+
+  - protocol: "git"
+    tool: "git.diff"
+    decision: allow
+
+  - protocol: "git"
+    tool: "git.show"
+    decision: allow
+
+  - protocol: "git"
+    tool: "git.blame"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "cat *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "ls *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "find *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "grep *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "head *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "tail *"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "wc *"
+    decision: allow

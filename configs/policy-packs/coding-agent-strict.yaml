@@ -1,0 +1,100 @@
+# AegisFlow Policy Pack: Coding Agent (Strict)
+# Blocks all destructive operations, reviews all writes, allows reads.
+name: coding-agent-strict
+description: "Strict policy for coding agents: block destructive ops, review writes, allow reads"
+default_decision: block
+
+rules:
+  # === BLOCK: Destructive operations ===
+  - protocol: "*"
+    tool: "delete_*"
+    decision: block
+
+  - protocol: "*"
+    tool: "drop_*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "rm -rf *"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "rm -r *"
+    decision: block
+
+  - protocol: "git"
+    tool: "git.force_push"
+    decision: block
+
+  - protocol: "git"
+    tool: "git.push"
+    target: "--force*"
+    decision: block
+
+  - protocol: "sql"
+    tool: "*"
+    capability: delete
+    decision: block
+
+  - protocol: "*"
+    tool: "*"
+    capability: delete
+    decision: block
+
+  # === REVIEW: Write operations ===
+  - protocol: "*"
+    tool: "create_*"
+    decision: review
+
+  - protocol: "*"
+    tool: "update_*"
+    decision: review
+
+  - protocol: "sql"
+    tool: "*"
+    capability: write
+    decision: review
+
+  - protocol: "git"
+    tool: "git.merge_*"
+    decision: review
+
+  - protocol: "*"
+    tool: "insert_*"
+    decision: review
+
+  # === ALLOW: Read operations ===
+  - protocol: "*"
+    tool: "list_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "get_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "search_*"
+    decision: allow
+
+  - protocol: "sql"
+    tool: "*"
+    capability: read
+    decision: allow
+
+  - protocol: "*"
+    tool: "read_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "view_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "describe_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "show_*"
+    decision: allow

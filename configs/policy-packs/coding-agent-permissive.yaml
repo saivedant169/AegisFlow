@@ -1,0 +1,53 @@
+# AegisFlow Policy Pack: Coding Agent (Permissive)
+# Blocks only the most dangerous operations, allows everything else.
+name: coding-agent-permissive
+description: "Permissive policy for coding agents: block only catastrophic ops, allow everything else"
+default_decision: allow
+
+rules:
+  # === BLOCK: Catastrophic operations only ===
+  - protocol: "*"
+    tool: "delete_repo"
+    decision: block
+
+  - protocol: "*"
+    tool: "delete_organization"
+    decision: block
+
+  - protocol: "sql"
+    tool: "drop_table"
+    decision: block
+
+  - protocol: "sql"
+    tool: "drop_database"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "rm -rf /"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "rm -rf /*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "mkfs*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.exec"
+    target: "dd if=*"
+    decision: block
+
+  - protocol: "git"
+    tool: "git.force_push"
+    target: "main"
+    decision: block
+
+  - protocol: "git"
+    tool: "git.force_push"
+    target: "master"
+    decision: block
