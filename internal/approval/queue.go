@@ -21,6 +21,7 @@ type ApprovalItem struct {
 	Envelope      *envelope.ActionEnvelope `json:"envelope"`
 	Status        string                   `json:"status"`
 	SubmittedAt   time.Time                `json:"submitted_at"`
+	ExpireAt      time.Time                `json:"expire_at"`
 	ReviewedAt    *time.Time               `json:"reviewed_at,omitempty"`
 	Reviewer      string                   `json:"reviewer,omitempty"`
 	ReviewComment string                   `json:"review_comment,omitempty"`
@@ -32,6 +33,7 @@ type Queue struct {
 	pending map[string]*ApprovalItem
 	history []*ApprovalItem
 	maxSize int
+	Timeout time.Duration
 }
 
 func NewQueue(maxSize int) *Queue {
@@ -39,6 +41,7 @@ func NewQueue(maxSize int) *Queue {
 		pending: make(map[string]*ApprovalItem),
 		history: make([]*ApprovalItem, 0),
 		maxSize: maxSize,
+		Timeout: 30 * time.Minute, // default timeout
 	}
 }
 
@@ -51,11 +54,13 @@ func (q *Queue) Submit(env *envelope.ActionEnvelope) (string, error) {
 		return "", errors.New("approval queue is full")
 	}
 
+	now := time.Now().UTC()
 	item := &ApprovalItem{
 		ID:          env.ID,
 		Envelope:    env,
 		Status:      StatusPending,
-		SubmittedAt: time.Now().UTC(),
+		SubmittedAt: now,
+		ExpireAt:    now.Add(q.Timeout),
 	}
 	q.pending[item.ID] = item
 	return item.ID, nil
@@ -123,6 +128,34 @@ func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, er
 	}
 
 	return item, nil
+}
+
+// CleanupExpired auto-denies items that have exceeded their expiration time.
+// Returns the number of items expired.
+func (q *Queue) CleanupExpired() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	now := time.Now().UTC()
+	expired := 0
+	for id, item := range q.pending {
+		if now.After(item.ExpireAt) {
+			item.Status = StatusExpired
+			item.ReviewedAt = &now
+			item.Reviewer = "system"
+			item.ReviewComment = "auto-denied: approval timeout exceeded"
+			delete(q.pending, id)
+			q.history = append(q.history, item)
+			expired++
+		}
+	}
+
+	// Cap history at 1000
+	if len(q.history) > 1000 {
+		q.history = q.history[len(q.history)-1000:]
+	}
+
+	return expired
 }
 
 // History returns the most recent N resolved items.

@@ -42,7 +42,79 @@ type Config struct {
 	Sandbox          SandboxConfig        `yaml:"sandbox"`
 	Capability       CapabilityConfig     `yaml:"capability"`
 	ResourcePolicies ResourcePolicyConfig `yaml:"resource_policies"`
-	Manifests        ManifestConfig       `yaml:"manifests"`
+	Manifests            ManifestConfig            `yaml:"manifests"`
+	ApprovalIntegrations ApprovalIntegrationConfig `yaml:"approval_integrations"`
+	Identity             IdentityConfig            `yaml:"identity"`
+	Behavioral           BehavioralConfig          `yaml:"behavioral"`
+	SupplyChain          SupplyChainConfig         `yaml:"supply_chain"`
+}
+
+// SupplyChainConfig controls signed extension verification.
+type SupplyChainConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	StrictMode bool   `yaml:"strict_mode"` // reject unsigned in strict
+	SigningKey  string `yaml:"signing_key"` // hex-encoded HMAC key
+}
+
+// BehavioralConfig configures the session-level behavioral policy engine.
+type BehavioralConfig struct {
+	Enabled         bool `yaml:"enabled"`
+	KillSwitchScore int  `yaml:"kill_switch_score"` // auto-block session above this score
+	WindowMinutes   int  `yaml:"window_minutes"`    // analysis window
+}
+
+// ApprovalIntegrationConfig configures external approval notification channels.
+type ApprovalIntegrationConfig struct {
+	Timeout time.Duration          `yaml:"timeout"` // auto-deny after this duration
+	GitHub  GitHubApprovalConfig   `yaml:"github"`
+	Slack   SlackApprovalConfig    `yaml:"slack"`
+}
+
+// GitHubApprovalConfig enables posting approval requests as PR comments.
+type GitHubApprovalConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Token   string `yaml:"token"`
+	Repo    string `yaml:"repo"` // owner/repo for PR comments
+}
+
+// SlackApprovalConfig enables posting approval requests via Slack webhooks.
+type SlackApprovalConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	WebhookURL string `yaml:"webhook_url"`
+}
+
+// IdentityConfig configures the enterprise identity hierarchy.
+type IdentityConfig struct {
+	Enabled       bool        `yaml:"enabled"`
+	Organizations []OrgConfig `yaml:"organizations"`
+}
+
+// OrgConfig is the YAML representation of an organization.
+type OrgConfig struct {
+	ID    string       `yaml:"id"`
+	Name  string       `yaml:"name"`
+	Teams []TeamConfig `yaml:"teams"`
+}
+
+// TeamConfig is the YAML representation of a team within an organization.
+type TeamConfig struct {
+	ID       string          `yaml:"id"`
+	Name     string          `yaml:"name"`
+	Projects []ProjectConfig `yaml:"projects"`
+}
+
+// ProjectConfig is the YAML representation of a project within a team.
+type ProjectConfig struct {
+	ID           string              `yaml:"id"`
+	Name         string              `yaml:"name"`
+	Environments []EnvironmentConfig `yaml:"environments"`
+}
+
+// EnvironmentConfig is the YAML representation of an environment within a project.
+type EnvironmentConfig struct {
+	ID       string `yaml:"id"`
+	Name     string `yaml:"name"`
+	RiskTier string `yaml:"risk_tier"`
 }
 
 type ManifestConfig struct {
@@ -731,6 +803,19 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Manifests.DefaultRiskTier == "" {
 		cfg.Manifests.DefaultRiskTier = "medium"
+	}
+
+	// Approval integration defaults
+	if cfg.ApprovalIntegrations.Timeout == 0 {
+		cfg.ApprovalIntegrations.Timeout = 30 * time.Minute
+	}
+
+	// Behavioral engine defaults
+	if cfg.Behavioral.KillSwitchScore == 0 {
+		cfg.Behavioral.KillSwitchScore = 80
+	}
+	if cfg.Behavioral.WindowMinutes == 0 {
+		cfg.Behavioral.WindowMinutes = 30
 	}
 
 	// CORS defaults

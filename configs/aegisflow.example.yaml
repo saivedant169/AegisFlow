@@ -495,3 +495,50 @@ resource_policies:
       verb: "read"
       decision: "allow"
       priority: 30
+
+# Approval integration settings
+# Send approval requests to GitHub PR comments and/or Slack channels.
+approval_integrations:
+  timeout: 30m                    # Auto-deny pending approvals after this duration
+  github:
+    enabled: false
+    token: ""                     # GitHub personal access token or app token
+    repo: "myorg/myrepo"         # owner/repo to post PR comments on
+  slack:
+    enabled: false
+    webhook_url: ""              # Slack incoming webhook URL
+
+# Enterprise Identity — org/team/project hierarchy with separation of duties
+identity:
+  enabled: true
+  organizations:
+    - id: "acme"
+      name: "Acme Corp"
+      teams:
+        - id: "platform"
+          name: "Platform Engineering"
+          projects:
+            - id: "gateway"
+              name: "AI Gateway"
+              environments:
+                - id: "gw-dev"
+                  name: "dev"
+                  risk_tier: "low"
+                - id: "gw-staging"
+                  name: "staging"
+                  risk_tier: "medium"
+                - id: "gw-prod"
+                  name: "prod"
+                  risk_tier: "critical"
+        - id: "ml-team"
+          name: "ML Team"
+          projects:
+            - id: "recommender"
+              name: "Recommendation Engine"
+              environments:
+                - id: "rec-dev"
+                  name: "dev"
+                  risk_tier: "low"
+                - id: "rec-prod"
+                  name: "prod"
+                  risk_tier: "high"

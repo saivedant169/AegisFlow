@@ -41,6 +41,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	approvalint "github.com/saivedant169/AegisFlow/internal/approval/integrations"
 	"github.com/saivedant169/AegisFlow/internal/capability"
 	"github.com/saivedant169/AegisFlow/internal/credential"
 	"github.com/saivedant169/AegisFlow/internal/usage"
@@ -458,8 +459,51 @@ func main() {
 
 	// Approval queue
 	approvalQueue := approval.NewQueue(1000)
+	if cfg.ApprovalIntegrations.Timeout > 0 {
+		approvalQueue.Timeout = cfg.ApprovalIntegrations.Timeout
+	}
 	approvalAdapter := approval.NewAdminAdapter(approvalQueue)
-	log.Printf("[init] approval queue enabled (max_size=1000)")
+	log.Printf("[init] approval queue enabled (max_size=1000, timeout=%s)", approvalQueue.Timeout)
+
+	// Approval notifiers (GitHub and Slack)
+	var approvalNotifiers []approvalint.ApprovalNotifier
+	if cfg.ApprovalIntegrations.GitHub.Enabled {
+		ghNotifier := approvalint.NewGitHubNotifier(
+			cfg.ApprovalIntegrations.GitHub.Token,
+			"https://api.github.com",
+			cfg.ApprovalIntegrations.GitHub.Repo,
+		)
+		approvalNotifiers = append(approvalNotifiers, ghNotifier)
+		log.Printf("[init] GitHub approval notifier enabled (repo: %s)", cfg.ApprovalIntegrations.GitHub.Repo)
+	}
+	if cfg.ApprovalIntegrations.Slack.Enabled {
+		adminURL := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
+		slackNotifier := approvalint.NewSlackNotifier(
+			cfg.ApprovalIntegrations.Slack.WebhookURL,
+			adminURL,
+		)
+		approvalNotifiers = append(approvalNotifiers, slackNotifier)
+		log.Printf("[init] Slack approval notifier enabled")
+	}
+	_ = approvalNotifiers // notifiers available for use by approval submission hooks
+
+	// Approval timeout cleanup goroutine
+	approvalCleanupStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-approvalCleanupStop:
+				return
+			case <-ticker.C:
+				if n := approvalQueue.CleanupExpired(); n > 0 {
+					log.Printf("[approval] expired %d timed-out approval items", n)
+				}
+			}
+		}
+	}()
+	defer close(approvalCleanupStop)
 
 	// Credential broker
 	var credentialAdapter admin.CredentialProvider
