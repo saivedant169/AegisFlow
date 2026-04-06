@@ -128,6 +128,32 @@ func main() {
 			fmt.Printf("Unknown policy-pack command: %s\n", os.Args[2])
 			os.Exit(1)
 		}
+	case "simulate":
+		cmdSimulate(adminURL, os.Args[2:])
+	case "why":
+		cmdWhy(adminURL, os.Args[2:])
+	case "diff-policy":
+		cmdDiffPolicy(os.Args[2:])
+	case "manifest":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl manifest <create|list|drift> [args]")
+			os.Exit(1)
+		}
+		switch os.Args[2] {
+		case "create":
+			cmdManifestCreate(adminURL, os.Args[3:])
+		case "list":
+			cmdManifestList(adminURL)
+		case "drift":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: aegisctl manifest drift <manifest-id>")
+				os.Exit(1)
+			}
+			cmdManifestDrift(adminURL, os.Args[3])
+		default:
+			fmt.Printf("Unknown manifest command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
 	case "test-action":
 		cmdTestAction(adminURL, os.Args[2:])
 	case "test":
@@ -168,6 +194,10 @@ Commands:
   pending     List pending approval items
   approve     Approve a pending item: aegisctl approve <id> [comment]
   deny        Deny a pending item: aegisctl deny <id> [comment]
+  simulate    Simulate a policy decision with full trace
+  why         Show decision trace for a past action: aegisctl why <envelope-id>
+  diff-policy Diff two policy files: aegisctl diff-policy <old.yaml> <new.yaml>
+  manifest    Manage task manifests and drift detection (create, list, drift)
   test-action Simulate an agent action through governance pipeline
   test [msg]  Send a test chat completion
   version     Show version

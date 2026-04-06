@@ -96,11 +96,35 @@ type EvidenceProvider interface {
 	ListSessions() interface{}
 }
 
+// CapabilityProvider is the interface consumed by the admin API to avoid an
+// import cycle with the capability package. Use capability.NewAdminAdapter to
+// wrap a *capability.Issuer so it satisfies this interface.
+type CapabilityProvider interface {
+	ActiveTickets() interface{}
+	RevokeTicket(id string) error
+	VerifyTicket(id string) (interface{}, error)
+}
+
 // ToolPolicyProvider is the interface consumed by the admin API to avoid an
 // import cycle with the toolpolicy package. Implementations evaluate
 // ActionEnvelopes against tool policy rules.
 type ToolPolicyProvider interface {
 	Evaluate(env *envelope.ActionEnvelope) string // returns "allow", "review", or "block"
+	// EvaluateWithTrace returns a JSON-serializable decision trace. Returns nil
+	// if the provider does not support tracing.
+	EvaluateWithTrace(env *envelope.ActionEnvelope) interface{}
+}
+
+// ManifestProvider is the interface consumed by the admin API to avoid an
+// import cycle with the manifest package. Use manifest.NewAdminAdapter to
+// wrap a *manifest.Store + *manifest.DriftDetector so it satisfies this interface.
+type ManifestProvider interface {
+	Register(m interface{}) error
+	Get(id string) (interface{}, error)
+	List() interface{}
+	Deactivate(id string) error
+	GetDrift(id string) interface{}
+	CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{}
 }
 
 // RolloutManager is the interface consumed by the admin API to avoid an import
@@ -133,7 +157,9 @@ type Server struct {
 	evidenceProvider   EvidenceProvider
 	approvalProvider   ApprovalProvider
 	credentialProvider CredentialProvider
-	toolPolicyProvider ToolPolicyProvider
+	toolPolicyProvider  ToolPolicyProvider
+	manifestProvider    ManifestProvider
+	capabilityProvider  CapabilityProvider
 }
 
 func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
@@ -151,6 +177,20 @@ type ServerOption func(*Server)
 func WithToolPolicyProvider(tp ToolPolicyProvider) ServerOption {
 	return func(s *Server) {
 		s.toolPolicyProvider = tp
+	}
+}
+
+// WithManifestProvider sets the manifest provider on the admin server.
+func WithManifestProvider(mp ManifestProvider) ServerOption {
+	return func(s *Server) {
+		s.manifestProvider = mp
+	}
+}
+
+// WithCapabilityProvider sets the capability ticket provider on the admin server.
+func WithCapabilityProvider(cp CapabilityProvider) ServerOption {
+	return func(s *Server) {
+		s.capabilityProvider = cp
 	}
 }
 
@@ -188,10 +228,19 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/approvals/history", s.handleApprovalsHistory)
 	r.Get("/admin/v1/approvals/{id}", s.handleApprovalGet)
 	r.Get("/admin/v1/credentials", s.handleCredentialsList)
+	r.Get("/admin/v1/tickets", s.handleTicketsList)
+	r.Get("/admin/v1/tickets/{id}/verify", s.handleTicketVerify)
 	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
 	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
 	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
 	r.Post("/admin/v1/test-action", s.handleTestAction)
+	r.Post("/admin/v1/simulate", s.handleSimulate)
+	r.Get("/admin/v1/actions/{id}/why", s.handleActionWhy)
+	r.Get("/admin/v1/manifests", s.handleManifestList)
+	r.Get("/admin/v1/manifests/{id}", s.handleManifestGet)
+	r.Get("/admin/v1/manifests/{id}/drift", s.handleManifestDrift)
+	r.Post("/admin/v1/manifests", s.handleManifestCreate)
+	r.Delete("/admin/v1/manifests/{id}", s.handleManifestDeactivate)
 	// GraphQL endpoint (reuses the same provider interfaces as REST)
 	if s.cfg.Admin.GraphQL.Enabled {
 		schema, err := s.buildSchema()
@@ -218,6 +267,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/approvals/{id}/approve", s.handleApprovalApprove)
 		r.Post("/admin/v1/approvals/{id}/deny", s.handleApprovalDeny)
 		r.Post("/admin/v1/credentials/{id}/revoke", s.handleCredentialRevoke)
+		r.Post("/admin/v1/tickets/{id}/revoke", s.handleTicketRevoke)
 		r.Get("/admin/v1/audit", s.auditHandler)
 	})
 
@@ -833,6 +883,7 @@ type testActionResponse struct {
 	Message               string      `json:"message"`
 	ApprovalID            string      `json:"approval_id,omitempty"`
 	CredentialProvenance  interface{} `json:"credential_provenance,omitempty"`
+	DriftEvents           interface{} `json:"drift_events,omitempty"`
 }
 
 func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
@@ -904,6 +955,14 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 		resp.Message = "Action is blocked by policy"
 	}
 
+	// Run drift detection if a manifest exists for this task
+	if s.manifestProvider != nil {
+		driftEvents := s.manifestProvider.CheckDrift(env.Task, env, 1, 0.0)
+		if driftEvents != nil {
+			resp.DriftEvents = driftEvents
+		}
+	}
+
 	// Record in audit log
 	if s.auditProvider != nil {
 		detail := fmt.Sprintf(`{"tool":"%s","target":"%s","capability":"%s","decision":"%s"}`, req.Tool, req.Target, req.Capability, decision)
@@ -912,4 +971,266 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// --- Simulate handler (POST /admin/v1/simulate) ---
+
+func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
+	var req testActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		return
+	}
+
+	if req.Protocol == "" || req.Tool == "" || req.Target == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "protocol, tool, and target are required"})
+		return
+	}
+
+	cap := envelope.Capability(req.Capability)
+	if cap == "" {
+		cap = envelope.CapExecute
+	}
+
+	actor := envelope.ActorInfo{
+		Type:      "agent",
+		ID:        "simulate",
+		SessionID: "simulate-session",
+		TenantID:  "simulate-tenant",
+	}
+	env := envelope.NewEnvelope(actor, "simulate", envelope.Protocol(req.Protocol), req.Tool, req.Target, cap)
+
+	result := map[string]interface{}{
+		"action":   env.Tool,
+		"decision": "block",
+		"trace":    nil,
+	}
+
+	if s.toolPolicyProvider != nil {
+		result["decision"] = s.toolPolicyProvider.Evaluate(env)
+		result["trace"] = s.toolPolicyProvider.EvaluateWithTrace(env)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// --- Why handler (GET /admin/v1/actions/{id}/why) ---
+
+// actionTraceStore is a simple in-memory store of recent decision traces keyed
+// by envelope ID. In production this would be backed by a persistent store.
+var actionTraceStore = make(map[string]interface{})
+
+// RecordActionTrace stores a decision trace so it can be retrieved by the why
+// endpoint.
+func RecordActionTrace(id string, trace interface{}) {
+	actionTraceStore[id] = trace
+}
+
+func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "action id is required"})
+		return
+	}
+
+	trace, ok := actionTraceStore[id]
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "no trace found for action " + id})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(trace)
+}
+
+// --- Manifest handlers ---
+
+func (s *Server) handleManifestList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.manifestProvider == nil {
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+	json.NewEncoder(w).Encode(s.manifestProvider.List())
+}
+
+func (s *Server) handleManifestGet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	w.Header().Set("Content-Type", "application/json")
+	if s.manifestProvider == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		return
+	}
+	m, err := s.manifestProvider.Get(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(m)
+}
+
+func (s *Server) handleManifestDrift(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	w.Header().Set("Content-Type", "application/json")
+	if s.manifestProvider == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		return
+	}
+	json.NewEncoder(w).Encode(s.manifestProvider.GetDrift(id))
+}
+
+type createManifestRequest struct {
+	ID               string   `json:"id"`
+	TaskID           string   `json:"task_id"`
+	Description      string   `json:"description"`
+	Owner            string   `json:"owner"`
+	ExpiresIn        string   `json:"expires_in"`
+	AllowedTools     []string `json:"allowed_tools"`
+	AllowedResources []string `json:"allowed_resources"`
+	AllowedProtocols []string `json:"allowed_protocols"`
+	AllowedVerbs     []string `json:"allowed_verbs"`
+	MaxActions       int      `json:"max_actions"`
+	MaxBudget        float64  `json:"max_budget"`
+	RiskTier         string   `json:"risk_tier"`
+}
+
+func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.manifestProvider == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		return
+	}
+
+	var req createManifestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		return
+	}
+
+	if req.TaskID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "task_id is required"})
+		return
+	}
+
+	id := req.ID
+	if id == "" {
+		id = fmt.Sprintf("manifest-%d", time.Now().UnixNano())
+	}
+
+	expiresAt := time.Now().UTC().Add(1 * time.Hour)
+	if req.ExpiresIn != "" {
+		dur, err := time.ParseDuration(req.ExpiresIn)
+		if err == nil {
+			expiresAt = time.Now().UTC().Add(dur)
+		}
+	}
+
+	riskTier := req.RiskTier
+	if riskTier == "" {
+		riskTier = "medium"
+	}
+
+	m := map[string]interface{}{
+		"id":                id,
+		"task_id":           req.TaskID,
+		"description":       req.Description,
+		"owner":             req.Owner,
+		"expires_at":        expiresAt,
+		"allowed_tools":     req.AllowedTools,
+		"allowed_resources": req.AllowedResources,
+		"allowed_protocols": req.AllowedProtocols,
+		"allowed_verbs":     req.AllowedVerbs,
+		"max_actions":       req.MaxActions,
+		"max_budget":        req.MaxBudget,
+		"risk_tier":         riskTier,
+	}
+
+	if err := s.manifestProvider.Register(m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, _ := s.manifestProvider.Get(id)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	w.Header().Set("Content-Type", "application/json")
+	if s.manifestProvider == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		return
+	}
+	if err := s.manifestProvider.Deactivate(id); err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"status": "deactivated"})
+}
+
+// --- Capability ticket handlers ---
+
+func (s *Server) handleTicketsList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.capabilityProvider == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"tickets": []interface{}{}})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"tickets": s.capabilityProvider.ActiveTickets()})
+}
+
+func (s *Server) handleTicketRevoke(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.capabilityProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "capability tickets not enabled"})
+		return
+	}
+	if err := s.capabilityProvider.RevokeTicket(id); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "revoked"})
+}
+
+func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if s.capabilityProvider == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "capability tickets not enabled"})
+		return
+	}
+	result, err := s.capabilityProvider.VerifyTicket(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }

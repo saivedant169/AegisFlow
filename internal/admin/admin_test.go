@@ -90,6 +90,10 @@ func (s *stubToolPolicyProvider) Evaluate(env *envelope.ActionEnvelope) string {
 	return s.decision
 }
 
+func (s *stubToolPolicyProvider) EvaluateWithTrace(env *envelope.ActionEnvelope) interface{} {
+	return nil
+}
+
 func TestHandleTestAction_Allow(t *testing.T) {
 	server := newIntegrationAdminServer()
 	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "allow"}

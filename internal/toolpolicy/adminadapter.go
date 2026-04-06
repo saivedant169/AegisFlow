@@ -19,3 +19,9 @@ func NewAdminAdapter(e *Engine) *AdminAdapter {
 func (a *AdminAdapter) Evaluate(env *envelope.ActionEnvelope) string {
 	return string(a.engine.Evaluate(env))
 }
+
+// EvaluateWithTrace evaluates an ActionEnvelope and returns the full decision
+// trace as a JSON-serializable value.
+func (a *AdminAdapter) EvaluateWithTrace(env *envelope.ActionEnvelope) interface{} {
+	return a.engine.EvaluateWithTrace(env)
+}
