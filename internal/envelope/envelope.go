@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/saivedant169/AegisFlow/internal/resource"
 )
 
 // ActionEnvelope normalizes every agent action into a policy-evaluable object.
@@ -21,8 +22,9 @@ type ActionEnvelope struct {
 	Target              string         `json:"target"`
 	Parameters          map[string]any `json:"parameters"`
 	RequestedCapability Capability     `json:"requested_capability"`
-	CredentialRef       string         `json:"credential_ref,omitempty"`
-	PolicyDecision      Decision       `json:"policy_decision"`
+	Resource            *resource.Resource `json:"resource,omitempty"`
+	CredentialRef       string             `json:"credential_ref,omitempty"`
+	PolicyDecision      Decision           `json:"policy_decision"`
 	EvidenceHash        string         `json:"evidence_hash,omitempty"`
 	Justification       string         `json:"justification,omitempty"`
 	Result              *ActionResult  `json:"result,omitempty"`
