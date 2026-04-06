@@ -1,0 +1,33 @@
+# AegisFlow Enterprise Resilience Configuration
+#
+# This example demonstrates health monitoring, safe degradation modes,
+# data retention, backup/restore, and circuit breakers.
+
+resilience:
+  enabled: true
+  health_interval: 30s
+
+  retention:
+    audit_log_days: 90
+    evidence_days: 365
+    approval_history_days: 180
+    compress_after_days: 30
+    auto_cleanup: true
+
+  backup_dir: "data/backups"
+
+  circuit_breaker:
+    threshold: 5
+    reset_after: 30s
+
+# Minimal server config for the example.
+server:
+  port: 8080
+  admin_port: 8081
+
+providers:
+  - name: mock
+    type: mock
+    enabled: true
+    default: true
+    models: ["gpt-4"]

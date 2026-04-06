@@ -34,6 +34,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/provider"
+	"github.com/saivedant169/AegisFlow/internal/resilience"
 	"github.com/saivedant169/AegisFlow/internal/ratelimit"
 	"github.com/saivedant169/AegisFlow/internal/rollout"
 	rolloutpg "github.com/saivedant169/AegisFlow/internal/rollout/pgstore"
@@ -635,10 +636,31 @@ func main() {
 		log.Printf("[init] capability tickets enabled (ttl: %s)", cfg.Capability.DefaultTTL)
 	}
 
+	// Resilience subsystem
+	var resilienceOpt admin.ServerOption
+	if cfg.Resilience.Enabled {
+		healthReg := resilience.NewHealthRegistry()
+		degradationMgr := resilience.NewDegradationManager()
+		retentionMgr := resilience.NewRetentionManager(resilience.RetentionPolicy{
+			AuditLogDays:        cfg.Resilience.Retention.AuditLogDays,
+			EvidenceDays:        cfg.Resilience.Retention.EvidenceDays,
+			ApprovalHistoryDays: cfg.Resilience.Retention.ApprovalHistoryDays,
+			CompressAfterDays:   cfg.Resilience.Retention.CompressAfterDays,
+			AutoCleanup:         cfg.Resilience.Retention.AutoCleanup,
+		})
+		backupMgr := resilience.NewBackupManager(cfg.Resilience.BackupDir)
+		resAdapter := resilience.NewAdminAdapter(healthReg, degradationMgr, retentionMgr, backupMgr)
+		resilienceOpt = admin.WithResilienceProvider(resAdapter)
+		log.Printf("[init] resilience enabled (health_interval: %s, backup_dir: %s)", cfg.Resilience.HealthInterval, cfg.Resilience.BackupDir)
+	}
+
 	// Admin server
 	adminOpts := []admin.ServerOption{toolPolicyOpt, manifestOpt}
 	if capabilityOpt != nil {
 		adminOpts = append(adminOpts, capabilityOpt)
+	}
+	if resilienceOpt != nil {
+		adminOpts = append(adminOpts, resilienceOpt)
 	}
 	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, adminOpts...)
 

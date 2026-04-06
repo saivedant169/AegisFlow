@@ -153,6 +153,17 @@ type BehavioralProvider interface {
 	ListSessions() interface{}
 }
 
+// ResilienceProvider is the interface consumed by the admin API to expose
+// health monitoring, degradation modes, retention stats, and backup endpoints.
+// Use resilience.NewAdminAdapter to satisfy this interface.
+type ResilienceProvider interface {
+	DetailedHealth() interface{}
+	DegradationModes() interface{}
+	CreateBackup() (interface{}, error)
+	ListBackups() interface{}
+	RetentionStats() interface{}
+}
+
 //go:embed dashboard.html
 var dashboardHTML []byte
 
@@ -176,6 +187,7 @@ type Server struct {
 	capabilityProvider   CapabilityProvider
 	supplyChainProvider  SupplyChainProvider
 	behavioralProvider   BehavioralProvider
+	resilienceProvider   ResilienceProvider
 }
 
 func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
@@ -221,6 +233,13 @@ func WithSupplyChainProvider(scp SupplyChainProvider) ServerOption {
 func WithBehavioralProvider(bp BehavioralProvider) ServerOption {
 	return func(s *Server) {
 		s.behavioralProvider = bp
+	}
+}
+
+// WithResilienceProvider sets the resilience (health/degradation/backup/retention) provider.
+func WithResilienceProvider(rp ResilienceProvider) ServerOption {
+	return func(s *Server) {
+		s.resilienceProvider = rp
 	}
 }
 
@@ -273,6 +292,11 @@ func (s *Server) Router() http.Handler {
 	r.Delete("/admin/v1/manifests/{id}", s.handleManifestDeactivate)
 	r.Get("/admin/v1/supply-chain", s.handleSupplyChain)
 	r.Get("/admin/v1/sessions/{id}/risk", s.handleSessionRisk)
+	r.Get("/admin/v1/health/detailed", s.handleHealthDetailed)
+	r.Get("/admin/v1/resilience/degradation", s.handleResilienceDegradation)
+	r.Get("/admin/v1/resilience/backups", s.handleResilienceBackupsList)
+	r.Get("/admin/v1/resilience/retention", s.handleResilienceRetention)
+	r.Post("/admin/v1/resilience/backup", s.handleResilienceBackupCreate)
 	// GraphQL endpoint (reuses the same provider interfaces as REST)
 	if s.cfg.Admin.GraphQL.Enabled {
 		schema, err := s.buildSchema()
@@ -1311,4 +1335,57 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleHealthDetailed(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.resilienceProvider == nil {
+		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		return
+	}
+	json.NewEncoder(w).Encode(s.resilienceProvider.DetailedHealth())
+}
+
+func (s *Server) handleResilienceDegradation(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.resilienceProvider == nil {
+		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		return
+	}
+	json.NewEncoder(w).Encode(s.resilienceProvider.DegradationModes())
+}
+
+func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.resilienceProvider == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "resilience not enabled"})
+		return
+	}
+	snap, err := s.resilienceProvider.CreateBackup()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(snap)
+}
+
+func (s *Server) handleResilienceBackupsList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.resilienceProvider == nil {
+		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		return
+	}
+	json.NewEncoder(w).Encode(s.resilienceProvider.ListBackups())
+}
+
+func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.resilienceProvider == nil {
+		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		return
+	}
+	json.NewEncoder(w).Encode(s.resilienceProvider.RetentionStats())
 }

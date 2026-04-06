@@ -47,6 +47,7 @@ type Config struct {
 	Identity             IdentityConfig            `yaml:"identity"`
 	Behavioral           BehavioralConfig          `yaml:"behavioral"`
 	SupplyChain          SupplyChainConfig         `yaml:"supply_chain"`
+	Resilience           ResilienceConfig          `yaml:"resilience"`
 }
 
 // SupplyChainConfig controls signed extension verification.
@@ -54,6 +55,31 @@ type SupplyChainConfig struct {
 	Enabled    bool   `yaml:"enabled"`
 	StrictMode bool   `yaml:"strict_mode"` // reject unsigned in strict
 	SigningKey  string `yaml:"signing_key"` // hex-encoded HMAC key
+}
+
+// ResilienceConfig controls enterprise resilience features: health monitoring,
+// degradation modes, retention, backup, and circuit breakers.
+type ResilienceConfig struct {
+	Enabled        bool                `yaml:"enabled"`
+	HealthInterval time.Duration       `yaml:"health_interval"`
+	Retention      RetentionPolicyCfg  `yaml:"retention"`
+	BackupDir      string              `yaml:"backup_dir"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+}
+
+// RetentionPolicyCfg mirrors resilience.RetentionPolicy for YAML loading.
+type RetentionPolicyCfg struct {
+	AuditLogDays        int  `yaml:"audit_log_days"`
+	EvidenceDays        int  `yaml:"evidence_days"`
+	ApprovalHistoryDays int  `yaml:"approval_history_days"`
+	CompressAfterDays   int  `yaml:"compress_after_days"`
+	AutoCleanup         bool `yaml:"auto_cleanup"`
+}
+
+// CircuitBreakerConfig holds defaults for all circuit breakers.
+type CircuitBreakerConfig struct {
+	Threshold  int           `yaml:"threshold"`
+	ResetAfter time.Duration `yaml:"reset_after"`
 }
 
 // BehavioralConfig configures the session-level behavioral policy engine.
@@ -816,6 +842,32 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Behavioral.WindowMinutes == 0 {
 		cfg.Behavioral.WindowMinutes = 30
+	}
+
+	// Resilience defaults
+	if cfg.Resilience.HealthInterval == 0 {
+		cfg.Resilience.HealthInterval = 30 * time.Second
+	}
+	if cfg.Resilience.Retention.AuditLogDays == 0 {
+		cfg.Resilience.Retention.AuditLogDays = 90
+	}
+	if cfg.Resilience.Retention.EvidenceDays == 0 {
+		cfg.Resilience.Retention.EvidenceDays = 365
+	}
+	if cfg.Resilience.Retention.ApprovalHistoryDays == 0 {
+		cfg.Resilience.Retention.ApprovalHistoryDays = 180
+	}
+	if cfg.Resilience.Retention.CompressAfterDays == 0 {
+		cfg.Resilience.Retention.CompressAfterDays = 30
+	}
+	if cfg.Resilience.BackupDir == "" {
+		cfg.Resilience.BackupDir = "data/backups"
+	}
+	if cfg.Resilience.CircuitBreaker.Threshold == 0 {
+		cfg.Resilience.CircuitBreaker.Threshold = 5
+	}
+	if cfg.Resilience.CircuitBreaker.ResetAfter == 0 {
+		cfg.Resilience.CircuitBreaker.ResetAfter = 30 * time.Second
 	}
 
 	// CORS defaults
