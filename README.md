@@ -83,10 +83,11 @@ type ActionEnvelope struct {
 1. Agent sends an action request (MCP tool call, HTTP request, shell command)
 2. AegisFlow normalizes it into an `ActionEnvelope`
 3. Policy engine evaluates: **allow**, **review**, or **block**
-4. If allowed, AegisFlow issues task-scoped credentials (not the agent's full token)
-5. Action executes through AegisFlow
-6. Result is recorded in the tamper-evident evidence chain
-7. Evidence is exportable and verifiable via `aegisflow verify`
+4. If **review**, the action enters the approval queue; operators approve or deny via the admin API or `aegisctl approve` / `aegisctl deny`
+5. If allowed, AegisFlow issues task-scoped credentials (not the agent's full token)
+6. Action executes through AegisFlow
+7. Result is recorded in the tamper-evident evidence chain
+8. Evidence is exportable and verifiable via `aegisctl evidence export` and `aegisctl evidence verify`
 
 ### Design principles
 
@@ -353,6 +354,12 @@ routes:
 | `POST` | `/admin/v1/audit/verify` | Verify audit chain integrity |
 | `GET` | `/admin/v1/cost-recommendations` | Cost optimization recommendations |
 | `POST` | `/admin/v1/graphql` | GraphQL admin API |
+| `GET` | `/admin/v1/approvals` | List pending approvals |
+| `POST` | `/admin/v1/approvals/{id}/approve` | Approve action |
+| `POST` | `/admin/v1/approvals/{id}/deny` | Deny action |
+| `GET` | `/admin/v1/evidence/sessions` | List evidence sessions |
+| `GET` | `/admin/v1/evidence/sessions/{id}/export` | Export session evidence |
+| `POST` | `/admin/v1/evidence/sessions/{id}/verify` | Verify session chain |
 
 ---
 
@@ -406,7 +413,7 @@ AegisFlow/
 - [x] **Phase 5**: Semantic caching, cost optimization, request/response transforms, load shedding, WebSocket, GraphQL, WASM SDK
 
 ### Next: Agent Execution Governance
-- [ ] **Phase 6**: MCP remote gateway + tool allowlist/denylist + review decision path
+- [x] **Phase 6**: MCP remote gateway + tool allowlist/denylist + review decision path + approval queue
 - [ ] **Phase 7**: Task-scoped credential broker (GitHub App, AWS STS, Vault)
 - [ ] **Phase 8**: Evidence export + verification CLI + policy packs for coding agents
 
