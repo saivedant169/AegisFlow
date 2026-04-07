@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: aegisflow
+    release: {{ .Release.Name }}
+data:
+  aegisflow.yaml: |
+    server:
+      port: {{ .Values.service.gatewayPort }}
+      admin_port: {{ .Values.service.adminPort }}
+
+    providers:
+      - name: "mock"
+        type: "mock"
+        enabled: true
+        default: true
+
+    tenants:
+      - id: "default"
+        name: "Default Agent"
+        api_keys:
+          - key: "change-me-in-production"
+            role: "admin"
+        rate_limit:
+          requests_per_minute: 120
+          tokens_per_minute: 200000
+
+    routes:
+      - match:
+          model: "*"
+        providers: ["mock"]
+        strategy: "priority"
+
+    tool_policies:
+      enabled: true
+      default_decision: {{ .Values.config.defaultDecision | quote }}
+
+    policies:
+      governance_mode: {{ .Values.config.governanceMode | quote }}
+      input:
+        - name: "block-jailbreak"
+          type: "keyword"
+          action: "block"
+          keywords:
+            - "ignore previous instructions"
+
+    shell_gate:
+      enabled: true
+      block_dangerous: true
+
+    sql_gate:
+      enabled: true
+      block_dangerous: true
+
+    mcp_gateway:
+      enabled: true
+      port: {{ .Values.service.mcpPort }}

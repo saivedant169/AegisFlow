@@ -1,0 +1,213 @@
+# AegisFlow Policy Pack: PR Writer
+#
+# Use this when the agent writes code and opens pull requests.
+# Destructive operations are blocked. Write operations require human review.
+#
+# What's allowed:
+#   GitHub: all reads, create_branch
+#   Shell:  reads, git, pytest
+#   SQL:    SELECT
+#   HTTP:   GET
+#
+# What needs review:
+#   GitHub: create_pull_request
+#   Shell:  kubectl, terraform
+#   SQL:    INSERT, UPDATE
+#   HTTP:   POST
+#
+# What's blocked:
+#   GitHub: merge, delete_*
+#   Shell:  rm, chmod, dd
+#   SQL:    DROP, TRUNCATE, DELETE
+#   HTTP:   DELETE
+
+tool_policies:
+  enabled: true
+  default_decision: "review"
+  rules:
+    # === GitHub: reads allowed ===
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.search_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.search_*"
+      decision: "allow"
+
+    # === GitHub: branch creation allowed ===
+    - protocol: "git"
+      tool: "github.create_branch"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.create_branch"
+      decision: "allow"
+
+    # === GitHub: PR creation needs review ===
+    - protocol: "git"
+      tool: "github.create_pull_request"
+      decision: "review"
+    - protocol: "mcp"
+      tool: "github.create_pull_request"
+      decision: "review"
+
+    # === GitHub: merge blocked ===
+    - protocol: "git"
+      tool: "github.merge_pull_request"
+      decision: "block"
+    - protocol: "mcp"
+      tool: "github.merge_pull_request"
+      decision: "block"
+
+    # === GitHub: deletes blocked ===
+    - protocol: "git"
+      tool: "github.delete_*"
+      decision: "block"
+    - protocol: "mcp"
+      tool: "github.delete_*"
+      decision: "block"
+
+    # === GitHub: dangerous admin ops blocked ===
+    - protocol: "git"
+      tool: "github.update_branch_protection"
+      decision: "block"
+    - protocol: "git"
+      tool: "github.invite_collaborator"
+      decision: "block"
+
+    # === Shell: safe reads allowed ===
+    - protocol: "shell"
+      tool: "shell.ls"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: ".env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: "/etc/shadow"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.grep"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.find"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.head"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.tail"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.wc"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.diff"
+      decision: "allow"
+
+    # === Shell: git and test allowed ===
+    - protocol: "shell"
+      tool: "shell.git"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.pytest"
+      decision: "allow"
+
+    # === Shell: infra tools need review ===
+    - protocol: "shell"
+      tool: "shell.kubectl"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.terraform"
+      decision: "review"
+
+    # === Shell: destructive blocked ===
+    - protocol: "shell"
+      tool: "shell.rm"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.chmod"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.dd"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.shutdown"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.printenv"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.curl"
+      decision: "block"
+
+    # === SQL: SELECT allowed ===
+    - protocol: "sql"
+      tool: "sql.select"
+      decision: "allow"
+
+    # === SQL: writes need review ===
+    - protocol: "sql"
+      tool: "sql.insert"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.update"
+      decision: "review"
+
+    # === SQL: destructive blocked ===
+    - protocol: "sql"
+      tool: "sql.drop_*"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.truncate"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.delete"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.grant"
+      decision: "block"
+
+    # === HTTP: GET allowed ===
+    - protocol: "http"
+      tool: "http.get"
+      decision: "allow"
+
+    # === HTTP: POST needs review ===
+    - protocol: "http"
+      tool: "http.post"
+      decision: "review"
+    - protocol: "http"
+      tool: "http.put"
+      decision: "review"
+    - protocol: "http"
+      tool: "http.patch"
+      decision: "review"
+
+    # === HTTP: DELETE blocked ===
+    - protocol: "http"
+      tool: "http.delete"
+      decision: "block"
+
+    # === Global: all deletes blocked ===
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"

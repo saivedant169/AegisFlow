@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "session": {
+    "id": "sess_20260401_abc123def456",
+    "started_at": "2026-04-01T10:00:00Z",
+    "ended_at": "2026-04-01T10:15:32Z",
+    "agent": {
+      "id": "claude-code-v1",
+      "type": "coding-agent",
+      "user": "developer@company.com"
+    },
+    "tenant": "engineering-team",
+    "policy_pack": "pr-writer"
+  },
+  "actions": [
+    {
+      "id": "env_001_a1b2c3d4",
+      "timestamp": "2026-04-01T10:00:12Z",
+      "protocol": "git",
+      "tool": "github.list_pull_requests",
+      "target": "myorg/backend",
+      "capability": "read",
+      "parameters": {
+        "state": "open",
+        "per_page": 10
+      },
+      "decision": "allow",
+      "policy_rule": "github.list_* -> allow",
+      "evidence_hash": "sha256:a3f8e2d1c0b9a8765432109876543210fedcba9876543210fedcba9876543210",
+      "previous_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "execution": {
+        "status": "success",
+        "duration_ms": 245,
+        "credential_ref": "cred_gh_shortlived_001"
+      }
+    },
+    {
+      "id": "env_002_e5f6g7h8",
+      "timestamp": "2026-04-01T10:02:45Z",
+      "protocol": "shell",
+      "tool": "shell.pytest",
+      "target": "/workspace/backend",
+      "capability": "execute",
+      "parameters": {
+        "args": ["-v", "tests/"]
+      },
+      "decision": "allow",
+      "policy_rule": "shell.pytest -> allow",
+      "evidence_hash": "sha256:b4c9f3e2d1a0987654321098765432fedcba98765432fedcba9876543210abcd",
+      "previous_hash": "sha256:a3f8e2d1c0b9a8765432109876543210fedcba9876543210fedcba9876543210",
+      "execution": {
+        "status": "success",
+        "duration_ms": 12340,
+        "credential_ref": null
+      }
+    },
+    {
+      "id": "env_003_i9j0k1l2",
+      "timestamp": "2026-04-01T10:05:10Z",
+      "protocol": "git",
+      "tool": "github.create_pull_request",
+      "target": "myorg/backend",
+      "capability": "write",
+      "parameters": {
+        "title": "Fix null pointer in user service",
+        "head": "fix/null-pointer-user-svc",
+        "base": "main",
+        "body": "Fixes #423. Added null check before accessing user.email."
+      },
+      "decision": "review",
+      "policy_rule": "github.create_pull_request -> review",
+      "evidence_hash": "sha256:c5d0a4f3e2b198765432109876543fedcba987654321fedcba98765432109876",
+      "previous_hash": "sha256:b4c9f3e2d1a0987654321098765432fedcba98765432fedcba9876543210abcd",
+      "approval": {
+        "status": "approved",
+        "reviewer": "tech-lead",
+        "timestamp": "2026-04-01T10:07:22Z",
+        "comment": "PR looks good, approved."
+      },
+      "execution": {
+        "status": "success",
+        "duration_ms": 890,
+        "credential_ref": "cred_gh_shortlived_002",
+        "result": {
+          "pr_number": 427,
+          "url": "https://github.com/myorg/backend/pull/427"
+        }
+      }
+    },
+    {
+      "id": "env_004_m3n4o5p6",
+      "timestamp": "2026-04-01T10:08:30Z",
+      "protocol": "shell",
+      "tool": "shell.rm",
+      "target": "/workspace/backend/tmp",
+      "capability": "delete",
+      "parameters": {
+        "args": ["-rf", "/workspace/backend/tmp"]
+      },
+      "decision": "block",
+      "policy_rule": "shell.rm -> block",
+      "evidence_hash": "sha256:d6e1b5a4c3f209876543210987654fedcba9876543210fedcba987654321abcde",
+      "previous_hash": "sha256:c5d0a4f3e2b198765432109876543fedcba987654321fedcba98765432109876",
+      "execution": null
+    },
+    {
+      "id": "env_005_q7r8s9t0",
+      "timestamp": "2026-04-01T10:10:15Z",
+      "protocol": "sql",
+      "tool": "sql.select",
+      "target": "app_db",
+      "capability": "read",
+      "parameters": {
+        "query": "SELECT id, email FROM users WHERE created_at > '2026-03-01'"
+      },
+      "decision": "allow",
+      "policy_rule": "sql.select -> allow",
+      "evidence_hash": "sha256:e7f2c6b5d4a3109876543210987654fedcba9876543210fedcba98765432abcdef",
+      "previous_hash": "sha256:d6e1b5a4c3f209876543210987654fedcba9876543210fedcba987654321abcde",
+      "execution": {
+        "status": "success",
+        "duration_ms": 34,
+        "credential_ref": "cred_db_shortlived_001"
+      }
+    }
+  ],
+  "manifest": {
+    "action_count": 5,
+    "allowed": 3,
+    "reviewed": 1,
+    "blocked": 1,
+    "chain_valid": true,
+    "manifest_hash": "sha256:f8a3d7c6b5e4210987654321098765fedcba98765432fedcba987654321abcdef0"
+  }
+}

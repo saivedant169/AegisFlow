@@ -1,0 +1,46 @@
+replicaCount: 1
+
+image:
+  repository: saivedant169/aegisflow
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  gatewayPort: 8080
+  adminPort: 8081
+  mcpPort: 8082
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+config:
+  # Inline AegisFlow YAML config. This gets mounted as a ConfigMap.
+  policyPack: "pr-writer"
+  governanceMode: "governance"
+  defaultDecision: "review"
+
+healthcheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# Set to true to deploy PostgreSQL and Redis as subcharts
+# For production, point to your own managed instances instead.
+postgresql:
+  enabled: false
+  host: ""
+  port: 5432
+  user: aegisflow
+  password: ""
+  database: aegisflow
+
+redis:
+  enabled: false
+  url: ""

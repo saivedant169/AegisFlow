@@ -25,6 +25,19 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
+## Governed Coding Agent Starter Kit
+
+Get AegisFlow governing your coding agents in 15 minutes:
+
+```bash
+cd starter-kit
+./install.sh
+```
+
+Pick a policy pack (read-only, PR writer, or infra review), connect your editor (Claude Code, Cursor), and run the efficacy tests. See [starter-kit/README.md](starter-kit/README.md) for the full guide.
+
+---
+
 ## Why AegisFlow?
 
 Agents are no longer just generating text. They are using tools, writing code, querying databases, and triggering real-world changes. The missing layer is not another model proxy. The missing layer is runtime trust.

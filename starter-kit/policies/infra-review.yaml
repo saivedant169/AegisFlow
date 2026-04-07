@@ -1,0 +1,212 @@
+# AegisFlow Policy Pack: Infrastructure Review
+#
+# Use this when the agent does infrastructure work (Terraform, kubectl, Helm).
+# Everything destructive requires human review. Catastrophic ops are blocked outright.
+#
+# What's allowed:
+#   GitHub: all reads
+#   Shell:  reads (ls, cat, grep, find, etc.)
+#   SQL:    SELECT
+#   HTTP:   GET
+#
+# What needs review:
+#   GitHub: all writes (create_*, merge_*, update_*)
+#   Shell:  terraform, kubectl, helm, docker
+#   SQL:    INSERT, UPDATE, ALTER
+#   HTTP:   POST, PUT, PATCH
+#
+# What's blocked:
+#   GitHub: delete_*
+#   Shell:  rm, dd
+#   SQL:    DROP
+#   HTTP:   DELETE (to unknown targets)
+
+tool_policies:
+  enabled: true
+  default_decision: "review"
+  rules:
+    # === GitHub: reads allowed ===
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.search_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.search_*"
+      decision: "allow"
+
+    # === GitHub: all writes need review ===
+    - protocol: "git"
+      tool: "github.create_*"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.merge_*"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.update_*"
+      decision: "review"
+    - protocol: "mcp"
+      tool: "github.create_*"
+      decision: "review"
+    - protocol: "mcp"
+      tool: "github.merge_*"
+      decision: "review"
+    - protocol: "mcp"
+      tool: "github.update_*"
+      decision: "review"
+
+    # === GitHub: deletes blocked ===
+    - protocol: "git"
+      tool: "github.delete_*"
+      decision: "block"
+    - protocol: "mcp"
+      tool: "github.delete_*"
+      decision: "block"
+    - protocol: "git"
+      tool: "github.invite_collaborator"
+      decision: "block"
+
+    # === Shell: safe reads allowed ===
+    - protocol: "shell"
+      tool: "shell.ls"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: ".env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: "/etc/shadow"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.grep"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.find"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.head"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.tail"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.wc"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.diff"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.pytest"
+      decision: "allow"
+
+    # === Shell: infra tools need review ===
+    - protocol: "shell"
+      tool: "shell.terraform"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.kubectl"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.helm"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.docker"
+      decision: "review"
+    - protocol: "shell"
+      tool: "shell.ansible"
+      decision: "review"
+
+    # === Shell: destructive blocked ===
+    - protocol: "shell"
+      tool: "shell.rm"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.dd"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.shutdown"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.printenv"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.curl"
+      decision: "review"
+
+    # === SQL: SELECT allowed ===
+    - protocol: "sql"
+      tool: "sql.select"
+      decision: "allow"
+
+    # === SQL: writes need review ===
+    - protocol: "sql"
+      tool: "sql.insert"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.update"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.alter"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.create_*"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.delete"
+      decision: "review"
+
+    # === SQL: DROP blocked ===
+    - protocol: "sql"
+      tool: "sql.drop_*"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.truncate"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.grant"
+      decision: "review"
+
+    # === HTTP: GET allowed ===
+    - protocol: "http"
+      tool: "http.get"
+      decision: "allow"
+
+    # === HTTP: mutations need review ===
+    - protocol: "http"
+      tool: "http.post"
+      decision: "review"
+    - protocol: "http"
+      tool: "http.put"
+      decision: "review"
+    - protocol: "http"
+      tool: "http.patch"
+      decision: "review"
+    - protocol: "http"
+      tool: "http.delete"
+      decision: "review"
+
+    # === Global: all deletes blocked ===
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"

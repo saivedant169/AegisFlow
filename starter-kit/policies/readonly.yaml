@@ -1,0 +1,118 @@
+# AegisFlow Policy Pack: Read-Only
+#
+# Use this when the agent should ONLY observe. No writes, no deletes, anywhere.
+# Good for: audits, investigations, onboarding new agents, read-only assistants.
+#
+# What's allowed:
+#   GitHub: list_*, get_*, search_*
+#   Shell:  ls, cat, grep, find, head, tail, wc, diff
+#   SQL:    SELECT only
+#   HTTP:   GET only
+#
+# Everything else is blocked.
+
+tool_policies:
+  enabled: true
+  default_decision: "block"
+  rules:
+    # === GitHub: read-only operations ===
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.search_*"
+      decision: "allow"
+
+    # === MCP: read-only operations ===
+    - protocol: "mcp"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.search_*"
+      decision: "allow"
+
+    # === Shell: safe read commands ===
+    - protocol: "shell"
+      tool: "shell.ls"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: ".env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: "/etc/shadow"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.grep"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.find"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.head"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.tail"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.wc"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.diff"
+      decision: "allow"
+
+    # === SQL: SELECT only ===
+    - protocol: "sql"
+      tool: "sql.select"
+      decision: "allow"
+
+    # === HTTP: GET only ===
+    - protocol: "http"
+      tool: "http.get"
+      decision: "allow"
+
+    # === Git: read-only commands ===
+    - protocol: "shell"
+      tool: "shell.git"
+      target: "git log*"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      target: "git status*"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      target: "git diff*"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      target: "git show*"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.git"
+      target: "git blame*"
+      decision: "allow"
+
+    # === Block everything else (explicit) ===
+    - protocol: "*"
+      tool: "*"
+      capability: "delete"
+      decision: "block"
+    - protocol: "*"
+      tool: "*"
+      capability: "write"
+      decision: "block"
+    - protocol: "*"
+      tool: "*"
+      capability: "execute"
+      decision: "block"

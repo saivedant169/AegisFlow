@@ -1,0 +1,64 @@
+services:
+  aegisflow:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
+    environment:
+      - AEGISFLOW_DB_HOST=postgres
+      - AEGISFLOW_DB_PORT=5432
+      - AEGISFLOW_DB_USER=aegisflow
+      - AEGISFLOW_DB_PASSWORD=aegisflow
+      - AEGISFLOW_DB_NAME=aegisflow
+      - AEGISFLOW_REDIS_URL=redis://redis:6379
+    volumes:
+      - ../../configs/starter-kit.yaml:/app/configs/aegisflow.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aegisflow
+      POSTGRES_PASSWORD: aegisflow
+      POSTGRES_DB: aegisflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

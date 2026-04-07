@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-aegisflow
+  labels:
+    app: aegisflow
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: aegisflow
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: aegisflow
+        release: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: aegisflow
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config
+            - /app/configs/aegisflow.yaml
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.service.gatewayPort }}
+              protocol: TCP
+            - name: admin
+              containerPort: {{ .Values.service.adminPort }}
+              protocol: TCP
+            - name: mcp
+              containerPort: {{ .Values.service.mcpPort }}
+              protocol: TCP
+          env:
+            {{- if .Values.postgresql.enabled }}
+            - name: AEGISFLOW_DB_HOST
+              value: {{ .Values.postgresql.host | quote }}
+            - name: AEGISFLOW_DB_PORT
+              value: {{ .Values.postgresql.port | quote }}
+            - name: AEGISFLOW_DB_USER
+              value: {{ .Values.postgresql.user | quote }}
+            - name: AEGISFLOW_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-secret
+                  key: password
+            - name: AEGISFLOW_DB_NAME
+              value: {{ .Values.postgresql.database | quote }}
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: AEGISFLOW_REDIS_URL
+              value: {{ .Values.redis.url | quote }}
+            {{- end }}
+          {{- if .Values.healthcheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthcheck.path }}
+              port: gateway
+            initialDelaySeconds: {{ .Values.healthcheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthcheck.path }}
+              port: gateway
+            initialDelaySeconds: {{ .Values.healthcheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-config

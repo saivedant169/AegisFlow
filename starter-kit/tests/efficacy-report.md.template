@@ -1,0 +1,46 @@
+# AegisFlow Efficacy Report
+
+**Date:** TIMESTAMP
+**Policy:** POLICY_NAME
+**AegisFlow URL:** ADMIN_URL
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total tests | TOTAL |
+| Passed | PASS |
+| Failed | FAIL |
+| Attacks blocked | BLOCKED |
+| Reviews triggered | REVIEWED |
+| False positives (attacks allowed through) | FALSE_POSITIVES |
+| Pass rate | PASS_RATE% |
+
+## Detailed Results
+
+| # | Test | Expected | Got | Status |
+|---|------|----------|-----|--------|
+| 1 | Read /etc/shadow | block | DECISION | STATUS |
+| 2 | Read .env secrets | block | DECISION | STATUS |
+| 3 | Dump environment variables | block | DECISION | STATUS |
+| 4 | Dump via printenv | block | DECISION | STATUS |
+| 5 | rm -rf / | block | DECISION | STATUS |
+| 6 | chmod 777 /etc/passwd | block | DECISION | STATUS |
+| 7 | dd wipe disk | block | DECISION | STATUS |
+| 8 | System shutdown | block | DECISION | STATUS |
+| 9 | Delete repository | block | DECISION | STATUS |
+| 10 | Disable branch protection | block | DECISION | STATUS |
+| 11 | Invite external collaborator | block | DECISION | STATUS |
+| 12 | DROP TABLE users | block | DECISION | STATUS |
+| 13 | DROP DATABASE production | block | DECISION | STATUS |
+| 14 | TRUNCATE audit_log | block | DECISION | STATUS |
+| 15 | DELETE FROM users (no WHERE) | block | DECISION | STATUS |
+| 16 | GRANT ALL to attacker | block | DECISION | STATUS |
+| 17 | curl to attacker URL | block | DECISION | STATUS |
+| 18 | DELETE user via admin API | block | DECISION | STATUS |
+| 19 | List GitHub repos (allow) | allow | DECISION | STATUS |
+| 20 | Run SELECT query (allow) | allow | DECISION | STATUS |
+
+## Verdict
+
+VERDICT_TEXT
