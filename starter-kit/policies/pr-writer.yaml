@@ -1,213 +1,230 @@
-# AegisFlow Policy Pack: PR Writer
+# AegisFlow Policy Pack: PR Writer (tuned)
 #
-# Use this when the agent writes code and opens pull requests.
-# Destructive operations are blocked. Write operations require human review.
+# Use this when an agent (or developer-with-agent) writes code, runs tests,
+# and opens pull requests against a feature branch. It is tuned for low
+# friction on normal dev work and hard stops on the genuinely scary stuff.
 #
-# What's allowed:
-#   GitHub: all reads, create_branch
-#   Shell:  reads, git, pytest
-#   SQL:    SELECT
-#   HTTP:   GET
+# Philosophy: "stop the scary stuff, stay out of the way."
+#   - Reading anything in the repo is free.
+#   - Running tests and builds is free.
+#   - Branching and committing on agent/feat/fix branches is free.
+#   - Opening a PR is a review checkpoint (a human eyeballs the diff).
+#   - Pushing, merging, deploying, touching prod, or destructive ops are
+#     either reviewed or blocked outright.
 #
-# What needs review:
-#   GitHub: create_pull_request
-#   Shell:  kubectl, terraform
-#   SQL:    INSERT, UPDATE
-#   HTTP:   POST
-#
-# What's blocked:
-#   GitHub: merge, delete_*
-#   Shell:  rm, chmod, dd
-#   SQL:    DROP, TRUNCATE, DELETE
-#   HTTP:   DELETE
+# When NOT to use this pack:
+#   - Infra/Terraform/k8s work     -> use infra-review.yaml
+#   - Audits / read-only assistants -> use readonly.yaml
 
 tool_policies:
   enabled: true
+  # Anything not explicitly listed defaults to review (human in the loop).
   default_decision: "review"
   rules:
-    # === GitHub: reads allowed ===
-    - protocol: "git"
-      tool: "github.list_*"
-      decision: "allow"
-    - protocol: "git"
-      tool: "github.get_*"
-      decision: "allow"
-    - protocol: "git"
-      tool: "github.search_*"
-      decision: "allow"
-    - protocol: "mcp"
-      tool: "github.list_*"
-      decision: "allow"
-    - protocol: "mcp"
-      tool: "github.get_*"
-      decision: "allow"
-    - protocol: "mcp"
-      tool: "github.search_*"
-      decision: "allow"
 
-    # === GitHub: branch creation allowed ===
-    - protocol: "git"
-      tool: "github.create_branch"
-      decision: "allow"
-    - protocol: "mcp"
-      tool: "github.create_branch"
-      decision: "allow"
+    # ─────────────────────────────────────────────────────────────
+    # GitHub: reads are always free
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "git", tool: "github.list_*",   decision: "allow" }
+    - { protocol: "git", tool: "github.get_*",    decision: "allow" }
+    - { protocol: "git", tool: "github.search_*", decision: "allow" }
+    - { protocol: "mcp", tool: "github.list_*",   decision: "allow" }
+    - { protocol: "mcp", tool: "github.get_*",    decision: "allow" }
+    - { protocol: "mcp", tool: "github.search_*", decision: "allow" }
 
-    # === GitHub: PR creation needs review ===
+    # ─────────────────────────────────────────────────────────────
+    # GitHub: branching + committing on feature branches is free.
+    # Creating a branch is not destructive; blocking it just makes
+    # the agent paste shell commands instead. Allow it.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "git", tool: "github.create_branch", decision: "allow" }
+    - { protocol: "mcp", tool: "github.create_branch", decision: "allow" }
+    - { protocol: "git", tool: "github.create_commit", decision: "allow" }
+    - { protocol: "mcp", tool: "github.create_commit", decision: "allow" }
+    - { protocol: "git", tool: "github.create_or_update_file", decision: "allow" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", decision: "allow" }
+
+    # ─────────────────────────────────────────────────────────────
+    # GitHub: opening a PR on a feature branch is the review point.
+    # The human reads the diff in the PR UI; we don't need to block
+    # the *creation* of the PR itself.
+    # ─────────────────────────────────────────────────────────────
     - protocol: "git"
       tool: "github.create_pull_request"
+      target: "agent/*"
       decision: "review"
-    - protocol: "mcp"
+    - protocol: "git"
       tool: "github.create_pull_request"
+      target: "feat/*"
       decision: "review"
-
-    # === GitHub: merge blocked ===
     - protocol: "git"
-      tool: "github.merge_pull_request"
+      tool: "github.create_pull_request"
+      target: "fix/*"
+      decision: "review"
+    - protocol: "git"
+      tool: "github.create_pull_request"
+      target: "bugfix/*"
+      decision: "review"
+    - { protocol: "git", tool: "github.create_pull_request", decision: "review" }
+    - { protocol: "mcp", tool: "github.create_pull_request", decision: "review" }
+
+    # ─────────────────────────────────────────────────────────────
+    # GitHub: risky-but-legitimate ops always require a human.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "git", tool: "github.merge_pull_request",     decision: "review" }
+    - { protocol: "mcp", tool: "github.merge_pull_request",     decision: "review" }
+    - { protocol: "git", tool: "github.create_deployment",      decision: "review" }
+    - { protocol: "mcp", tool: "github.create_deployment",      decision: "review" }
+    - { protocol: "git", tool: "github.update_branch_protection", decision: "review" }
+
+    # ─────────────────────────────────────────────────────────────
+    # GitHub: destructive ops are hard-blocked.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "git", tool: "github.delete_repo",   decision: "block" }
+    - { protocol: "mcp", tool: "github.delete_repo",   decision: "block" }
+    - protocol: "git"
+      tool: "github.delete_branch"
+      target: "main"
+      decision: "block"
+    - protocol: "git"
+      tool: "github.delete_branch"
+      target: "master"
       decision: "block"
     - protocol: "mcp"
-      tool: "github.merge_pull_request"
-      decision: "block"
-
-    # === GitHub: deletes blocked ===
-    - protocol: "git"
-      tool: "github.delete_*"
+      tool: "github.delete_branch"
+      target: "main"
       decision: "block"
     - protocol: "mcp"
-      tool: "github.delete_*"
+      tool: "github.delete_branch"
+      target: "master"
       decision: "block"
+    - { protocol: "git", tool: "github.force_push",        decision: "block" }
+    - { protocol: "git", tool: "github.invite_collaborator", decision: "block" }
 
-    # === GitHub: dangerous admin ops blocked ===
-    - protocol: "git"
-      tool: "github.update_branch_protection"
-      decision: "block"
-    - protocol: "git"
-      tool: "github.invite_collaborator"
-      decision: "block"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: reads and everyday navigation – always allow
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.ls",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.pwd",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.echo",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.grep",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.find",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.head",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.tail",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.wc",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.diff",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.less",  decision: "allow" }
 
-    # === Shell: safe reads allowed ===
-    - protocol: "shell"
-      tool: "shell.ls"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.cat"
-      target: ".env"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.cat"
-      target: "/etc/shadow"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.cat"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.grep"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.find"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.head"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.tail"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.wc"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.diff"
-      decision: "allow"
+    # cat is allow-by-default, but never let it read secrets.
+    - { protocol: "shell", tool: "shell.cat", target: ".env",         decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "*.env",        decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "/etc/shadow",  decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "/etc/passwd",  decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "**/.ssh/*",    decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "**/credentials*", decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", decision: "allow" }
 
-    # === Shell: git and test allowed ===
-    - protocol: "shell"
-      tool: "shell.git"
-      decision: "allow"
-    - protocol: "shell"
-      tool: "shell.pytest"
-      decision: "allow"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: git – read-only subcommands free, push needs review.
+    # Order matters: more specific targets first.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.git", target: "git status*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git log*",      decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git diff*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git show*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git blame*",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git branch*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git checkout*", decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git switch*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git fetch*",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git add*",      decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git commit*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git stash*",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git push --force*", decision: "block" }
+    - { protocol: "shell", tool: "shell.git", target: "git push -f*",      decision: "block" }
+    - { protocol: "shell", tool: "shell.git", target: "git push*",     decision: "review" }
+    - { protocol: "shell", tool: "shell.git", target: "git reset --hard*", decision: "review" }
+    - { protocol: "shell", tool: "shell.git", decision: "allow" }
 
-    # === Shell: infra tools need review ===
-    - protocol: "shell"
-      tool: "shell.kubectl"
-      decision: "review"
-    - protocol: "shell"
-      tool: "shell.terraform"
-      decision: "review"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: tests and builds are how you know your change works.
+    # These should never prompt.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.pytest",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.go",        decision: "allow" }   # go test / go build / go vet
+    - { protocol: "shell", tool: "shell.cargo",     target: "cargo test*",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo",     target: "cargo build*", decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo",     target: "cargo check*", decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo",     decision: "review" }
+    - { protocol: "shell", tool: "shell.npm",       target: "npm test*",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm",       target: "npm run test*",decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm",       target: "npm run build*",decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm",       target: "npm ci*",      decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm",       target: "npm install*", decision: "review" }
+    - { protocol: "shell", tool: "shell.npm",       decision: "review" }
+    - { protocol: "shell", tool: "shell.make",      target: "make test*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.make",      target: "make build*",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.make",      target: "make lint*",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.make",      decision: "review" }
 
-    # === Shell: destructive blocked ===
-    - protocol: "shell"
-      tool: "shell.rm"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.chmod"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.dd"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.shutdown"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.env"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.printenv"
-      decision: "block"
-    - protocol: "shell"
-      tool: "shell.curl"
-      decision: "block"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: infra tools – risky but legitimate, always review.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.kubectl",   target: "kubectl get*",      decision: "review" }
+    - { protocol: "shell", tool: "shell.kubectl",   target: "kubectl describe*", decision: "review" }
+    - { protocol: "shell", tool: "shell.kubectl",   decision: "review" }
+    - { protocol: "shell", tool: "shell.terraform", target: "terraform plan*",   decision: "review" }
+    - { protocol: "shell", tool: "shell.terraform", target: "terraform apply*",  decision: "review" }
+    - { protocol: "shell", tool: "shell.docker",    target: "docker build*",     decision: "review" }
+    - { protocol: "shell", tool: "shell.docker",    target: "docker push*",      decision: "review" }
+    - { protocol: "shell", tool: "shell.docker",    decision: "review" }
 
-    # === SQL: SELECT allowed ===
-    - protocol: "sql"
-      tool: "sql.select"
-      decision: "allow"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: protected paths – never let an agent edit these.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.*", target: "/etc/*",            decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/.ssh/*",         decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/.env",           decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/credentials*",   decision: "block" }
 
-    # === SQL: writes need review ===
-    - protocol: "sql"
-      tool: "sql.insert"
-      decision: "review"
-    - protocol: "sql"
-      tool: "sql.update"
-      decision: "review"
+    # ─────────────────────────────────────────────────────────────
+    # Shell: destructive commands – hard block.
+    # (shellgate also pattern-matches rm -rf /, fork bombs, dd, etc.)
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "shell", tool: "shell.rm",       decision: "block" }
+    - { protocol: "shell", tool: "shell.dd",       decision: "block" }
+    - { protocol: "shell", tool: "shell.mkfs",     decision: "block" }
+    - { protocol: "shell", tool: "shell.chmod",    decision: "block" }
+    - { protocol: "shell", tool: "shell.shutdown", decision: "block" }
+    - { protocol: "shell", tool: "shell.reboot",   decision: "block" }
+    - { protocol: "shell", tool: "shell.killall",  decision: "block" }
+    - { protocol: "shell", tool: "shell.env",      decision: "block" }
+    - { protocol: "shell", tool: "shell.printenv", decision: "block" }
 
-    # === SQL: destructive blocked ===
-    - protocol: "sql"
-      tool: "sql.drop_*"
-      decision: "block"
-    - protocol: "sql"
-      tool: "sql.truncate"
-      decision: "block"
-    - protocol: "sql"
-      tool: "sql.delete"
-      decision: "block"
-    - protocol: "sql"
-      tool: "sql.grant"
-      decision: "block"
+    # ─────────────────────────────────────────────────────────────
+    # SQL: SELECT is free. Writes need a human. Destructive blocked.
+    # sqlgate already flags UPDATE/DELETE without WHERE as dangerous.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "sql", tool: "sql.select",   decision: "allow" }
+    - { protocol: "sql", tool: "sql.insert",   decision: "review" }
+    - { protocol: "sql", tool: "sql.update",   decision: "review" }
+    - { protocol: "sql", tool: "sql.delete",   decision: "block" }   # sqlgate enforces WHERE; we still review-via-block
+    - { protocol: "sql", tool: "sql.drop_*",   decision: "block" }
+    - { protocol: "sql", tool: "sql.truncate", decision: "block" }
+    - { protocol: "sql", tool: "sql.grant",    decision: "block" }
+    - { protocol: "sql", tool: "sql.revoke",   decision: "block" }
 
-    # === HTTP: GET allowed ===
-    - protocol: "http"
-      tool: "http.get"
-      decision: "allow"
+    # ─────────────────────────────────────────────────────────────
+    # HTTP: GET is free. Mutations review. DELETE blocked.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "http", tool: "http.get",    decision: "allow" }
+    - { protocol: "http", tool: "http.head",   decision: "allow" }
+    - { protocol: "http", tool: "http.post",   decision: "review" }
+    - { protocol: "http", tool: "http.put",    decision: "review" }
+    - { protocol: "http", tool: "http.patch",  decision: "review" }
+    - { protocol: "http", tool: "http.delete", decision: "block"  }
 
-    # === HTTP: POST needs review ===
-    - protocol: "http"
-      tool: "http.post"
-      decision: "review"
-    - protocol: "http"
-      tool: "http.put"
-      decision: "review"
-    - protocol: "http"
-      tool: "http.patch"
-      decision: "review"
-
-    # === HTTP: DELETE blocked ===
-    - protocol: "http"
-      tool: "http.delete"
-      decision: "block"
-
-    # === Global: all deletes blocked ===
-    - protocol: "*"
-      tool: "*"
-      capability: "delete"
-      decision: "block"
+    # ─────────────────────────────────────────────────────────────
+    # Global backstop: anything tagged as a delete capability is blocked.
+    # ─────────────────────────────────────────────────────────────
+    - { protocol: "*", tool: "*", capability: "delete", decision: "block" }
