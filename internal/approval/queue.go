@@ -130,6 +130,20 @@ func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, er
 	return item, nil
 }
 
+// IsApprovedForTool checks if there's a recently approved item for the given tool name.
+// Used by the MCP gateway to allow retries after approval.
+func (q *Queue) IsApprovedForTool(tool string) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	for _, item := range q.history {
+		if item.Status == StatusApproved && item.Envelope != nil && item.Envelope.Tool == tool {
+			return true
+		}
+	}
+	return false
+}
+
 // CleanupExpired auto-denies items that have exceeded their expiration time.
 // Returns the number of items expired.
 func (q *Queue) CleanupExpired() int {

@@ -263,6 +263,19 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 		log.Printf("[mcpgw] BLOCKED tool call: %s", params.Name)
 		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32001, Message: "tool call blocked by policy: " + params.Name}}
 	case envelope.DecisionReview:
+		// Check if this tool was already approved
+		if g.approvals != nil && g.approvals.IsApprovedForTool(params.Name) {
+			log.Printf("[mcpgw] PREVIOUSLY APPROVED tool call: %s", params.Name)
+			upstream := g.findUpstream(params.Name)
+			if upstream == nil {
+				return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32003, Message: "no upstream configured for tool: " + params.Name}}
+			}
+			resp, err := g.proxyToUpstream(upstream, req)
+			if err != nil {
+				return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32000, Message: "upstream error: " + err.Error()}}
+			}
+			return *resp
+		}
 		log.Printf("[mcpgw] REVIEW REQUIRED for tool call: %s", params.Name)
 		if g.approvals != nil {
 			g.approvals.Submit(env)
@@ -329,6 +342,23 @@ func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
 		return
 
 	case envelope.DecisionReview:
+		// Check if this tool was already approved
+		if g.approvals != nil && g.approvals.IsApprovedForTool(params.Name) {
+			log.Printf("[mcpgw] PREVIOUSLY APPROVED tool call: %s", params.Name)
+			upstream := g.findUpstream(params.Name)
+			if upstream == nil {
+				g.writeError(w, req.ID, -32003, "no upstream configured for tool: "+params.Name)
+				return
+			}
+			resp, err := g.proxyToUpstream(upstream, req)
+			if err != nil {
+				g.writeError(w, req.ID, -32000, "upstream error: "+err.Error())
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
 		log.Printf("[mcpgw] REVIEW REQUIRED for tool call: %s", params.Name)
 		if g.approvals != nil {
 			g.approvals.Submit(env)
