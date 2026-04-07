@@ -56,3 +56,7 @@ docs/plans/
 docs/superpowers/
 Awesome-LLMOps
 .claude/worktrees/
+
+# PR-writer installer artifacts
+.aegisflow-run/
+configs/pr-writer.yaml
