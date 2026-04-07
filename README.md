@@ -25,6 +25,8 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
+> **See it in action:** [How AegisFlow governs coding agent PR workflows](docs/PR_WRITER.md) -- one scenario, real output, real proof.
+
 ## Governed Coding Agent Starter Kit
 
 Get AegisFlow governing your coding agents in 15 minutes:
