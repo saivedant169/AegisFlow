@@ -25,18 +25,29 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
-> **See it in action:** [How AegisFlow governs coding agent PR workflows](docs/PR_WRITER.md) -- one scenario, real output, real proof.
+> **Let coding agents draft PRs safely.** Install in 15 minutes. Block destructive actions. Review risky writes. Prove what happened. [See the full walkthrough →](docs/PR_WRITER.md)
 
-## Governed Coding Agent Starter Kit
+## Quickstart: Governed PR Writer
 
-Get AegisFlow governing your coding agents in 15 minutes:
+Install AegisFlow in front of your coding agent in under 3 minutes:
 
 ```bash
-cd starter-kit
-./install.sh
+git clone https://github.com/saivedant169/AegisFlow.git
+cd AegisFlow/starter-kit
+./install-pr-writer.sh
 ```
 
-Pick a policy pack (read-only, PR writer, or infra review), connect your editor (Claude Code, Cursor), and run the efficacy tests. See [starter-kit/README.md](starter-kit/README.md) for the full guide.
+The installer builds AegisFlow, starts it with the tuned PR-writer policy pack, runs 3 sanity checks, and prints exactly what to do next. Tested install-to-verified time: **under 10 seconds**.
+
+Then connect your agent:
+- [Claude Code setup](starter-kit/editors/claude-code.md)
+- [Cursor setup](starter-kit/editors/cursor.md)
+- [Full quickstart](starter-kit/QUICKSTART_PR_WRITER.md)
+
+**What your agent can do:** read the repo, run tests, edit code, open PRs.
+**What it cannot do:** merge to main, deploy to prod, run destructive shell commands, use broad credentials, make high-risk writes without review.
+
+Other policy packs: `readonly`, `infra-review`. See [starter-kit/README.md](starter-kit/README.md) for all options.
 
 ---
 
@@ -516,6 +527,15 @@ AegisFlow/
 - [x] **Phase 6**: MCP remote gateway + tool allowlist/denylist + review decision path + approval queue
 - [x] **Phase 7**: Task-scoped credential broker (GitHub App JWT, AWS STS SigV4, Vault DB secrets, credential provenance in evidence chain)
 - [x] **Phase 8**: Evidence export + verification CLI (`aegisctl verify`, `aegisctl evidence`) + 3 coding-agent policy packs
+
+### Enterprise-Grade (all 12 items)
+- [x] **Tier 1**: Typed resource model, TaskManifest + drift detection, capability tickets, policy simulation/why/diff, safe execution sandboxes, human-usable evidence
+- [x] **Tier 2**: Behavioral session policy, GitHub + Slack approval integrations, enterprise identity + separation of duties, signed policy supply chain
+- [x] **Tier 3**: HA/recovery/retention/backup, threat model + OWASP mapping + security docs
+
+### Adoption
+- [x] **Phase 9**: Governed Coding Agent Starter Kit (3 policy packs, editor configs, Docker/Helm/Terraform deploy templates, efficacy tests, evidence examples)
+- [x] **Phase 10 (in progress)**: PR-writer proof page, focused installer, tuned policy pack, design-partner onboarding
 
 ---
 
