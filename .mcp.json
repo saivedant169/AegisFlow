@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aegisflow": {
+      "command": "bash",
+      "args": ["scripts/mcp-stdio-bridge.sh"]
+    }
+  }
+}

@@ -30,34 +30,34 @@ tool_policies:
   default_decision: "block"
   rules:
     # GitHub - reads allowed
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.list_*"
       decision: "allow"
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.get_*"
       decision: "allow"
 
     # GitHub - branch creation allowed
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.create_branch"
       decision: "allow"
 
     # GitHub - writes need review
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.create_pull_request"
       decision: "review"
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.merge_pull_request"
       decision: "review"
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.create_issue"
       decision: "review"
 
     # GitHub - destructive actions blocked
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.delete_*"
       decision: "block"
-    - protocol: "git"
+    - protocol: "mcp"
       tool: "github.update_branch_protection"
       decision: "block"
 
@@ -89,5 +89,5 @@ mcp_gateway:
   port: 8082
   upstreams:
     - name: "github-mock"
-      url: "http://mock-mcp:3000"
-      transport: "streamable-http"
+      url: "http://localhost:3000"
+      tools: ["github.*"]
