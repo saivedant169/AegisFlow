@@ -705,7 +705,7 @@ func main() {
 			}
 			toolPolicyEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
 		}
-		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, nil, nil, upstreams)
+		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, nil, approvalQueue, upstreams)
 		mcpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.MCPGateway.Port)
 		mcpSrv := &http.Server{
 			Addr:         mcpAddr,
