@@ -2,6 +2,116 @@
 
 All notable changes to AegisFlow will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while it is pre-1.0.
+
+## [0.5.0] - 2026-04-07
+
+This release is the pivot. AegisFlow used to describe itself as an AI gateway. Now it is an open-source runtime governance layer for tool-using agents. The gateway features are still here, but they sit behind the governance plane as supporting infrastructure.
+
+### Added — Agent execution governance (Phase 6)
+
+- ActionEnvelope core type: every agent action gets normalised into one policy-evaluable object with actor, protocol, tool, target, parameters, requested capability, decision, and an evidence hash
+- MCP remote gateway (JSON-RPC 2.0 and SSE transport) on port 8082 so Claude Code, Cursor, and other MCP clients can connect directly
+- Tool policy engine with glob matching and three first-class decisions: allow, review, block
+- Approval queue for human-in-the-loop review, with submit, approve, deny, and history
+- Session evidence chain with SHA-256 hash linking and tamper detection
+- Fail-closed governance mode (with a break-glass override for dev/debug)
+- aegisctl commands: `test-action`, `pending`, `approve`, `deny`, `verify`, `evidence`, `simulate`, `why`, `diff-policy`, `manifest`, `supply-chain`
+- Protocol connectors: shell (with dangerous command detection), SQL (with operation classification), GitHub (with risk tiers), HTTP (reverse proxy with host allowlists)
+- 10 end-to-end Phase 6 integration tests
+
+### Added — Task-scoped credentials (Phase 7)
+
+- GitHub App credential broker with real RS256 JWT signing (pure stdlib, no external JWT library)
+- AWS STS credential broker with SigV4 signing inlined (no AWS SDK dependency)
+- HashiCorp Vault broker for database secrets with lease management
+- Static credential broker as a clearly-labelled degraded fallback
+- Credential registry with periodic cleanup of expired tokens
+- Credential provenance recorded in the evidence chain, so every action is linked to the exact short-lived credential used
+- Admin API endpoints for listing active credentials and revoking them
+
+### Added — Evidence, policy packs, benchmarks, and demo (Phase 8)
+
+- Evidence export and session manifests with human-readable reports
+- `aegisctl verify` for audit chain and session verification
+- `aegisctl evidence` for export and session listing
+- Three blessed policy packs: `readonly`, `pr-writer`, `infra-review`
+- Governance overhead benchmarks: policy evaluate (~1.2 µs), full allow pipeline (~5.2 µs), review path (~1.3 µs)
+- Attack demo pack with 20 scenarios across shell, SQL, GitHub, HTTP, and credential theft
+- One-click Docker Compose demo and interactive demo script (9 steps)
+
+### Added — Governed Coding Agent Starter Kit (Phase 9)
+
+- Complete `starter-kit/` directory with everything a team needs to adopt AegisFlow in 15 minutes
+- PR-writer focused installer (`install-pr-writer.sh`) with prerequisite checks, sanity tests, and a verified install-to-running time under 10 seconds on a dev machine
+- Claude Code and Cursor setup guides with copy-paste configs
+- Production deployment templates: Docker Compose, Helm chart, Terraform for AWS ECS Fargate
+- Efficacy test pack: 20 attack scenarios plus 2 legitimate operations, pass/fail report output
+- Sample evidence bundle and human-readable session report
+
+### Added — Adoption sprint (Phase 10, in progress)
+
+- `docs/PR_WRITER.md` proof page: one concrete scenario walkthrough with real output, real hashes, and real decisions
+- Tuned `pr-writer` policy pack: `git status`, `git log`, `git diff`, `pytest`, `go test`, and other everyday commands now pass without interruption; dangerous operations still hard-blocked
+
+### Added — Enterprise grade (all 12 uplift items)
+
+Tier 1 (must-build):
+- Typed resource model with hierarchical policy matching and environment awareness
+- TaskManifest with intent-to-execution drift detection
+- Capability tickets: HMAC-signed one-purpose execution tokens with nonce replay protection
+- Policy simulation and explainability (`aegisctl simulate`, `why`, `diff-policy`)
+- Safe execution sandboxes for shell, SQL, HTTP, and Git with architectural safety constraints
+
+Tier 2 (hardening):
+- Behavioral session policy engine with sequence-based threat detection (exfiltration, privilege escalation, destructive sequences, fan-out, credential abuse)
+- Approval integrations: GitHub PR comments and Slack webhooks, with approval timeout auto-deny
+- Enterprise identity model: org → team → project → environment hierarchy with separation-of-duties rules
+- Signed policy and connector supply chain with trust tiers and strict-mode verification
+
+Tier 3 (operational maturity):
+- Resilience: component health monitoring, safe degradation modes, retention policies, backup/restore, circuit breakers
+- Threat model (10 threat categories), OWASP Agentic Top 10 control mapping, deployment guide, security questionnaire, saved-incident narratives
+
+### Added — Gateway layer (Phase 5)
+
+- Semantic caching via embedding similarity with a configurable cosine threshold
+- Cost optimisation engine that suggests cheaper model alternatives based on real usage
+- Request/response transformation: PII stripping from responses, per-tenant system prompt injection, model aliasing
+- Load shedding with three priority tiers
+- WebSocket endpoint at `/v1/ws` for persistent connections
+- GraphQL admin API with 13 queries and 5 mutations alongside the existing REST API
+- WASM plugin SDK with tutorial and two example plugins
+- 16 new integration tests
+
+### Changed
+
+- README rewritten to lead with the PR-writer workflow and governance positioning, not the gateway one
+- Default policy engine mode is now fail-closed (break-glass mode exists for explicit opt-in)
+- Gateway features are now described as supporting infrastructure behind the governance plane, not the main story
+- Architecture diagram redrawn to show agent → AegisFlow (policy, credentials, evidence) → tools
+- Roadmap section reorganised to show Phase 6–10 agent governance work alongside the completed Phase 1–5 gateway work
+
+### Fixed
+
+- MCP gateway now checks approval history before blocking, so an approved action can be retried successfully on the second attempt
+- Approval queue is correctly wired into the MCP gateway (was previously passing nil)
+- `aegisctl approve` now passes the API key on authenticated endpoints
+- Audit endpoint in the demo script now uses the admin API key
+- Demo API key role bumped from operator to admin for audit verification access
+- MCP gateway upstream URL switched from Docker hostname to `localhost:3000` for local dev
+- `tool_policies` rules in the realworld config now use `protocol: "mcp"` instead of `"git"` to match actual MCP transport
+- Merge conflict resolution for semantic caching and governance branches
+
+### Security
+
+- Fail-closed is the default behaviour for the policy engine
+- Capability tickets prevent replay through nonce and HMAC signing
+- Evidence chain integrity is provable via `aegisctl verify`
+- Credential provenance means every action is attributable to a specific short-lived credential
+- Supply chain signing covers policy packs and connectors (not just WASM plugins)
+- Shell sandbox redacts environment variables matching credential patterns
+
 ## [0.4.0] - 2026-03-30
 
 ### Added — Phase 4: Advanced Governance & Marketplace
