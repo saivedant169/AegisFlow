@@ -1,8 +1,9 @@
 # AegisFlow Governed Coding Agent Starter Kit
+
 [![CI](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml/badge.svg)](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/saivedant169/AegisFlow)](https://goreportcard.com/report/github.com/saivedant169/AegisFlow)
 [![Go Reference](https://pkg.go.dev/badge/github.com/saivedant169/AegisFlow.svg)](https://pkg.go.dev/github.com/saivedant169/AegisFlow)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](../LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
 AegisFlow sits between your coding agent (Claude Code, Cursor, Copilot, Codex) and the tools it uses. Every tool call passes through AegisFlow, which decides: **allow**, **review** (human approval), or **block**. You get least-privilege enforcement, an approval workflow, and a tamper-evident audit trail -- without changing your agent or your tools.
