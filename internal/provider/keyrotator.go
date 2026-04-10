@@ -2,7 +2,6 @@ package provider
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -20,19 +19,20 @@ type managedKey struct {
 	cooldown time.Time
 }
 
-// KeyRotator selects API keys using round-robin or random strategy and
-// automatically excludes keys that are rate-limited or permanently failed.
+// KeyRotator selects API keys using round-robin and automatically excludes
+// keys that are rate-limited or permanently failed.
 type KeyRotator struct {
 	mu       sync.Mutex
 	keys     []*managedKey
 	strategy string
-	counter  atomic.Uint64
+	counter  uint64 // always accessed under mu; plain uint64 avoids drift when active-set length changes
 	cooldown time.Duration
 }
 
 // NewKeyRotator creates a rotator from the given key values.
-// strategy is "round-robin" (default) or "random".
-// rateLimitCooldown controls how long a 429-hit key is excluded; 0 defaults to 60s.
+// strategy must be "round-robin" (the only supported strategy; defaults to it if empty).
+// rateLimitCooldown controls how long a 429-hit key is excluded before being re-admitted.
+// TODO: make rateLimitCooldown configurable per-provider via YAML (currently defaults to 60s).
 func NewKeyRotator(keys []string, strategy string, rateLimitCooldown time.Duration) *KeyRotator {
 	if strategy == "" {
 		strategy = "round-robin"
@@ -57,7 +57,8 @@ func (r *KeyRotator) Pick() (string, bool) {
 	if len(active) == 0 {
 		return "", false
 	}
-	idx := r.counter.Add(1) % uint64(len(active))
+	idx := r.counter % uint64(len(active))
+	r.counter++
 	return active[idx].value, true
 }
 
@@ -74,7 +75,7 @@ func (r *KeyRotator) MarkFailed(key string) {
 }
 
 // MarkRateLimited temporarily excludes a key (call on HTTP 429 Too Many Requests).
-// The key is re-admitted after the configured cooldown duration.
+// The key is re-admitted automatically after the configured cooldown duration.
 func (r *KeyRotator) MarkRateLimited(key string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

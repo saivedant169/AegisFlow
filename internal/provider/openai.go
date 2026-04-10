@@ -179,7 +179,8 @@ func (o *OpenAIProvider) markKeyFromError(key string, err error) {
 }
 
 // doRequest executes the HTTP POST to the provider with retry logic.
-// The provided key is used for authorization on every attempt.
+// On each retry the key is re-picked from the rotator so that a key marked
+// rate-limited or failed during a previous attempt is not reused.
 func (o *OpenAIProvider) doRequest(ctx context.Context, body []byte, key string) (*http.Response, error) {
 	attempts := o.retry.maxAttempts
 	if attempts <= 0 {
@@ -207,6 +208,12 @@ func (o *OpenAIProvider) doRequest(ctx context.Context, body []byte, key string)
 
 		statusErr := &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(respBody), Header: resp.Header.Clone()}
 		if attempt < attempts && o.retry.shouldRetry(resp.StatusCode) {
+			// Mark the current key before picking a fresh one for the next attempt,
+			// so a 429-limited key is not retried immediately.
+			o.markKeyFromError(key, statusErr)
+			if next, ok := o.keys.Pick(); ok {
+				key = next
+			}
 			delay := o.retry.delayForAttempt(attempt, resp.Header)
 			log.Printf("provider %s: retry attempt %d/%d after %s due to status %d", o.name, attempt+1, attempts, delay, resp.StatusCode)
 			o.sleep(delay)

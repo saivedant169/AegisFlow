@@ -496,7 +496,7 @@ type ProviderConfig struct {
 	BaseURL      string            `yaml:"base_url"`
 	APIKeyEnv    string            `yaml:"api_key_env"`   // backward compat: single key from env
 	APIKeys      []ProviderAPIKey  `yaml:"api_keys"`      // multi-key rotation
-	KeySelection string            `yaml:"key_selection"` // "round-robin" (default) or "random"
+	KeySelection string            `yaml:"key_selection"` // "round-robin" (default; only supported strategy)
 	Models       []string          `yaml:"models"`
 	Timeout      time.Duration     `yaml:"timeout"`
 	MaxRetries   int               `yaml:"max_retries"`
