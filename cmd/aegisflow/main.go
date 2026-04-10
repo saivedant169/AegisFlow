@@ -762,6 +762,28 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `{"status":"ok","requests":%d}`, n)
 }
 
+// buildKeyRotator constructs a KeyRotator from a provider config.
+// It supports the new api_keys list (with key or key_env per entry) as well as
+// the legacy single api_key_env field for backward compatibility.
+func buildKeyRotator(pc config.ProviderConfig) *provider.KeyRotator {
+	var keys []string
+	for _, entry := range pc.APIKeys {
+		switch {
+		case entry.Key != "":
+			keys = append(keys, entry.Key)
+		case entry.KeyEnv != "":
+			if v := os.Getenv(entry.KeyEnv); v != "" {
+				keys = append(keys, v)
+			}
+		}
+	}
+	// Fall back to the legacy single-key field if no api_keys were resolved.
+	if len(keys) == 0 && pc.APIKeyEnv != "" {
+		keys = append(keys, os.Getenv(pc.APIKeyEnv))
+	}
+	return provider.NewKeyRotator(keys, pc.KeySelection, 0)
+}
+
 func initProviders(cfg *config.Config, registry *provider.Registry) {
 	for _, pc := range cfg.Providers {
 		if !pc.Enabled {
@@ -779,10 +801,11 @@ func initProviders(cfg *config.Config, registry *provider.Registry) {
 			registry.Register(provider.NewMockProvider(pc.Name, latency))
 			log.Printf("registered provider: %s (type: mock, latency: %s)", pc.Name, latency)
 		case "openai":
-			p := provider.NewOpenAIProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout, pc.MaxRetries)
+			kr := buildKeyRotator(pc)
+			p := provider.NewOpenAIProviderWithKeys(pc.Name, pc.BaseURL, kr, pc.Models, pc.Timeout, pc.MaxRetries)
 			p.ConfigureRetry(pc.Retry)
 			registry.Register(p)
-			log.Printf("registered provider: %s (type: openai, base_url: %s)", pc.Name, pc.BaseURL)
+			log.Printf("registered provider: %s (type: openai, base_url: %s, keys: %d)", pc.Name, pc.BaseURL, kr.Len())
 		case "anthropic":
 			registry.Register(provider.NewAnthropicProvider(pc.Name, pc.BaseURL, pc.APIKeyEnv, pc.Models, pc.Timeout))
 			log.Printf("registered provider: %s (type: anthropic, base_url: %s)", pc.Name, pc.BaseURL)

@@ -481,20 +481,29 @@ type CORSConfig struct {
 	MaxAge           int      `yaml:"max_age"`
 }
 
+// ProviderAPIKey represents one entry in the api_keys list for a provider.
+// Use Key for a literal value (dev/testing) or KeyEnv for a secret from an env var (production).
+type ProviderAPIKey struct {
+	Key    string `yaml:"key"`
+	KeyEnv string `yaml:"key_env"`
+}
+
 type ProviderConfig struct {
-	Name       string            `yaml:"name"`
-	Type       string            `yaml:"type"`
-	Enabled    bool              `yaml:"enabled"`
-	Default    bool              `yaml:"default"`
-	BaseURL    string            `yaml:"base_url"`
-	APIKeyEnv  string            `yaml:"api_key_env"`
-	Models     []string          `yaml:"models"`
-	Timeout    time.Duration     `yaml:"timeout"`
-	MaxRetries int               `yaml:"max_retries"`
-	Retry      RetryConfig       `yaml:"retry"`
-	APIVersion string            `yaml:"api_version"`
-	Config     map[string]string `yaml:"config"`
-	Region     string            `yaml:"region"`
+	Name         string            `yaml:"name"`
+	Type         string            `yaml:"type"`
+	Enabled      bool              `yaml:"enabled"`
+	Default      bool              `yaml:"default"`
+	BaseURL      string            `yaml:"base_url"`
+	APIKeyEnv    string            `yaml:"api_key_env"`   // backward compat: single key from env
+	APIKeys      []ProviderAPIKey  `yaml:"api_keys"`      // multi-key rotation
+	KeySelection string            `yaml:"key_selection"` // "round-robin" (default; only supported strategy)
+	Models       []string          `yaml:"models"`
+	Timeout      time.Duration     `yaml:"timeout"`
+	MaxRetries   int               `yaml:"max_retries"`
+	Retry        RetryConfig       `yaml:"retry"`
+	APIVersion   string            `yaml:"api_version"`
+	Config       map[string]string `yaml:"config"`
+	Region       string            `yaml:"region"`
 }
 
 type RetryConfig struct {

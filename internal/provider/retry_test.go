@@ -61,7 +61,7 @@ func TestOpenAIProviderRetriesWithRetryAfter(t *testing.T) {
 	p := &OpenAIProvider{
 		name:    "openai-test",
 		baseURL: srv.URL,
-		apiKey:  "test-key",
+		keys:    NewKeyRotator([]string{"test-key"}, "round-robin", 0),
 		client:  srv.Client(),
 	}
 	p.ConfigureRetry(config.RetryConfig{MaxAttempts: 2, RetryableStatusCodes: []int{429}})
