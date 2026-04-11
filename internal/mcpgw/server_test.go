@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
@@ -266,6 +267,68 @@ func TestDefaultBlockPolicy(t *testing.T) {
 	}
 	if resp.Error.Code != -32001 {
 		t.Fatalf("expected -32001, got %d", resp.Error.Code)
+	}
+}
+
+// TestToolCallUpstreamUnreachableErrorMessage verifies that when the MCP
+// gateway cannot reach an upstream, the error message includes the tool name,
+// the upstream name from config, and a remediation hint pointing at the URL.
+// This is the fix for issue #82.
+func TestToolCallUpstreamUnreachableErrorMessage(t *testing.T) {
+	// Start a real upstream server, grab its URL, then shut it down so
+	// any subsequent request fails with a connection error.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	deadURL := upstream.URL
+	upstream.Close()
+
+	engine := toolpolicy.NewEngine([]toolpolicy.ToolRule{
+		{Protocol: "mcp", Tool: "github.list_repos", Decision: "allow"},
+	}, "block")
+
+	gw := NewGateway(engine, nil, nil, []UpstreamConfig{
+		{Name: "github-prod", URL: deadURL, Tools: []string{"github.*"}},
+	})
+
+	reqBody := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`1`),
+		Method:  "tools/call",
+		Params: json.RawMessage(`{
+			"name": "github.list_repos",
+			"arguments": {"org": "aegisflow"}
+		}`),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	gw.ServeHTTP(rec, req)
+
+	var resp JSONRPCResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error == nil {
+		t.Fatal("expected error for unreachable upstream, got none")
+	}
+	if resp.Error.Code != -32000 {
+		t.Fatalf("expected upstream error code -32000, got %d", resp.Error.Code)
+	}
+
+	msg := resp.Error.Message
+	if !strings.Contains(msg, "github.list_repos") {
+		t.Errorf("error message should include tool name %q, got: %s", "github.list_repos", msg)
+	}
+	if !strings.Contains(msg, "github-prod") {
+		t.Errorf("error message should include upstream name %q, got: %s", "github-prod", msg)
+	}
+	if !strings.Contains(msg, deadURL) {
+		t.Errorf("error message should include upstream URL %q (remediation hint), got: %s", deadURL, msg)
+	}
+	if !strings.Contains(strings.ToLower(msg), "check that the upstream is running") {
+		t.Errorf("error message should include remediation hint 'check that the upstream is running', got: %s", msg)
 	}
 }
 

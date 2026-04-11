@@ -234,6 +234,18 @@ func (g *Gateway) buildInitializeResponse(req *JSONRPCRequest) JSONRPCResponse {
 	return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}
 }
 
+// formatUpstreamError builds a user-friendly error message for when the
+// gateway cannot reach an upstream. It includes the tool name, the upstream
+// name from config, the original error, and a remediation hint pointing at
+// the configured URL. The URL is taken from config and is safe to expose;
+// no credentials are included.
+func formatUpstreamError(toolName string, upstream *UpstreamConfig, err error) string {
+	return fmt.Sprintf(
+		"upstream %q unreachable for tool %q: %s; check that the upstream is running at %s",
+		upstream.Name, toolName, err.Error(), upstream.URL,
+	)
+}
+
 // processToolCall evaluates a tools/call request and returns the response
 // (used by SSE path; the direct path still calls handleToolCall).
 func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
@@ -272,7 +284,7 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 			}
 			resp, err := g.proxyToUpstream(upstream, req)
 			if err != nil {
-				return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32000, Message: "upstream error: " + err.Error()}}
+				return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32000, Message: formatUpstreamError(params.Name, upstream, err)}}
 			}
 			return *resp
 		}
@@ -289,7 +301,7 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 		}
 		resp, err := g.proxyToUpstream(upstream, req)
 		if err != nil {
-			return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32000, Message: "upstream error: " + err.Error()}}
+			return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32000, Message: formatUpstreamError(params.Name, upstream, err)}}
 		}
 		return *resp
 	default:
@@ -352,7 +364,7 @@ func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
 			}
 			resp, err := g.proxyToUpstream(upstream, req)
 			if err != nil {
-				g.writeError(w, req.ID, -32000, "upstream error: "+err.Error())
+				g.writeError(w, req.ID, -32000, formatUpstreamError(params.Name, upstream, err))
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -376,7 +388,7 @@ func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
 
 		resp, err := g.proxyToUpstream(upstream, req)
 		if err != nil {
-			g.writeError(w, req.ID, -32000, "upstream error: "+err.Error())
+			g.writeError(w, req.ID, -32000, formatUpstreamError(params.Name, upstream, err))
 			return
 		}
 
