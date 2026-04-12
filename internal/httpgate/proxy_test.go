@@ -68,10 +68,14 @@ func TestBlockDeleteRequest(t *testing.T) {
 		t.Errorf("expected 403, got %d", rec.Code)
 	}
 
-	var body map[string]string
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
 	json.NewDecoder(rec.Body).Decode(&body)
-	if body["error"] != "request blocked by policy" {
-		t.Errorf("unexpected error message: %s", body["error"])
+	if !strings.Contains(body.Error.Message, "blocked by policy") {
+		t.Errorf("unexpected error message: %s", body.Error.Message)
 	}
 }
 
@@ -145,10 +149,14 @@ func TestProxyReturns403OnBlock(t *testing.T) {
 		t.Errorf("expected 403, got %d", rec.Code)
 	}
 
-	var body map[string]string
+	var body struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
 	json.NewDecoder(rec.Body).Decode(&body)
-	if !strings.Contains(body["error"], "blocked") {
-		t.Errorf("expected blocked error, got: %s", body["error"])
+	if !strings.Contains(body.Error.Message, "blocked") {
+		t.Errorf("expected blocked error, got: %s", body.Error.Message)
 	}
 }
 

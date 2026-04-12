@@ -12,6 +12,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // Proxy is an HTTP reverse proxy that intercepts agent API calls,
@@ -42,9 +43,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Match the request to a configured upstream service.
 	svc := MatchService(r.Host, r.URL.Path, p.services)
 	if svc == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{
-			"error": "no matching service for path: " + r.URL.Path,
-		})
+		writeJSON(w, http.StatusNotFound, types.NewErrorResponse(
+			http.StatusNotFound, "not_found", "no matching service for path: "+r.URL.Path,
+		))
 		return
 	}
 
@@ -83,19 +84,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch decision {
 	case envelope.DecisionBlock:
 		p.chain.Record(env)
-		writeJSON(w, http.StatusForbidden, map[string]string{
-			"error":    "request blocked by policy",
-			"tool":     toolName,
-			"decision": string(decision),
-		})
+		writeJSON(w, http.StatusForbidden, types.NewErrorResponse(
+			http.StatusForbidden, "policy_violation", "request blocked by policy: "+toolName,
+		))
 		return
 
 	case envelope.DecisionReview:
 		approvalID, err := p.queue.Submit(env)
 		if err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-				"error": "failed to submit for review: " + err.Error(),
-			})
+			writeJSON(w, http.StatusServiceUnavailable, types.NewErrorResponse(
+				http.StatusServiceUnavailable, "service_unavailable", "failed to submit for review: "+err.Error(),
+			))
 			return
 		}
 		p.chain.Record(env)
@@ -115,9 +114,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Error:   err.Error(),
 			}
 			p.chain.Record(env)
-			writeJSON(w, http.StatusBadGateway, map[string]string{
-				"error": "upstream request failed: " + err.Error(),
-			})
+			writeJSON(w, http.StatusBadGateway, types.NewErrorResponse(
+				http.StatusBadGateway, "upstream_error", "upstream request failed: "+err.Error(),
+			))
 			return
 		}
 		defer resp.Body.Close()
@@ -142,9 +141,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Fallback: block unknown decisions.
 	p.chain.Record(env)
-	writeJSON(w, http.StatusForbidden, map[string]string{
-		"error": "unknown policy decision",
-	})
+	writeJSON(w, http.StatusForbidden, types.NewErrorResponse(
+		http.StatusForbidden, "policy_violation", "unknown policy decision",
+	))
 }
 
 // forwardRequest proxies the incoming request to the upstream service.

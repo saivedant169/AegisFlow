@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // AdminHandler provides HTTP handlers for identity management endpoints.
@@ -54,7 +55,16 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+	errType := "server_error"
+	switch {
+	case status == 400:
+		errType = "invalid_request"
+	case status == 404:
+		errType = "not_found"
+	case status == 409:
+		errType = "conflict"
+	}
+	writeJSON(w, status, types.NewErrorResponse(status, errType, msg))
 }
 
 // --- Organizations ---

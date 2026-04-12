@@ -18,6 +18,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/provider"
 	"github.com/saivedant169/AegisFlow/internal/usage"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // AnalyticsProvider is the interface consumed by the admin API to avoid an
@@ -340,6 +341,14 @@ func (s *Server) GetRequestLog() *RequestLog {
 	return s.requestLog
 }
 
+// writeAPIError writes a structured error response using the standard
+// types.ErrorResponse format, consistent with the gateway and middleware.
+func writeAPIError(w http.ResponseWriter, code int, errType, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message))
+}
+
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok"}`))
@@ -461,9 +470,7 @@ func (s *Server) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) rolloutUnavailable(w http.ResponseWriter) bool {
 	if s.rolloutMgr == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "rollout manager not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "rollout manager not available")
 		return true
 	}
 	return false
@@ -475,9 +482,7 @@ func (s *Server) rolloutsListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.rolloutMgr.ListRollouts()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusInternalServerError, "server_error", err.Error())
 		return
 	}
 	if result == nil {
@@ -502,17 +507,13 @@ func (s *Server) rolloutsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var req createRolloutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
 		return
 	}
 
 	obsWindow, err := time.ParseDuration(req.ObservationWindow)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid observation_window: " + err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid observation_window: " + err.Error())
 		return
 	}
 
@@ -535,9 +536,7 @@ func (s *Server) rolloutsCreateHandler(w http.ResponseWriter, r *http.Request) {
 		req.LatencyP95Threshold,
 	)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusConflict, "conflict", err.Error())
 		return
 	}
 
@@ -553,9 +552,7 @@ func (s *Server) rolloutGetHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	result, err := s.rolloutMgr.GetRolloutWithMetrics(id)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 
@@ -569,9 +566,7 @@ func (s *Server) rolloutPauseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "id")
 	if err := s.rolloutMgr.PauseRollout(id); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -584,9 +579,7 @@ func (s *Server) rolloutResumeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "id")
 	if err := s.rolloutMgr.ResumeRollout(id); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -599,9 +592,7 @@ func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	id := chi.URLParam(r, "id")
 	if err := s.rolloutMgr.RollbackRollout(id); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -641,9 +632,7 @@ func (s *Server) handleCostRecommendations(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) analyticsUnavailable(w http.ResponseWriter) bool {
 	if s.analyticsProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "analytics not enabled"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "analytics not enabled")
 		return true
 	}
 	return false
@@ -687,9 +676,7 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	} else {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "alert not found"})
+		writeAPIError(w, http.StatusNotFound, "not_found", "alert not found")
 	}
 }
 
@@ -708,9 +695,7 @@ func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 	limit := 100 // default
 	result, err := s.auditProvider.Query(actor, actorRole, action, tenantID, limit)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusInternalServerError, "server_error", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -725,9 +710,7 @@ func (s *Server) auditVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.auditProvider.Verify()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusInternalServerError, "server_error", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -752,9 +735,7 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) evidenceUnavailable(w http.ResponseWriter) bool {
 	if s.evidenceProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "evidence provider not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "evidence provider not available")
 		return true
 	}
 	return false
@@ -775,9 +756,7 @@ func (s *Server) handleEvidenceExport(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	result, err := s.evidenceProvider.ExportSession(id)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -791,9 +770,7 @@ func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	result, err := s.evidenceProvider.VerifySession(id)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -814,15 +791,11 @@ func (s *Server) handleCredentialsList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.credentialProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "credential broker not enabled"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "credential broker not enabled")
 		return
 	}
 	if err := s.credentialProvider.RevokeCredential(id); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -852,16 +825,12 @@ func (s *Server) handleApprovalsHistory(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleApprovalGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.approvalProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+		writeAPIError(w, http.StatusNotFound, "not_found", "not found")
 		return
 	}
 	item, err := s.approvalProvider.Get(id)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -871,9 +840,7 @@ func (s *Server) handleApprovalGet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.approvalProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "approvals not enabled"})
+		writeAPIError(w, http.StatusNotFound, "not_found", "approvals not enabled")
 		return
 	}
 	var body struct {
@@ -886,9 +853,7 @@ func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := s.approvalProvider.Approve(id, body.Reviewer, body.Comment)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -898,9 +863,7 @@ func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.approvalProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "approvals not enabled"})
+		writeAPIError(w, http.StatusNotFound, "not_found", "approvals not enabled")
 		return
 	}
 	var body struct {
@@ -913,9 +876,7 @@ func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := s.approvalProvider.Deny(id, body.Reviewer, body.Comment)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -945,16 +906,12 @@ type testActionResponse struct {
 func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	var req testActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
 		return
 	}
 
 	if req.Protocol == "" || req.Tool == "" || req.Target == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "protocol, tool, and target are required"})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "protocol, tool, and target are required")
 		return
 	}
 
@@ -1034,16 +991,12 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	var req testActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
 		return
 	}
 
 	if req.Protocol == "" || req.Tool == "" || req.Target == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "protocol, tool, and target are required"})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "protocol, tool, and target are required")
 		return
 	}
 
@@ -1090,17 +1043,13 @@ func RecordActionTrace(id string, trace interface{}) {
 func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "action id is required"})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "action id is required")
 		return
 	}
 
 	trace, ok := actionTraceStore[id]
 	if !ok {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "no trace found for action " + id})
+		writeAPIError(w, http.StatusNotFound, "not_found", "no trace found for action " + id)
 		return
 	}
 
@@ -1123,14 +1072,12 @@ func (s *Server) handleManifestGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "manifest provider not available")
 		return
 	}
 	m, err := s.manifestProvider.Get(id)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	json.NewEncoder(w).Encode(m)
@@ -1140,8 +1087,7 @@ func (s *Server) handleManifestDrift(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "manifest provider not available")
 		return
 	}
 	json.NewEncoder(w).Encode(s.manifestProvider.GetDrift(id))
@@ -1165,21 +1111,18 @@ type createManifestRequest struct {
 func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "manifest provider not available")
 		return
 	}
 
 	var req createManifestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
 		return
 	}
 
 	if req.TaskID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "task_id is required"})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "task_id is required")
 		return
 	}
 
@@ -1217,8 +1160,7 @@ func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.manifestProvider.Register(m); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
@@ -1231,13 +1173,11 @@ func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request
 	id := chi.URLParam(r, "id")
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "manifest provider not available"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "manifest provider not available")
 		return
 	}
 	if err := s.manifestProvider.Deactivate(id); err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]string{"status": "deactivated"})
@@ -1257,15 +1197,11 @@ func (s *Server) handleTicketsList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTicketRevoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.capabilityProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "capability tickets not enabled"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "capability tickets not enabled")
 		return
 	}
 	if err := s.capabilityProvider.RevokeTicket(id); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -1275,16 +1211,12 @@ func (s *Server) handleTicketRevoke(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if s.capabilityProvider == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "capability tickets not enabled"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "capability tickets not enabled")
 		return
 	}
 	result, err := s.capabilityProvider.VerifyTicket(id)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -1310,8 +1242,7 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	sessionID := chi.URLParam(r, "id")
 	if sessionID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "session id required"})
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "session id required")
 		return
 	}
 	if s.behavioralProvider == nil {
@@ -1325,13 +1256,11 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.behavioralProvider.SessionRisk(sessionID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusInternalServerError, "server_error", err.Error())
 		return
 	}
 	if result == nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "session not found"})
+		writeAPIError(w, http.StatusNotFound, "not_found", "session not found")
 		return
 	}
 	json.NewEncoder(w).Encode(result)
@@ -1358,14 +1287,12 @@ func (s *Server) handleResilienceDegradation(w http.ResponseWriter, r *http.Requ
 func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "resilience not enabled"})
+		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "resilience not enabled")
 		return
 	}
 	snap, err := s.resilienceProvider.CreateBackup()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusInternalServerError, "server_error", err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusCreated)

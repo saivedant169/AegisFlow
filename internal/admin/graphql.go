@@ -431,9 +431,7 @@ func (s *Server) graphqlHandler(schema graphql.Schema) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req graphqlRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON body"})
+			writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
 			return
 		}
 
