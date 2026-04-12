@@ -159,6 +159,18 @@ func (s *stubEvidenceProvider) ListSessions() interface{} {
 		{"session_id": "sess-1", "total_actions": 3},
 	}
 }
+func (s *stubEvidenceProvider) RenderReport(id string) (string, error) {
+	if id == "missing" {
+		return "", errors.New("session not found")
+	}
+	return "# Evidence Report: " + id, nil
+}
+func (s *stubEvidenceProvider) RenderHTMLReport(id string) (string, error) {
+	if id == "missing" {
+		return "", errors.New("session not found")
+	}
+	return "<html><body>Report: " + id + "</body></html>", nil
+}
 
 type stubBudgetProvider struct{}
 

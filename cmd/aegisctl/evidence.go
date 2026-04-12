@@ -105,6 +105,53 @@ func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
 	}
 }
 
+func cmdEvidenceReport(adminURL string, sessionID string, args []string) {
+	format := "markdown"
+	outputFile := ""
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--html" {
+			format = "html"
+		}
+		if args[i] == "--file" && i+1 < len(args) {
+			outputFile = args[i+1]
+			i++
+		}
+	}
+
+	endpoint := "/admin/v1/evidence/sessions/" + sessionID + "/report"
+	if format == "html" {
+		endpoint += ".html"
+	}
+
+	resp, err := client.Get(adminURL + endpoint)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		os.Exit(1)
+	}
+
+	if resp.StatusCode != 200 {
+		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		os.Exit(1)
+	}
+
+	if outputFile != "" {
+		if err := os.WriteFile(outputFile, body, 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Report written to: %s\n", outputFile)
+	} else {
+		fmt.Print(string(body))
+	}
+}
+
 // SessionSummary matches the evidence.SessionManifest JSON structure.
 type SessionSummary struct {
 	SessionID    string `json:"session_id"`

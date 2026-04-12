@@ -95,6 +95,8 @@ type EvidenceProvider interface {
 	ExportSession(sessionID string) (interface{}, error)
 	VerifySession(sessionID string) (interface{}, error)
 	ListSessions() interface{}
+	RenderReport(sessionID string) (string, error)
+	RenderHTMLReport(sessionID string) (string, error)
 }
 
 // CapabilityProvider is the interface consumed by the admin API to avoid an
@@ -283,6 +285,8 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
 	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
 	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
+	r.Get("/admin/v1/evidence/sessions/{id}/report", s.handleEvidenceReport)
+	r.Get("/admin/v1/evidence/sessions/{id}/report.html", s.handleEvidenceReportHTML)
 	r.Post("/admin/v1/test-action", s.handleTestAction)
 	r.Post("/admin/v1/simulate", s.handleSimulate)
 	r.Get("/admin/v1/actions/{id}/why", s.handleActionWhy)
@@ -775,6 +779,34 @@ func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleEvidenceReport(w http.ResponseWriter, r *http.Request) {
+	if s.evidenceUnavailable(w) {
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	report, err := s.evidenceProvider.RenderReport(sessionID)
+	if err != nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Write([]byte(report))
+}
+
+func (s *Server) handleEvidenceReportHTML(w http.ResponseWriter, r *http.Request) {
+	if s.evidenceUnavailable(w) {
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	report, err := s.evidenceProvider.RenderHTMLReport(sessionID)
+	if err != nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(report))
 }
 
 // --- Credential handlers ---

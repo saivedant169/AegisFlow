@@ -46,6 +46,7 @@ import (
 	approvalint "github.com/saivedant169/AegisFlow/internal/approval/integrations"
 	"github.com/saivedant169/AegisFlow/internal/capability"
 	"github.com/saivedant169/AegisFlow/internal/credential"
+	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/internal/manifest"
 	"github.com/saivedant169/AegisFlow/internal/mcpgw"
@@ -489,6 +490,11 @@ func main() {
 		log.Printf("[init] cost optimization engine enabled")
 	}
 
+	// Evidence chain
+	evidenceChain := evidence.NewSessionChain("aegisflow-main")
+	evidenceAdapter := evidence.NewAdminAdapter(evidenceChain)
+	log.Printf("[init] evidence chain enabled (session: %s)", evidenceChain.SessionID())
+
 	// Approval queue
 	approvalQueue := approval.NewQueue(1000)
 	if cfg.ApprovalIntegrations.Timeout > 0 {
@@ -698,7 +704,7 @@ func main() {
 	if behavioralRegistry != nil {
 		adminOpts = append(adminOpts, admin.WithBehavioralProvider(behavioral.NewAdminAdapter(behavioralRegistry)))
 	}
-	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, adminOpts...)
+	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, evidenceAdapter, approvalAdapter, credentialAdapter, adminOpts...)
 
 	gatewayAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	adminAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.AdminPort)

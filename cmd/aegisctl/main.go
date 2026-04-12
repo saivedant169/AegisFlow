@@ -92,7 +92,7 @@ func main() {
 		cmdVerify(adminURL, os.Args[2:])
 	case "evidence":
 		if len(os.Args) < 3 {
-			fmt.Println("Usage: aegisctl evidence <sessions|export> [args]")
+			fmt.Println("Usage: aegisctl evidence <sessions|export|report> [args]")
 			os.Exit(1)
 		}
 		switch os.Args[2] {
@@ -104,6 +104,12 @@ func main() {
 				os.Exit(1)
 			}
 			cmdEvidenceExport(adminURL, os.Args[3], os.Args[4:])
+		case "report":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: aegisctl evidence report <session-id> [--html] [--file output.md]")
+				os.Exit(1)
+			}
+			cmdEvidenceReport(adminURL, os.Args[3], os.Args[4:])
 		default:
 			fmt.Printf("Unknown evidence command: %s\n", os.Args[2])
 			os.Exit(1)
@@ -196,7 +202,7 @@ Usage: aegisctl <command> [args]
 
 Commands:
   verify      Verify evidence chain integrity (--session <id> for specific session)
-  evidence    Evidence management (sessions, export)
+  evidence    Evidence management (sessions, export, report)
   policy-pack Manage policy packs (list, show)
   plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
   status      Check gateway and admin health
