@@ -4,6 +4,48 @@ All notable changes to AegisFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while it is pre-1.0.
 
+## [0.6.0] - 2026-04-12
+
+This release wires up previously disconnected subsystems, hardens error handling and test coverage, and adds policy versioning — the ability to track, diff, and rollback policy changes at runtime.
+
+### Added — Runtime integration
+
+- **Approval notifications**: Slack and GitHub notifiers now fire automatically on submit, approve, and deny. Previously the notifier code existed but was never called (`_ = approvalNotifiers`).
+- **Behavioral kill switch**: The session anomaly detection engine (6 rules: exfiltration, privilege escalation, credential abuse, destructive sequences, fan-out, repeated escalation) is now wired into the gateway. Sessions that exceed the configurable risk threshold are auto-blocked with HTTP 403.
+- **Manifest drift enforcement**: Drift detection now supports a configurable `enforcement_mode` (`warn` or `enforce`). In enforce mode, drift violations block actions. Default is `warn` for backward compatibility.
+- **Evidence reports**: New `RenderMarkdownReport()` and `RenderHTMLReport()` produce human-readable session reports for auditors. Available via admin API (`/admin/v1/evidence/sessions/{id}/report` and `/report.html`) and CLI (`aegisctl evidence report`).
+- **Policy versioning**: In-memory version history (last 20 snapshots) with automatic snapshots on config reload. New admin API endpoints (`/admin/v1/policy-versions`, `/current`, `/{version}`, `/{version}/rollback`). New CLI commands (`aegisctl policy history`, `policy current`, `policy rollback <version>`). Rollback atomically replaces engine rules.
+- **Enhanced `aegisctl status`**: Now shows providers, pending approvals, evidence sessions, budgets, and recent violations — not just UP/DOWN.
+- **Evidence admin adapter**: SessionChain now exposed to admin API with export, verify, and report endpoints.
+
+### Fixed — Error handling and consistency
+
+- **aegisctl JSON decode errors**: 18 call sites across 7 files silently ignored malformed JSON responses. All now properly report errors via `decodeJSON` helper.
+- **Unified error response format**: Admin API (48 sites), identity admin, and httpgate all migrated from `{"error":"msg"}` to structured `{"error":{"code":N,"type":"...","message":"..."}}` matching the gateway format.
+- **MCP gateway upstream errors**: Error messages now include tool name, upstream name, and remediation hint instead of raw `connection refused` (#82).
+- **Config startup validation**: 11 new rules catch empty provider names/types, duplicate providers, routes referencing unknown providers, tenants with no API keys, duplicate tenant IDs, negative rate limits, and negative max body size at startup instead of runtime.
+
+### Improved — Test coverage
+
+- Overall project coverage: 56% to 63%+
+- `internal/identity`: 48% to 92% (29 admin handler tests + ConnectorAdmin SoD rule)
+- `internal/approval`: 54% to 80% (IsApprovedForTool, CleanupExpired, notifier tests)
+- `internal/admin`: 23% to 65% (77 tests covering all endpoint categories)
+- `internal/capability`: 74% to 92% (admin adapter tests)
+- `internal/usage`: 64% to 100% (tracker + cost estimation tests)
+- `internal/evidence`: 60% to 68% (export + report tests)
+- `internal/config`: 12 new validation tests
+
+### Changed
+
+- `internal/toolpolicy/Engine` is now thread-safe with `sync.RWMutex` and supports `ReplaceRules()` for live policy updates
+- README updated with 37 admin API endpoints (was 17), 37 internal packages (was 23), and documentation for all new features
+
+### Contributors
+
+- API key rotation support (rk-python5, PR #75)
+- CI badge fix (tanmaykadam1533, PR #88)
+
 ## [0.5.0] - 2026-04-07
 
 This release is the pivot. AegisFlow used to describe itself as an AI gateway. Now it is an open-source runtime governance layer for tool-using agents. The gateway features are still here, but they sit behind the governance plane as supporting infrastructure.

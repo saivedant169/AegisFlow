@@ -228,7 +228,7 @@ func (g *Gateway) buildInitializeResponse(req *JSONRPCRequest) JSONRPCResponse {
 		"capabilities":    map[string]any{"tools": map[string]any{}},
 		"serverInfo": map[string]any{
 			"name":    "aegisflow-mcp-gateway",
-			"version": "0.5.0",
+			"version": "0.6.0",
 		},
 	})
 	return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}

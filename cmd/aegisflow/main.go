@@ -54,7 +54,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
-const version = "v0.5.0"
+const version = "v0.6.0"
 
 var totalRequests uint64
 
