@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -104,5 +105,60 @@ func TestRecordCount(t *testing.T) {
 
 	if chain.Count() != 3 {
 		t.Fatalf("expected 3 records, got %d", chain.Count())
+	}
+}
+
+func TestExportEmptyChain(t *testing.T) {
+	chain := NewSessionChain("empty-session")
+	data, err := chain.Export()
+	if err != nil {
+		t.Fatalf("export failed: %v", err)
+	}
+
+	var bundle map[string]interface{}
+	if err := json.Unmarshal(data, &bundle); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if bundle["session_id"] != "empty-session" {
+		t.Fatalf("expected empty-session, got %v", bundle["session_id"])
+	}
+	if bundle["count"].(float64) != 0 {
+		t.Fatalf("expected 0 records, got %v", bundle["count"])
+	}
+}
+
+func TestExportWithRecords(t *testing.T) {
+	chain := NewSessionChain("export-test")
+	chain.Record(testEnv("tool1", envelope.DecisionAllow))
+	chain.Record(testEnv("tool2", envelope.DecisionBlock))
+
+	data, err := chain.Export()
+	if err != nil {
+		t.Fatalf("export failed: %v", err)
+	}
+
+	var bundle map[string]interface{}
+	if err := json.Unmarshal(data, &bundle); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if bundle["session_id"] != "export-test" {
+		t.Fatalf("expected export-test, got %v", bundle["session_id"])
+	}
+	if bundle["count"].(float64) != 2 {
+		t.Fatalf("expected 2 records, got %v", bundle["count"])
+	}
+	if bundle["last_hash"] == nil || bundle["last_hash"] == "" {
+		t.Fatal("expected non-empty last_hash")
+	}
+	if bundle["exported_at"] == nil {
+		t.Fatal("expected exported_at timestamp")
+	}
+
+	records, ok := bundle["records"].([]interface{})
+	if !ok {
+		t.Fatalf("expected records array, got %T", bundle["records"])
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records in array, got %d", len(records))
 	}
 }
