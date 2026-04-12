@@ -123,6 +123,49 @@ func TestExceptionGrantsTimeBound(t *testing.T) {
 	}
 }
 
+func TestConnectorAdminNotSessionOperator(t *testing.T) {
+	rule := ConnectorAdminNotSessionOperator()
+
+	// An admin trying to operate a session should be blocked.
+	admin := Identity{
+		ID:   "admin-user",
+		Type: "human",
+		Name: "Admin",
+		Roles: []Role{
+			{Name: "admin", Scope: "connector", ScopeID: "conn-1"},
+		},
+	}
+
+	err := rule.Check(admin, "operate_session")
+	if err == nil {
+		t.Fatal("expected error for admin operating session")
+	}
+	if !strings.Contains(err.Error(), "admin role") {
+		t.Fatalf("expected error about admin role, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), admin.ID) {
+		t.Fatalf("expected error to include actor ID %q, got: %v", admin.ID, err)
+	}
+
+	// An admin performing a non-session action should be allowed.
+	if err := rule.Check(admin, "configure_connector"); err != nil {
+		t.Fatalf("expected no error for non-session action, got: %v", err)
+	}
+
+	// A non-admin operating a session should be allowed.
+	operator := Identity{
+		ID:   "op-user",
+		Type: "human",
+		Name: "Operator",
+		Roles: []Role{
+			{Name: "operator", Scope: "connector", ScopeID: "conn-1"},
+		},
+	}
+	if err := rule.Check(operator, "operate_session"); err != nil {
+		t.Fatalf("expected no error for non-admin operator, got: %v", err)
+	}
+}
+
 func TestEvaluateRules(t *testing.T) {
 	rules := DefaultRules()
 
