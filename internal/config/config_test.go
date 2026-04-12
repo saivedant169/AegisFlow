@@ -503,6 +503,13 @@ func TestLoadInvalidYAML(t *testing.T) {
 
 func TestCanaryConfigParsing(t *testing.T) {
 	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+  - name: "azure"
+    type: "azure"
+    enabled: true
 routes:
   - match:
       model: "gpt-4"
@@ -553,6 +560,10 @@ routes:
 
 func TestRegionConfigParsing(t *testing.T) {
 	yamlData := `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
 routes:
   - match:
       model: "gpt-4"

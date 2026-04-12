@@ -916,10 +916,61 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 }
 
 func validateConfig(cfg *Config) error {
-	for _, provider := range cfg.Providers {
+	// --- Server ---
+	if cfg.Server.MaxBodySize < 0 {
+		return fmt.Errorf("server.max_body_size must not be negative (got %d)", cfg.Server.MaxBodySize)
+	}
+
+	// --- Providers ---
+	providerNames := make(map[string]bool, len(cfg.Providers))
+	for i, provider := range cfg.Providers {
+		if provider.Name == "" {
+			return fmt.Errorf("providers[%d]: provider name must not be empty", i)
+		}
+		if provider.Type == "" {
+			return fmt.Errorf("provider %q: provider type must not be empty", provider.Name)
+		}
+		if providerNames[provider.Name] {
+			return fmt.Errorf("duplicate provider name %q", provider.Name)
+		}
+		providerNames[provider.Name] = true
 		if provider.Retry.MaxAttempts < 1 {
 			return fmt.Errorf("provider %q retry.max_attempts must be at least 1", provider.Name)
 		}
 	}
+
+	// --- Routes ---
+	for i, route := range cfg.Routes {
+		if len(route.Providers) == 0 {
+			return fmt.Errorf("routes[%d]: no providers specified", i)
+		}
+		for _, p := range route.Providers {
+			if !providerNames[p] {
+				return fmt.Errorf("routes[%d]: references unknown provider %q", i, p)
+			}
+		}
+	}
+
+	// --- Tenants ---
+	tenantIDs := make(map[string]bool, len(cfg.Tenants))
+	for i, tenant := range cfg.Tenants {
+		if tenant.ID == "" {
+			return fmt.Errorf("tenants[%d]: tenant id must not be empty", i)
+		}
+		if tenantIDs[tenant.ID] {
+			return fmt.Errorf("duplicate tenant id %q", tenant.ID)
+		}
+		tenantIDs[tenant.ID] = true
+		if len(tenant.APIKeys) == 0 {
+			return fmt.Errorf("tenant %q: api_keys must not be empty", tenant.ID)
+		}
+		if tenant.RateLimit.RequestsPerMinute < 0 {
+			return fmt.Errorf("tenant %q: requests_per_minute must not be negative", tenant.ID)
+		}
+		if tenant.RateLimit.TokensPerMinute < 0 {
+			return fmt.Errorf("tenant %q: tokens_per_minute must not be negative", tenant.ID)
+		}
+	}
+
 	return nil
 }
