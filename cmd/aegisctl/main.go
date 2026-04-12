@@ -691,19 +691,27 @@ func cmdPending(adminURL string) {
 }
 
 func cmdApprove(adminURL, id, comment string) {
+	apiKey := getEnv("AEGISFLOW_API_KEY", "aegis-test-default-001")
 	body, _ := marshalJSON(map[string]string{"reviewer": "aegisctl", "comment": comment})
-	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/approve", "application/json", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", adminURL+"/admin/v1/approvals/"+id+"/approve", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", apiKey)
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		var result map[string]string
+		var result struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
 		if err := decodeJSON(resp, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Error (%d): could not decode error response: %v\n", resp.StatusCode, err)
+			fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
 		} else {
-			fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+			fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
 		}
 		os.Exit(1)
 	}
@@ -711,19 +719,27 @@ func cmdApprove(adminURL, id, comment string) {
 }
 
 func cmdDeny(adminURL, id, comment string) {
+	apiKey := getEnv("AEGISFLOW_API_KEY", "aegis-test-default-001")
 	body, _ := marshalJSON(map[string]string{"reviewer": "aegisctl", "comment": comment})
-	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/deny", "application/json", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", adminURL+"/admin/v1/approvals/"+id+"/deny", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", apiKey)
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		var result map[string]string
+		var result struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
 		if err := decodeJSON(resp, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Error (%d): could not decode error response: %v\n", resp.StatusCode, err)
+			fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
 		} else {
-			fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+			fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
 		}
 		os.Exit(1)
 	}
