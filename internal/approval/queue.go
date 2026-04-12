@@ -2,11 +2,19 @@ package approval
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 )
+
+// Notifier receives approval lifecycle events.
+type Notifier interface {
+	NotifyReview(item *ApprovalItem) error
+	NotifyApproved(item *ApprovalItem) error
+	NotifyDenied(item *ApprovalItem) error
+}
 
 const (
 	StatusPending  = "pending"
@@ -29,11 +37,12 @@ type ApprovalItem struct {
 
 // Queue manages pending approval items.
 type Queue struct {
-	mu      sync.RWMutex
-	pending map[string]*ApprovalItem
-	history []*ApprovalItem
-	maxSize int
-	Timeout time.Duration
+	mu        sync.RWMutex
+	pending   map[string]*ApprovalItem
+	history   []*ApprovalItem
+	maxSize   int
+	Timeout   time.Duration
+	notifiers []Notifier
 }
 
 func NewQueue(maxSize int) *Queue {
@@ -45,12 +54,27 @@ func NewQueue(maxSize int) *Queue {
 	}
 }
 
+// AddNotifier registers a notifier to receive approval lifecycle events.
+func (q *Queue) AddNotifier(n Notifier) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.notifiers = append(q.notifiers, n)
+}
+
+func (q *Queue) notify(item *ApprovalItem, fn func(Notifier, *ApprovalItem) error) {
+	for _, n := range q.notifiers {
+		if err := fn(n, item); err != nil {
+			log.Printf("[approval] notifier error: %v", err)
+		}
+	}
+}
+
 // Submit adds an ActionEnvelope to the approval queue. Returns the approval ID.
 func (q *Queue) Submit(env *envelope.ActionEnvelope) (string, error) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	if len(q.pending) >= q.maxSize {
+		q.mu.Unlock()
 		return "", errors.New("approval queue is full")
 	}
 
@@ -63,6 +87,9 @@ func (q *Queue) Submit(env *envelope.ActionEnvelope) (string, error) {
 		ExpireAt:    now.Add(q.Timeout),
 	}
 	q.pending[item.ID] = item
+	q.mu.Unlock()
+
+	q.notify(item, Notifier.NotifyReview)
 	return item.ID, nil
 }
 
@@ -106,10 +133,10 @@ func (q *Queue) Deny(id, reviewer, comment string) (*ApprovalItem, error) {
 
 func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, error) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	item, ok := q.pending[id]
 	if !ok {
+		q.mu.Unlock()
 		return nil, errors.New("approval item not found or already reviewed: " + id)
 	}
 
@@ -125,6 +152,14 @@ func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, er
 	// Cap history at 1000
 	if len(q.history) > 1000 {
 		q.history = q.history[len(q.history)-1000:]
+	}
+
+	q.mu.Unlock()
+
+	if status == StatusApproved {
+		q.notify(item, Notifier.NotifyApproved)
+	} else if status == StatusDenied {
+		q.notify(item, Notifier.NotifyDenied)
 	}
 
 	return item, nil

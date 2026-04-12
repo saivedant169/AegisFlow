@@ -173,6 +173,61 @@ func TestIsApprovedForTool_DifferentTool(t *testing.T) {
 	}
 }
 
+// mockNotifier tracks notification calls for testing.
+type mockNotifier struct {
+	reviewCalled  int
+	approveCalled int
+	denyCalled    int
+}
+
+func (m *mockNotifier) NotifyReview(item *ApprovalItem) error   { m.reviewCalled++; return nil }
+func (m *mockNotifier) NotifyApproved(item *ApprovalItem) error { m.approveCalled++; return nil }
+func (m *mockNotifier) NotifyDenied(item *ApprovalItem) error   { m.denyCalled++; return nil }
+
+func TestNotifierCalledOnSubmit(t *testing.T) {
+	q := NewQueue(100)
+	m := &mockNotifier{}
+	q.AddNotifier(m)
+
+	_, err := q.Submit(testEnv("tool"))
+	if err != nil {
+		t.Fatalf("submit failed: %v", err)
+	}
+	if m.reviewCalled != 1 {
+		t.Fatalf("expected reviewCalled == 1, got %d", m.reviewCalled)
+	}
+}
+
+func TestNotifierCalledOnApprove(t *testing.T) {
+	q := NewQueue(100)
+	m := &mockNotifier{}
+	q.AddNotifier(m)
+
+	id, _ := q.Submit(testEnv("tool"))
+	_, err := q.Approve(id, "admin", "ok")
+	if err != nil {
+		t.Fatalf("approve failed: %v", err)
+	}
+	if m.approveCalled != 1 {
+		t.Fatalf("expected approveCalled == 1, got %d", m.approveCalled)
+	}
+}
+
+func TestNotifierCalledOnDeny(t *testing.T) {
+	q := NewQueue(100)
+	m := &mockNotifier{}
+	q.AddNotifier(m)
+
+	id, _ := q.Submit(testEnv("tool"))
+	_, err := q.Deny(id, "admin", "no")
+	if err != nil {
+		t.Fatalf("deny failed: %v", err)
+	}
+	if m.denyCalled != 1 {
+		t.Fatalf("expected denyCalled == 1, got %d", m.denyCalled)
+	}
+}
+
 func TestCleanupExpired(t *testing.T) {
 	q := NewQueue(100)
 	q.Timeout = 1 * time.Millisecond // expire immediately

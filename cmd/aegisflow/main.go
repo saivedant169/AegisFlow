@@ -56,6 +56,21 @@ const version = "v0.5.0"
 
 var totalRequests uint64
 
+// notifierAdapter bridges approvalint.ApprovalNotifier to approval.Notifier.
+type notifierAdapter struct {
+	inner approvalint.ApprovalNotifier
+}
+
+func (a *notifierAdapter) NotifyReview(item *approval.ApprovalItem) error {
+	return a.inner.NotifyReview(item)
+}
+func (a *notifierAdapter) NotifyApproved(item *approval.ApprovalItem) error {
+	return a.inner.NotifyApproved(item)
+}
+func (a *notifierAdapter) NotifyDenied(item *approval.ApprovalItem) error {
+	return a.inner.NotifyDenied(item)
+}
+
 func main() {
 	configPath := flag.String("config", "configs/aegisflow.yaml", "path to config file")
 	showVersion := flag.Bool("version", false, "print aegisflow version")
@@ -486,7 +501,9 @@ func main() {
 		approvalNotifiers = append(approvalNotifiers, slackNotifier)
 		log.Printf("[init] Slack approval notifier enabled")
 	}
-	_ = approvalNotifiers // notifiers available for use by approval submission hooks
+	for _, n := range approvalNotifiers {
+		approvalQueue.AddNotifier(&notifierAdapter{inner: n})
+	}
 
 	// Approval timeout cleanup goroutine
 	approvalCleanupStop := make(chan struct{})
