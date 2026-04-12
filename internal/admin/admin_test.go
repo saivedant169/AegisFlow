@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -46,6 +47,20 @@ func (s *verifyOnlyAuditProvider) Verify() (interface{}, error) {
 func (s *verifyOnlyAuditProvider) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
 }
 
+func newFullAdminServer() *Server {
+	srv := newIntegrationAdminServer()
+	srv.approvalProvider = &stubApprovalProvider{
+		pendingItems: []map[string]interface{}{
+			{"id": "appr-1", "status": "pending", "tool": "github.push"},
+		},
+		historyItems: []map[string]interface{}{
+			{"id": "appr-0", "status": "approved", "reviewer": "alice"},
+		},
+	}
+	srv.evidenceProvider = &stubEvidenceProvider{}
+	return srv
+}
+
 func newIntegrationAdminServer() *Server {
 	cfg := &config.Config{
 		Tenants: []config.TenantConfig{
@@ -79,6 +94,61 @@ func newIntegrationAdminServer() *Server {
 		nil,
 		nil,
 	)
+}
+
+// --- Stub providers for testing ---
+
+type stubApprovalProvider struct {
+	pendingItems  []map[string]interface{}
+	historyItems  []map[string]interface{}
+	approveErr    error
+	denyErr       error
+}
+
+func (s *stubApprovalProvider) Pending() interface{} { return s.pendingItems }
+func (s *stubApprovalProvider) History(limit int) interface{} { return s.historyItems }
+func (s *stubApprovalProvider) Get(id string) (interface{}, error) {
+	for _, item := range s.pendingItems {
+		if item["id"] == id {
+			return item, nil
+		}
+	}
+	for _, item := range s.historyItems {
+		if item["id"] == id {
+			return item, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
+func (s *stubApprovalProvider) Approve(id, reviewer, comment string) (interface{}, error) {
+	if s.approveErr != nil {
+		return nil, s.approveErr
+	}
+	return map[string]interface{}{"id": id, "status": "approved", "reviewer": reviewer}, nil
+}
+func (s *stubApprovalProvider) Deny(id, reviewer, comment string) (interface{}, error) {
+	if s.denyErr != nil {
+		return nil, s.denyErr
+	}
+	return map[string]interface{}{"id": id, "status": "denied", "reviewer": reviewer}, nil
+}
+func (s *stubApprovalProvider) Submit(env interface{}) (string, error) { return "sub-1", nil }
+
+type stubEvidenceProvider struct{}
+
+func (s *stubEvidenceProvider) ExportSession(id string) (interface{}, error) {
+	if id == "missing" {
+		return nil, errors.New("session not found")
+	}
+	return map[string]interface{}{"session_id": id, "records": []interface{}{}}, nil
+}
+func (s *stubEvidenceProvider) VerifySession(id string) (interface{}, error) {
+	return map[string]interface{}{"valid": true, "total_records": 5}, nil
+}
+func (s *stubEvidenceProvider) ListSessions() interface{} {
+	return []map[string]interface{}{
+		{"session_id": "sess-1", "total_actions": 3},
+	}
 }
 
 // stubToolPolicyProvider is a simple ToolPolicyProvider for testing.
@@ -249,4 +319,323 @@ func TestAdminRBACIntegration(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 	})
+}
+
+// --- Real-logic handler tests ---
+
+func TestHealthEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]string
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["status"] != "ok" {
+		t.Fatalf("expected status ok, got %v", body["status"])
+	}
+}
+
+func TestProvidersEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	// Add a provider to cfg so the handler has something to iterate
+	server.cfg.Providers = []config.ProviderConfig{
+		{Name: "mock", Type: "mock", Enabled: true},
+	}
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/providers", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body []map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&body)
+	if len(body) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(body))
+	}
+	if body[0]["name"] != "mock" {
+		t.Fatalf("expected provider name 'mock', got %v", body[0]["name"])
+	}
+}
+
+func TestTenantsEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/tenants", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body []map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&body)
+	if len(body) != 3 {
+		t.Fatalf("expected 3 tenants, got %d", len(body))
+	}
+}
+
+func TestPoliciesEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/policies", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestViolationsEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/violations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestCacheEndpointNoCache(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/cache", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAuditQueryEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/audit?limit=10", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestSimulateEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "allow"}
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"mcp","tool":"list_repos","target":"github.com/org","capability":"read"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/simulate", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	var body map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["decision"] != "allow" {
+		t.Fatalf("expected allow, got %v", body["decision"])
+	}
+}
+
+func TestSimulateEndpointMissingFields(t *testing.T) {
+	server := newIntegrationAdminServer()
+	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "allow"}
+	router := server.Router()
+
+	payload := []byte(`{"protocol":"mcp"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/simulate", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// --- Approval delegation handler tests ---
+
+func TestApprovalsPendingEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestApprovalsHistoryEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/history", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestApprovalsGetEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/appr-1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestApprovalsGetNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/nonexistent", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestApprovalApproveEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	payload := []byte(`{"reviewer":"bob","comment":"looks good"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/approvals/appr-1/approve", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestApprovalDenyEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	payload := []byte(`{"reviewer":"bob","comment":"too risky"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/approvals/appr-1/deny", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+// --- Evidence delegation handler tests ---
+
+func TestEvidenceSessionsEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestEvidenceExportEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions/sess-1/export", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestEvidenceExportNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions/missing/export", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestEvidenceVerifyEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/evidence/sessions/sess-1/verify", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRolloutsListEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/rollouts", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRolloutGetEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/rollouts/roll-1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
 }
