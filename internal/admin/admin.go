@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -148,6 +149,16 @@ type SupplyChainProvider interface {
 	ListAssets() interface{}
 }
 
+// PolicyVersionProvider is the interface consumed by the admin API to avoid an
+// import cycle with the toolpolicy package. Implementations expose policy
+// version history and rollback.
+type PolicyVersionProvider interface {
+	ListVersions() interface{}
+	GetVersion(version int) (interface{}, error)
+	CurrentVersion() interface{}
+	Rollback(version int) error
+}
+
 // BehavioralProvider is the interface consumed by the admin API to avoid an
 // import cycle with the behavioral package. Use behavioral.NewAdminAdapter to
 // wrap a *behavioral.Registry so it satisfies this interface.
@@ -189,8 +200,9 @@ type Server struct {
 	manifestProvider     ManifestProvider
 	capabilityProvider   CapabilityProvider
 	supplyChainProvider  SupplyChainProvider
-	behavioralProvider   BehavioralProvider
-	resilienceProvider   ResilienceProvider
+	behavioralProvider      BehavioralProvider
+	resilienceProvider      ResilienceProvider
+	policyVersionProvider   PolicyVersionProvider
 }
 
 func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
@@ -246,6 +258,13 @@ func WithResilienceProvider(rp ResilienceProvider) ServerOption {
 	}
 }
 
+// WithPolicyVersionProvider sets the policy version history provider.
+func WithPolicyVersionProvider(p PolicyVersionProvider) ServerOption {
+	return func(s *Server) {
+		s.policyVersionProvider = p
+	}
+}
+
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.Recoverer)
@@ -297,6 +316,9 @@ func (s *Server) Router() http.Handler {
 	r.Delete("/admin/v1/manifests/{id}", s.handleManifestDeactivate)
 	r.Get("/admin/v1/supply-chain", s.handleSupplyChain)
 	r.Get("/admin/v1/sessions/{id}/risk", s.handleSessionRisk)
+	r.Get("/admin/v1/policy-versions", s.handlePolicyVersionsList)
+	r.Get("/admin/v1/policy-versions/current", s.handlePolicyVersionCurrent)
+	r.Get("/admin/v1/policy-versions/{version}", s.handlePolicyVersionGet)
 	r.Get("/admin/v1/health/detailed", s.handleHealthDetailed)
 	r.Get("/admin/v1/resilience/degradation", s.handleResilienceDegradation)
 	r.Get("/admin/v1/resilience/backups", s.handleResilienceBackupsList)
@@ -329,6 +351,7 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/approvals/{id}/deny", s.handleApprovalDeny)
 		r.Post("/admin/v1/credentials/{id}/revoke", s.handleCredentialRevoke)
 		r.Post("/admin/v1/tickets/{id}/revoke", s.handleTicketRevoke)
+		r.Post("/admin/v1/policy-versions/{version}/rollback", s.handlePolicyVersionRollback)
 		r.Get("/admin/v1/audit", s.auditHandler)
 	})
 
@@ -1347,4 +1370,71 @@ func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	json.NewEncoder(w).Encode(s.resilienceProvider.RetentionStats())
+}
+
+// --- Policy version handlers ---
+
+func (s *Server) handlePolicyVersionsList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.policyVersionProvider == nil {
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+	json.NewEncoder(w).Encode(s.policyVersionProvider.ListVersions())
+}
+
+func (s *Server) handlePolicyVersionCurrent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.policyVersionProvider == nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", "policy versioning not enabled")
+		return
+	}
+	cur := s.policyVersionProvider.CurrentVersion()
+	if cur == nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", "no policy versions recorded")
+		return
+	}
+	json.NewEncoder(w).Encode(cur)
+}
+
+func (s *Server) handlePolicyVersionGet(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.policyVersionProvider == nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", "policy versioning not enabled")
+		return
+	}
+	vStr := chi.URLParam(r, "version")
+	version, err := strconv.Atoi(vStr)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "version must be an integer")
+		return
+	}
+	v, err := s.policyVersionProvider.GetVersion(version)
+	if err != nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	json.NewEncoder(w).Encode(v)
+}
+
+func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.policyVersionProvider == nil {
+		writeAPIError(w, http.StatusNotFound, "not_found", "policy versioning not enabled")
+		return
+	}
+	vStr := chi.URLParam(r, "version")
+	version, err := strconv.Atoi(vStr)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "version must be an integer")
+		return
+	}
+	if err := s.policyVersionProvider.Rollback(version); err != nil {
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":              "ok",
+		"rolled_back_to":      version,
+	})
 }

@@ -2,6 +2,7 @@ package toolpolicy
 
 import (
 	"path"
+	"sync"
 
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 )
@@ -17,6 +18,7 @@ type ToolRule struct {
 
 // Engine evaluates ActionEnvelopes against a list of ToolRules.
 type Engine struct {
+	mu              sync.RWMutex
 	rules           []ToolRule
 	defaultDecision envelope.Decision
 }
@@ -37,8 +39,34 @@ func NewEngine(rules []ToolRule, defaultDecision string) *Engine {
 	}
 }
 
+// ReplaceRules atomically swaps the engine's rules and default decision.
+func (e *Engine) ReplaceRules(rules []ToolRule, defaultDecision string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.rules = rules
+	e.defaultDecision = envelope.Decision(defaultDecision)
+}
+
+// Rules returns a copy of the current rules.
+func (e *Engine) Rules() []ToolRule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	result := make([]ToolRule, len(e.rules))
+	copy(result, e.rules)
+	return result
+}
+
+// DefaultDecision returns the current default decision as a string.
+func (e *Engine) DefaultDecision() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return string(e.defaultDecision)
+}
+
 // Evaluate checks the envelope against rules. First matching rule wins.
 func (e *Engine) Evaluate(env *envelope.ActionEnvelope) envelope.Decision {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	for _, rule := range e.rules {
 		if e.matches(rule, env) {
 			return envelope.Decision(rule.Decision)

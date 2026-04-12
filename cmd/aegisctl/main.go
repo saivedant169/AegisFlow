@@ -136,6 +136,26 @@ func main() {
 		cmdSimulate(adminURL, os.Args[2:])
 	case "why":
 		cmdWhy(adminURL, os.Args[2:])
+	case "policy":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: aegisctl policy <history|current|rollback> [args]")
+			os.Exit(1)
+		}
+		switch os.Args[2] {
+		case "history":
+			cmdPolicyHistory(adminURL)
+		case "current":
+			cmdPolicyCurrent(adminURL)
+		case "rollback":
+			if len(os.Args) < 4 {
+				fmt.Println("Usage: aegisctl policy rollback <version>")
+				os.Exit(1)
+			}
+			cmdPolicyRollback(adminURL, os.Args[3])
+		default:
+			fmt.Printf("Unknown policy command: %s\n", os.Args[2])
+			os.Exit(1)
+		}
 	case "diff-policy":
 		cmdDiffPolicy(os.Args[2:])
 	case "manifest":
@@ -214,6 +234,7 @@ Commands:
   pending     List pending approval items
   approve     Approve a pending item: aegisctl approve <id> [comment]
   deny        Deny a pending item: aegisctl deny <id> [comment]
+  policy      Policy versioning (history, current, rollback)
   simulate    Simulate a policy decision with full trace
   why         Show decision trace for a past action: aegisctl why <envelope-id>
   diff-policy Diff two policy files: aegisctl diff-policy <old.yaml> <new.yaml>

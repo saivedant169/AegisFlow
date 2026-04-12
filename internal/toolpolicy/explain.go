@@ -27,6 +27,9 @@ type RuleCheckStep struct {
 // EvaluateWithTrace checks the envelope against rules and returns the full
 // decision trace so operators can see the decision path.
 func (e *Engine) EvaluateWithTrace(env *envelope.ActionEnvelope) *PolicyDecisionTrace {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	trace := &PolicyDecisionTrace{
 		MatchedIndex: -1,
 		CheckTrace:   make([]RuleCheckStep, 0, len(e.rules)),

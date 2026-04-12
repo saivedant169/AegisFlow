@@ -94,9 +94,31 @@ func main() {
 	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
 	defer logger.Sync()
 
-	// Config hot-reload
+	// Config hot-reload (tpEngine and policyVersionStore are set below but
+	// captured by reference, so the callback sees the final values).
+	var tpEngineForWatcher **toolpolicy.Engine = new(*toolpolicy.Engine)
+	var pvStoreForWatcher **toolpolicy.PolicyVersionStore = new(*toolpolicy.PolicyVersionStore)
 	watcher := config.NewWatcher(*configPath, cfg, func(newCfg *config.Config) {
 		log.Printf("config reloaded — some changes require restart")
+
+		// Reload tool policies dynamically.
+		if *tpEngineForWatcher != nil && newCfg.ToolPolicies.Enabled {
+			newRules := make([]toolpolicy.ToolRule, len(newCfg.ToolPolicies.Rules))
+			for i, r := range newCfg.ToolPolicies.Rules {
+				newRules[i] = toolpolicy.ToolRule{
+					Protocol:   r.Protocol,
+					Tool:       r.Tool,
+					Target:     r.Target,
+					Capability: r.Capability,
+					Decision:   r.Decision,
+				}
+			}
+			(*tpEngineForWatcher).ReplaceRules(newRules, newCfg.ToolPolicies.DefaultDecision)
+			if *pvStoreForWatcher != nil {
+				(*pvStoreForWatcher).Snapshot(newRules, newCfg.ToolPolicies.DefaultDecision, "reload")
+			}
+			log.Printf("[config] tool policies reloaded (%d rules, default=%s)", len(newRules), newCfg.ToolPolicies.DefaultDecision)
+		}
 	})
 	watcher.Start(5 * time.Second)
 	defer watcher.Stop()
@@ -623,8 +645,10 @@ func main() {
 
 	// Tool policy engine for admin test-action endpoint
 	var toolPolicyOpt admin.ServerOption
+	var tpEngine *toolpolicy.Engine
+	policyVersionStore := toolpolicy.NewPolicyVersionStore(20)
 	{
-		tpEngine := toolpolicy.NewEngine(nil, cfg.ToolPolicies.DefaultDecision)
+		tpEngine = toolpolicy.NewEngine(nil, cfg.ToolPolicies.DefaultDecision)
 		if cfg.ToolPolicies.Enabled {
 			rules := make([]toolpolicy.ToolRule, len(cfg.ToolPolicies.Rules))
 			for i, r := range cfg.ToolPolicies.Rules {
@@ -638,7 +662,10 @@ func main() {
 			}
 			tpEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
 		}
+		policyVersionStore.Snapshot(tpEngine.Rules(), tpEngine.DefaultDecision(), "initial")
 		toolPolicyOpt = admin.WithToolPolicyProvider(toolpolicy.NewAdminAdapter(tpEngine))
+		*tpEngineForWatcher = tpEngine
+		*pvStoreForWatcher = policyVersionStore
 	}
 
 	// Manifest store and drift detector
@@ -693,8 +720,12 @@ func main() {
 		log.Printf("[init] resilience enabled (health_interval: %s, backup_dir: %s)", cfg.Resilience.HealthInterval, cfg.Resilience.BackupDir)
 	}
 
+	// Policy version adapter
+	versionAdapter := toolpolicy.NewVersionAdminAdapter(policyVersionStore, tpEngine)
+	policyVersionOpt := admin.WithPolicyVersionProvider(versionAdapter)
+
 	// Admin server
-	adminOpts := []admin.ServerOption{toolPolicyOpt, manifestOpt}
+	adminOpts := []admin.ServerOption{toolPolicyOpt, manifestOpt, policyVersionOpt}
 	if capabilityOpt != nil {
 		adminOpts = append(adminOpts, capabilityOpt)
 	}
