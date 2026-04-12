@@ -305,7 +305,7 @@
     <div>
       <div class="name"><span>Aegis</span>Flow</div>
     </div>
-    <span class="version">v0.4.0</span>
+    <span class="version">v0.6.0</span>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section">Overview</div>
@@ -1558,7 +1558,7 @@ async function fetchTenants() {
           </div>
         </div>
         <div style="margin-top:12px;font-size:11px;color:var(--text-muted);">
-          Models: ${t.allowed_models.map(m => '<code style="background:var(--border);padding:1px 5px;border-radius:3px;font-size:10px;">' + m + '</code>').join(' ')}
+          Models: ${(t.allowed_models || []).map(m => '<code style="background:var(--border);padding:1px 5px;border-radius:3px;font-size:10px;">' + m + '</code>').join(' ') || '<span style="color:var(--text-muted);">all</span>'}
         </div>
       </div>`;
     }).join('');
