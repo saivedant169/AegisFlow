@@ -258,12 +258,34 @@ for the full test script.
 - SHA-256 hash-chained audit log with append-only writes
 - Session manifest with ordered action records
 - Policy decisions, approval records, credential issuance records
-- Exportable evidence bundles with `aegisflow verify` CLI
-- Tamper detection that catches any modification to the chain
+- Human-readable Markdown and HTML evidence reports for auditors
+- Exportable evidence bundles with `aegisctl evidence export`
+- Tamper detection and verification via `aegisctl evidence verify`
+
+#### Human-in-the-Loop Approvals
+- Review queue for risky actions (human approves or denies before execution)
+- Slack notifications with Block Kit messages and approve/deny deep links
+- GitHub PR comment notifications with risk-level indicators
+- Configurable auto-deny timeout for unreviewed actions
+- `aegisctl approve` / `aegisctl deny` CLI commands
+
+#### Behavioral Session Policy
+- 6 built-in detection rules: exfiltration, privilege escalation, credential abuse, destructive sequences, suspicious fan-out, repeated escalation
+- Cumulative risk scoring per session (0-100)
+- Kill switch: auto-block sessions that exceed a configurable risk threshold
+- Session-level anomaly detection catches patterns that individual action checks miss
+
+#### Task Manifests & Drift Enforcement
+- Declare agent intent: allowed tools, protocols, verbs, resources, action limits, budgets
+- Drift detection compares declared intent vs actual execution
+- Configurable enforcement mode: `warn` (log only) or `enforce` (block violations)
+- 7 drift types: unexpected tool, resource, protocol, verb, exceeded actions, exceeded budget, manifest expired
 
 #### Enterprise RBAC
 - Three-role hierarchy: admin, operator, viewer
 - Per-API-key role assignment
+- Org/team/project/environment identity hierarchy
+- Separation-of-duties rules (policy author cannot approve, admin cannot operate sessions)
 - Backward-compatible tenant config
 
 ### Supporting Infrastructure
@@ -457,20 +479,38 @@ routes:
 | `GET` | `/health` | Admin health check |
 | `GET` | `/metrics` | Prometheus metrics |
 | `GET` | `/admin/v1/usage` | Usage statistics per tenant |
-| `GET` | `/admin/v1/config` | Current running configuration |
+| `GET` | `/admin/v1/providers` | Provider status and health |
+| `GET` | `/admin/v1/tenants` | Tenant configuration summary |
+| `GET` | `/admin/v1/policies` | Active policy rules |
+| `GET` | `/admin/v1/whoami` | Current API key role and tenant |
 | `GET` | `/admin/v1/analytics` | Real-time analytics summary |
-| `GET` | `/admin/v1/alerts` | Recent alerts |
-| `GET` | `/admin/v1/budgets` | Budget statuses |
-| `GET` | `/admin/v1/audit` | Query audit log |
-| `POST` | `/admin/v1/audit/verify` | Verify audit chain integrity |
+| `GET` | `/admin/v1/alerts` | Recent anomaly alerts |
+| `POST` | `/admin/v1/alerts/{id}/acknowledge` | Acknowledge alert |
+| `GET` | `/admin/v1/budgets` | Budget statuses and forecasts |
 | `GET` | `/admin/v1/cost-recommendations` | Cost optimization recommendations |
+| `GET` | `/admin/v1/audit` | Query audit log (filter by actor, action, tenant) |
+| `POST` | `/admin/v1/audit/verify` | Verify audit chain integrity |
 | `POST` | `/admin/v1/graphql` | GraphQL admin API |
 | `GET` | `/admin/v1/approvals` | List pending approvals |
 | `POST` | `/admin/v1/approvals/{id}/approve` | Approve action |
 | `POST` | `/admin/v1/approvals/{id}/deny` | Deny action |
 | `GET` | `/admin/v1/evidence/sessions` | List evidence sessions |
-| `GET` | `/admin/v1/evidence/sessions/{id}/export` | Export session evidence |
-| `POST` | `/admin/v1/evidence/sessions/{id}/verify` | Verify session chain |
+| `GET` | `/admin/v1/evidence/sessions/{id}/export` | Export session evidence (JSON) |
+| `GET` | `/admin/v1/evidence/sessions/{id}/report` | Human-readable Markdown report |
+| `GET` | `/admin/v1/evidence/sessions/{id}/report.html` | HTML evidence report |
+| `POST` | `/admin/v1/evidence/sessions/{id}/verify` | Verify session chain integrity |
+| `GET` | `/admin/v1/credentials` | List active credentials |
+| `POST` | `/admin/v1/credentials/{id}/revoke` | Revoke a credential |
+| `GET` | `/admin/v1/manifests` | List active task manifests |
+| `POST` | `/admin/v1/manifests` | Create task manifest |
+| `GET` | `/admin/v1/manifests/{id}/drift` | Get drift events for manifest |
+| `GET` | `/admin/v1/tickets` | List capability tickets |
+| `GET` | `/admin/v1/sessions/{id}/risk` | Session behavioral risk score |
+| `POST` | `/admin/v1/test-action` | Test policy decision without executing |
+| `POST` | `/admin/v1/simulate` | Simulate policy with full trace |
+| `GET` | `/admin/v1/rollouts` | List canary rollouts |
+| `GET` | `/admin/v1/health/detailed` | Detailed health with provider status |
+| `GET` | `/admin/v1/supply-chain` | Supply chain asset trust status |
 
 ---
 
@@ -485,25 +525,42 @@ AegisFlow/
 ├── internal/
 │   ├── admin/                  # Admin API + GraphQL
 │   ├── analytics/              # Time-series collector + anomaly detection
+│   ├── approval/               # Human-in-the-loop approval queue + Slack/GitHub notifiers
 │   ├── audit/                  # Tamper-evident hash-chain logging
+│   ├── behavioral/             # Session anomaly detection + kill switch
 │   ├── budget/                 # Budget enforcement + forecasting
 │   ├── cache/                  # Response cache + semantic embedding cache
-│   ├── config/                 # YAML configuration
+│   ├── capability/             # HMAC-signed capability tickets
+│   ├── config/                 # YAML configuration with startup validation
 │   ├── costopt/                # Cost optimization engine
+│   ├── credential/             # Task-scoped credential brokers (GitHub, AWS STS, Vault)
 │   ├── envelope/               # ActionEnvelope core type
 │   ├── eval/                   # AI quality evaluation hooks
+│   ├── evidence/               # Hash-linked evidence chain + Markdown/HTML reports
 │   ├── federation/             # Multi-cluster federation
 │   ├── gateway/                # Request handler + transforms + WebSocket
+│   ├── githubgate/             # GitHub API interceptor with risk classification
+│   ├── httpgate/               # HTTP reverse proxy with policy enforcement
+│   ├── identity/               # Org/team/project hierarchy + separation of duties
 │   ├── loadshed/               # Load shedding + priority queues
+│   ├── manifest/               # Task manifests + drift detection + enforcement
+│   ├── mcpgw/                  # MCP JSON-RPC gateway (SSE + direct)
 │   ├── middleware/             # Auth, rate limiting, RBAC, metrics
 │   ├── operator/               # K8s CRD reconciler
 │   ├── policy/                 # Policy engine + WASM plugins
 │   ├── provider/               # Provider adapters (10+)
 │   ├── ratelimit/              # Rate limiter (memory + Redis)
+│   ├── resilience/             # Circuit breaker + health monitoring + backup
+│   ├── resource/               # Typed resource model (repo, table, host, etc.)
 │   ├── rollout/                # Canary rollout manager
 │   ├── router/                 # Model routing + strategies
+│   ├── sandbox/                # Runtime sandboxing (shell, SQL, HTTP, Git)
+│   ├── shellgate/              # Shell command interceptor
+│   ├── sqlgate/                # SQL query interceptor + operation classification
 │   ├── storage/                # PostgreSQL persistence
+│   ├── supply/                 # Supply chain verification + signed policy packs
 │   ├── telemetry/              # OpenTelemetry init
+│   ├── toolpolicy/             # Tool-level policy engine + simulate + diff
 │   ├── usage/                  # Token counting + cost tracking
 │   └── webhook/                # HMAC-signed webhook notifications
 ├── api/v1alpha1/               # K8s CRD types + validation webhooks
@@ -533,9 +590,15 @@ AegisFlow/
 - [x] **Tier 2**: Behavioral session policy, GitHub + Slack approval integrations, enterprise identity + separation of duties, signed policy supply chain
 - [x] **Tier 3**: HA/recovery/retention/backup, threat model + OWASP mapping + security docs
 
+### Runtime Integration
+- [x] **Approval notifications**: Slack + GitHub notifiers fire automatically on submit/approve/deny
+- [x] **Behavioral kill switch**: Sessions auto-blocked when cumulative risk exceeds threshold
+- [x] **Manifest drift enforcement**: Configurable `warn`/`enforce` mode blocks out-of-scope actions
+- [x] **Evidence reports**: Human-readable Markdown and HTML reports for auditors
+
 ### Adoption
 - [x] **Phase 9**: Governed Coding Agent Starter Kit (3 policy packs, editor configs, Docker/Helm/Terraform deploy templates, efficacy tests, evidence examples)
-- [x] **Phase 10 (in progress)**: PR-writer proof page, focused installer, tuned policy pack, design-partner onboarding
+- [x] **Phase 10**: PR-writer proof page, focused installer, tuned policy pack, design-partner onboarding
 
 ---
 
