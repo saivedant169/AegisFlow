@@ -14,6 +14,8 @@ import (
 
 	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
+	"github.com/saivedant169/AegisFlow/internal/behavioral"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
@@ -51,6 +53,7 @@ type Handler struct {
 	modelAliases         map[string]string
 	tenantTransforms     map[string]*TransformConfig // tenant ID -> transform config
 	semanticCache        *cache.SemanticCache
+	behavioralRegistry   *behavioral.Registry
 }
 
 // SetAuditLogger sets the audit logging function on the handler.
@@ -87,6 +90,11 @@ func (h *Handler) SetTenantTransforms(transforms map[string]*TransformConfig) {
 // SetSemanticCache configures the semantic (embedding-based) cache on the handler.
 func (h *Handler) SetSemanticCache(sc *cache.SemanticCache) {
 	h.semanticCache = sc
+}
+
+// SetBehavioralRegistry configures the behavioral analysis registry on the handler.
+func (h *Handler) SetBehavioralRegistry(reg *behavioral.Registry) {
+	h.behavioralRegistry = reg
 }
 
 const (
@@ -151,6 +159,16 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	tenantID := ""
 	if t := middleware.TenantFromContext(r.Context()); t != nil {
 		tenantID = t.ID
+	}
+
+	// Behavioral kill-switch check
+	sessionID := tenantID
+	if h.behavioralRegistry != nil && sessionID != "" {
+		sa := h.behavioralRegistry.GetOrCreate(sessionID)
+		if sa.Blocked() {
+			writeError(w, http.StatusForbidden, "session_blocked", "session blocked by behavioral kill switch — cumulative risk score exceeded threshold")
+			return
+		}
 	}
 
 	// Apply model aliasing
@@ -330,6 +348,19 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 			LatencyMs:    time.Since(startTime).Milliseconds(),
 			BuiltinScore: qualityScore,
 		})
+	}
+
+	// Behavioral analysis: record action and analyze for anomalies
+	if h.behavioralRegistry != nil && sessionID != "" {
+		sa := h.behavioralRegistry.GetOrCreate(sessionID)
+		sa.RecordAction(&envelope.ActionEnvelope{
+			Timestamp: time.Now().UTC(),
+			Tool:      req.Model,
+			Target:    "chat-completion",
+			Protocol:  envelope.ProtocolHTTP,
+			Actor:     envelope.ActorInfo{TenantID: tenantID, SessionID: sessionID},
+		})
+		sa.Analyze()
 	}
 
 	// Record analytics data point

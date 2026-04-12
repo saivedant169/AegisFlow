@@ -20,6 +20,7 @@ import (
 
 	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
+	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/audit"
 	auditpg "github.com/saivedant169/AegisFlow/internal/audit/pgstore"
 	"github.com/saivedant169/AegisFlow/internal/budget"
@@ -251,6 +252,18 @@ func main() {
 		budgetCheckFn = budgetMgr.CheckFunc()
 	}
 
+	// Behavioral analysis engine
+	var behavioralRegistry *behavioral.Registry
+	if cfg.Behavioral.Enabled {
+		behavioralRegistry = behavioral.NewRegistry(
+			behavioral.DefaultRules(),
+			cfg.Behavioral.KillSwitchScore,
+			cfg.Behavioral.WindowMinutes,
+		)
+		log.Printf("[init] behavioral analysis enabled (kill_switch=%d, window=%dm)",
+			cfg.Behavioral.KillSwitchScore, cfg.Behavioral.WindowMinutes)
+	}
+
 	// Request log for live feed
 	reqLog := admin.NewRequestLog(200)
 
@@ -258,6 +271,9 @@ func main() {
 	handler.SetRequestLogger(reqLog, cfg.Federation.ControlPlane.Name)
 	if semanticCache != nil {
 		handler.SetSemanticCache(semanticCache)
+	}
+	if behavioralRegistry != nil {
+		handler.SetBehavioralRegistry(behavioralRegistry)
 	}
 
 	// Eval hooks
@@ -678,6 +694,9 @@ func main() {
 	}
 	if resilienceOpt != nil {
 		adminOpts = append(adminOpts, resilienceOpt)
+	}
+	if behavioralRegistry != nil {
+		adminOpts = append(adminOpts, admin.WithBehavioralProvider(behavioral.NewAdminAdapter(behavioralRegistry)))
 	}
 	adminSvr := admin.NewServer(ut, cfg, registry, reqLog, responseCache, rolloutAdapter, analyticsAdapter, budgetAdapter, auditAdapter, federationProvider, costOptAdapter, nil, approvalAdapter, credentialAdapter, adminOpts...)
 
