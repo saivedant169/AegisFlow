@@ -58,6 +58,11 @@ func newFullAdminServer() *Server {
 		},
 	}
 	srv.evidenceProvider = &stubEvidenceProvider{}
+	srv.analyticsProvider = &stubAnalyticsProvider{}
+	srv.budgetProvider = &stubBudgetProvider{}
+	srv.costOptProvider = &stubCostOptProvider{}
+	srv.credentialProvider = &stubCredentialProvider{}
+	srv.manifestProvider = &stubManifestProvider{}
 	return srv
 }
 
@@ -149,6 +154,59 @@ func (s *stubEvidenceProvider) ListSessions() interface{} {
 	return []map[string]interface{}{
 		{"session_id": "sess-1", "total_actions": 3},
 	}
+}
+
+type stubBudgetProvider struct{}
+
+func (s *stubBudgetProvider) AllStatuses() interface{} {
+	return []map[string]interface{}{{"tenant": "t1", "spent": 42.0}}
+}
+func (s *stubBudgetProvider) ForecastAll() interface{} {
+	return []map[string]interface{}{{"tenant": "t1", "projected": 100.0}}
+}
+
+type stubCostOptProvider struct{}
+
+func (s *stubCostOptProvider) Recommendations() interface{} {
+	return []map[string]interface{}{{"type": "downgrade", "savings": 30.0}}
+}
+
+type stubCredentialProvider struct{}
+
+func (s *stubCredentialProvider) ActiveCredentials() interface{} {
+	return []map[string]interface{}{{"id": "cred-1", "type": "static"}}
+}
+func (s *stubCredentialProvider) RevokeCredential(id string) error {
+	if id == "cred-1" {
+		return nil
+	}
+	return errors.New("not found")
+}
+func (s *stubCredentialProvider) IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error) {
+	return map[string]interface{}{"id": "cred-new"}, nil
+}
+
+type stubManifestProvider struct{}
+
+func (s *stubManifestProvider) Register(m interface{}) error { return nil }
+func (s *stubManifestProvider) Get(id string) (interface{}, error) {
+	if id == "m-1" {
+		return map[string]interface{}{"id": "m-1", "task_id": "task-1"}, nil
+	}
+	return nil, errors.New("not found")
+}
+func (s *stubManifestProvider) List() interface{} {
+	return []map[string]interface{}{{"id": "m-1"}}
+}
+func (s *stubManifestProvider) Deactivate(id string) error {
+	if id == "m-1" {
+		return nil
+	}
+	return errors.New("not found")
+}
+func (s *stubManifestProvider) GetDrift(id string) interface{} { return []interface{}{} }
+func (s *stubManifestProvider) CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{} {
+	return nil
 }
 
 // stubToolPolicyProvider is a simple ToolPolicyProvider for testing.
@@ -635,6 +693,234 @@ func TestRolloutGetEndpoint(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- Rollout operation tests ---
+
+func TestRolloutPauseEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/rollouts/roll-1/pause", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestRolloutResumeEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/rollouts/roll-1/resume", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRolloutRollbackEndpoint(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/rollouts/roll-1/rollback", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAnalyticsEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/analytics", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAnalyticsRealtimeEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/analytics/realtime", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAlertsEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/alerts", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAlertAcknowledgeEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/alerts/a1/acknowledge", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAlertAcknowledgeNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/alerts/nonexistent/acknowledge", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestBudgetsEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/budgets", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestCostRecommendationsEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/cost-recommendations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestCredentialsListEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/credentials", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestCredentialRevokeEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/credentials/cred-1/revoke", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCredentialRevokeNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/credentials/nonexistent/revoke", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestWhoamiEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/whoami", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]string
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["role"] != "operator" {
+		t.Fatalf("expected role=operator, got %s", body["role"])
+	}
+	if body["tenant_id"] != "operator-tenant" {
+		t.Fatalf("expected tenant_id=operator-tenant, got %s", body["tenant_id"])
+	}
+}
+
+func TestManifestListEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/manifests", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestManifestGetEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/manifests/m-1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestManifestGetNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/manifests/nonexistent", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestManifestDriftEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/manifests/m-1/drift", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestManifestDeactivateEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodDelete, "/admin/v1/manifests/m-1", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
