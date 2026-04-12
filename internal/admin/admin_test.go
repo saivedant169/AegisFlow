@@ -63,6 +63,10 @@ func newFullAdminServer() *Server {
 	srv.costOptProvider = &stubCostOptProvider{}
 	srv.credentialProvider = &stubCredentialProvider{}
 	srv.manifestProvider = &stubManifestProvider{}
+	srv.capabilityProvider = &stubCapabilityProvider{}
+	srv.supplyChainProvider = &stubSupplyChainProvider{}
+	srv.behavioralProvider = &stubBehavioralProvider{}
+	srv.resilienceProvider = &stubResilienceProvider{}
 	return srv
 }
 
@@ -207,6 +211,58 @@ func (s *stubManifestProvider) Deactivate(id string) error {
 func (s *stubManifestProvider) GetDrift(id string) interface{} { return []interface{}{} }
 func (s *stubManifestProvider) CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{} {
 	return nil
+}
+
+type stubCapabilityProvider struct{}
+
+func (s *stubCapabilityProvider) ActiveTickets() interface{} {
+	return []map[string]interface{}{{"id": "tkt-1", "subject": "agent-1"}}
+}
+func (s *stubCapabilityProvider) RevokeTicket(id string) error {
+	if id == "tkt-1" {
+		return nil
+	}
+	return errors.New("not found")
+}
+func (s *stubCapabilityProvider) VerifyTicket(id string) (interface{}, error) {
+	if id == "tkt-1" {
+		return map[string]interface{}{"ticket_id": id, "valid": true}, nil
+	}
+	return nil, errors.New("not found")
+}
+
+type stubSupplyChainProvider struct{}
+
+func (s *stubSupplyChainProvider) ListAssets() interface{} {
+	return []map[string]interface{}{{"name": "plugin-1", "trust": "verified"}}
+}
+
+type stubBehavioralProvider struct{}
+
+func (s *stubBehavioralProvider) SessionRisk(sessionID string) (interface{}, error) {
+	if sessionID == "sess-1" {
+		return map[string]interface{}{"session_id": sessionID, "risk_score": 25}, nil
+	}
+	return nil, nil
+}
+func (s *stubBehavioralProvider) ListSessions() interface{} { return []interface{}{} }
+
+type stubResilienceProvider struct{}
+
+func (s *stubResilienceProvider) DetailedHealth() interface{} {
+	return map[string]interface{}{"status": "healthy", "providers": 3}
+}
+func (s *stubResilienceProvider) DegradationModes() interface{} {
+	return []map[string]interface{}{{"mode": "fallback", "active": false}}
+}
+func (s *stubResilienceProvider) CreateBackup() (interface{}, error) {
+	return map[string]interface{}{"id": "backup-1", "created": true}, nil
+}
+func (s *stubResilienceProvider) ListBackups() interface{} {
+	return []map[string]interface{}{{"id": "backup-1"}}
+}
+func (s *stubResilienceProvider) RetentionStats() interface{} {
+	return map[string]interface{}{"audit_log_days": 90}
 }
 
 // stubToolPolicyProvider is a simple ToolPolicyProvider for testing.
@@ -919,6 +975,197 @@ func TestManifestDeactivateEndpoint(t *testing.T) {
 	router := server.Router()
 	req := httptest.NewRequest(http.MethodDelete, "/admin/v1/manifests/m-1", nil)
 	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestManifestCreateEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	payload := []byte(`{"task_id":"task-1","description":"test manifest","allowed_tools":["git.*"],"risk_tier":"low"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/manifests", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestManifestCreateMissingTaskID(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	payload := []byte(`{"description":"no task id"}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/manifests", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestActionWhyEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	RecordActionTrace("act-1", map[string]interface{}{"decision": "allow", "action": "test"})
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/actions/act-1/why", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestActionWhyNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/actions/nonexistent/why", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// --- Capability ticket handlers ---
+
+func TestTicketsListEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/tickets", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestTicketRevokeEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/tickets/tkt-1/revoke", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestTicketVerifyEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/tickets/tkt-1/verify", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestTicketVerifyNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/tickets/nonexistent/verify", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// --- Supply chain ---
+
+func TestSupplyChainEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/supply-chain", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- Behavioral ---
+
+func TestSessionRiskEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/sessions/sess-1/risk", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestSessionRiskNotFound(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/sessions/unknown/risk", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// --- Resilience ---
+
+func TestHealthDetailedEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/health/detailed", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestResilienceDegradationEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/resilience/degradation", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestResilienceBackupCreateEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/resilience/backup", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestResilienceBackupsListEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/resilience/backups", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestResilienceRetentionEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodGet, "/admin/v1/resilience/retention", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
