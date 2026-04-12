@@ -363,6 +363,28 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/></svg>
       Federation
     </div>
+    <div style="border-top:1px solid var(--border); margin:12px 8px;"></div>
+    <div style="padding:0 16px 8px; font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); font-weight:600;">Governance</div>
+    <div class="nav-item" data-page="approvals" onclick="switchPage('approvals')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Approvals
+    </div>
+    <div class="nav-item" data-page="evidence" onclick="switchPage('evidence')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Evidence
+    </div>
+    <div class="nav-item" data-page="behavioral" onclick="switchPage('behavioral')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Behavioral
+    </div>
+    <div class="nav-item" data-page="manifests" onclick="switchPage('manifests')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+      Manifests
+    </div>
+    <div class="nav-item" data-page="policyVersions" onclick="switchPage('policyVersions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Policy Versions
+    </div>
   </div>
   <div class="sidebar-footer">
     <div class="status-row">
@@ -978,6 +1000,186 @@
     </div>
   </div>
 
+  <!-- PAGE: Approvals -->
+  <div class="page" id="page-approvals" style="display:none;">
+    <div class="topbar">
+      <h2>Approvals</h2>
+      <div class="refresh-info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Auto-refresh 3s
+      </div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Pending</div>
+        <div class="stat-value" id="approvalsPendingCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Approved (recent)</div>
+        <div class="stat-value" id="approvalsApprovedCount">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Pending Approvals</span>
+        <span class="table-count" id="approvalsPendingLabel">0 items</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Tool</th><th>Protocol</th><th>Target</th><th>Actor</th><th>Submitted</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="approvalsTable">
+          <tr><td colspan="7" class="empty-state"><p>No pending approvals</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE: Evidence -->
+  <div class="page" id="page-evidence" style="display:none;">
+    <div class="topbar">
+      <h2>Evidence Chain</h2>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-label">Sessions</div>
+        <div class="stat-value" id="evidenceSessionCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Total Actions</div>
+        <div class="stat-value" id="evidenceActionCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Chain Status</div>
+        <div class="stat-value" id="evidenceChainStatus">-</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Sessions</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Session ID</th><th>Actions</th><th>Allowed</th><th>Blocked</th><th>Chain Valid</th><th>Report</th></tr>
+        </thead>
+        <tbody id="evidenceTable">
+          <tr><td colspan="6" class="empty-state"><p>No evidence sessions</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE: Behavioral -->
+  <div class="page" id="page-behavioral" style="display:none;">
+    <div class="topbar">
+      <h2>Behavioral Analysis</h2>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-label">Active Sessions</div>
+        <div class="stat-value" id="behavioralSessionCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">At-Risk Sessions</div>
+        <div class="stat-value" id="behavioralAtRisk">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow" style="background:var(--accent-red);"></div>
+        <div class="stat-label">Blocked Sessions</div>
+        <div class="stat-value" id="behavioralBlocked">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Session Risk Monitor</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Session ID</th><th>Risk Score</th><th>Alerts</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="behavioralTable">
+          <tr><td colspan="5" class="empty-state"><p>No behavioral data</p><div class="hint">Enable behavioral analysis in config</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE: Manifests -->
+  <div class="page" id="page-manifests" style="display:none;">
+    <div class="topbar">
+      <h2>Task Manifests</h2>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-label">Active Manifests</div>
+        <div class="stat-value" id="manifestsCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow orange"></div>
+        <div class="stat-label">Drift Events</div>
+        <div class="stat-value" id="manifestsDriftCount">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Active Manifests</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Task</th><th>Owner</th><th>Risk Tier</th><th>Tools</th><th>Active</th></tr>
+        </thead>
+        <tbody id="manifestsTable">
+          <tr><td colspan="6" class="empty-state"><p>No active manifests</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE: Policy Versions -->
+  <div class="page" id="page-policyVersions" style="display:none;">
+    <div class="topbar">
+      <h2>Policy Versions</h2>
+    </div>
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-card">
+        <div class="stat-glow purple"></div>
+        <div class="stat-label">Current Version</div>
+        <div class="stat-value" id="policyCurrentVersion">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow blue"></div>
+        <div class="stat-label">Total Versions</div>
+        <div class="stat-value" id="policyVersionCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-glow green"></div>
+        <div class="stat-label">Rules (current)</div>
+        <div class="stat-value" id="policyRuleCount">0</div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">Version History</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Version</th><th>Timestamp</th><th>Rules</th><th>Default</th><th>Source</th><th>Action</th></tr>
+        </thead>
+        <tbody id="policyVersionsTable">
+          <tr><td colspan="6" class="empty-state"><p>No policy versions</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div><!-- end main -->
 
 <script>
@@ -1226,6 +1428,11 @@ function switchPage(page) {
   if (page === 'budgets') fetchBudgets();
   if (page === 'audit') fetchAudit();
   if (page === 'federation') fetchFederation();
+  if (page === 'approvals') fetchApprovals();
+  if (page === 'evidence') fetchEvidence();
+  if (page === 'behavioral') fetchBehavioral();
+  if (page === 'manifests') fetchManifests();
+  if (page === 'policyVersions') fetchPolicyVersions();
 }
 
 async function fetchPolicies() {
@@ -2085,6 +2292,191 @@ async function fetchWhoami() {
       }
     }
   } catch (e) {}
+}
+
+// --- Governance: Approvals ---
+async function fetchApprovals() {
+  try {
+    const resp = await fetch('/admin/v1/approvals');
+    const data = await resp.json();
+    const pending = data.pending || data || [];
+    const pendingList = Array.isArray(pending) ? pending : [];
+    document.getElementById('approvalsPendingCount').textContent = pendingList.length;
+    document.getElementById('approvalsPendingLabel').textContent = pendingList.length + ' items';
+
+    const histResp = await fetch('/admin/v1/approvals/history');
+    const histData = await histResp.json();
+    const history = Array.isArray(histData) ? histData : [];
+    document.getElementById('approvalsApprovedCount').textContent = history.filter(h => h.status === 'approved').length;
+
+    const tbody = document.getElementById('approvalsTable');
+    if (pendingList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><p>No pending approvals</p></td></tr>';
+      return;
+    }
+    tbody.innerHTML = pendingList.map(item => {
+      const env = item.envelope || {};
+      const actor = env.actor || {};
+      const ts = item.submitted_at ? new Date(item.submitted_at).toLocaleString() : '-';
+      return `<tr>
+        <td><code>${(item.id || '').substring(0, 8)}...</code></td>
+        <td>${env.tool || '-'}</td>
+        <td><span class="badge">${env.protocol || '-'}</span></td>
+        <td>${env.target || '-'}</td>
+        <td>${actor.id || '-'}</td>
+        <td>${ts}</td>
+        <td>
+          <button onclick="approveItem('${item.id}')" style="background:var(--accent-green);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;margin-right:4px;font-size:12px;">Approve</button>
+          <button onclick="denyItem('${item.id}')" style="background:var(--accent-red);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Deny</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (e) { console.error('fetchApprovals:', e); }
+}
+
+async function approveItem(id) {
+  try {
+    await fetch('/admin/v1/approvals/' + id + '/approve', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({reviewer:'dashboard',comment:'Approved via dashboard'}) });
+    fetchApprovals();
+  } catch (e) { alert('Approve failed: ' + e.message); }
+}
+
+async function denyItem(id) {
+  const reason = prompt('Reason for denial:');
+  if (reason === null) return;
+  try {
+    await fetch('/admin/v1/approvals/' + id + '/deny', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({reviewer:'dashboard',comment:reason}) });
+    fetchApprovals();
+  } catch (e) { alert('Deny failed: ' + e.message); }
+}
+
+// --- Governance: Evidence ---
+async function fetchEvidence() {
+  try {
+    const resp = await fetch('/admin/v1/evidence/sessions');
+    const sessions = await resp.json();
+    const list = Array.isArray(sessions) ? sessions : [];
+    document.getElementById('evidenceSessionCount').textContent = list.length;
+
+    let totalActions = 0;
+    let allValid = true;
+    list.forEach(s => {
+      totalActions += (s.total_actions || 0);
+      if (s.chain_valid === false) allValid = false;
+    });
+    document.getElementById('evidenceActionCount').textContent = totalActions;
+    document.getElementById('evidenceChainStatus').textContent = allValid ? 'Valid' : 'INVALID';
+    document.getElementById('evidenceChainStatus').style.color = allValid ? 'var(--accent-green)' : 'var(--accent-red)';
+
+    const tbody = document.getElementById('evidenceTable');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No evidence sessions</p></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(s => {
+      const valid = s.chain_valid !== false;
+      return `<tr>
+        <td><code>${s.session_id || '-'}</code></td>
+        <td>${s.total_actions || 0}</td>
+        <td>${s.allowed || 0}</td>
+        <td>${s.blocked || 0}</td>
+        <td style="color:${valid ? 'var(--accent-green)' : 'var(--accent-red)'}">${valid ? 'Valid' : 'INVALID'}</td>
+        <td><a href="/admin/v1/evidence/sessions/${s.session_id}/report.html" target="_blank" style="color:var(--accent-blue);text-decoration:none;">View Report</a></td>
+      </tr>`;
+    }).join('');
+  } catch (e) { console.error('fetchEvidence:', e); }
+}
+
+// --- Governance: Behavioral ---
+async function fetchBehavioral() {
+  try {
+    const resp = await fetch('/admin/v1/health/detailed');
+    const health = await resp.json();
+    // Behavioral data comes from individual session risk lookups
+    // For the overview, show what we can from the health endpoint
+    document.getElementById('behavioralSessionCount').textContent = '-';
+    document.getElementById('behavioralAtRisk').textContent = '-';
+    document.getElementById('behavioralBlocked').textContent = '-';
+
+    const tbody = document.getElementById('behavioralTable');
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>Behavioral monitoring active</p><div class="hint">Session risk data appears when agents are connected and running actions</div></td></tr>';
+  } catch (e) { console.error('fetchBehavioral:', e); }
+}
+
+// --- Governance: Manifests ---
+async function fetchManifests() {
+  try {
+    const resp = await fetch('/admin/v1/manifests');
+    const manifests = await resp.json();
+    const list = Array.isArray(manifests) ? manifests : [];
+    document.getElementById('manifestsCount').textContent = list.length;
+    document.getElementById('manifestsDriftCount').textContent = '-';
+
+    const tbody = document.getElementById('manifestsTable');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No active manifests</p></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(m => {
+      const tools = (m.allowed_tools || []).join(', ') || '-';
+      const toolsShort = tools.length > 30 ? tools.substring(0, 27) + '...' : tools;
+      return `<tr>
+        <td><code>${(m.id || '').substring(0, 12)}...</code></td>
+        <td>${m.task_id || '-'}</td>
+        <td>${m.owner || '-'}</td>
+        <td><span class="badge">${m.risk_tier || 'medium'}</span></td>
+        <td>${toolsShort}</td>
+        <td style="color:${m.active ? 'var(--accent-green)' : 'var(--text-muted)'}">${m.active ? 'Yes' : 'No'}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) { console.error('fetchManifests:', e); }
+}
+
+// --- Governance: Policy Versions ---
+async function fetchPolicyVersions() {
+  try {
+    const resp = await fetch('/admin/v1/policy-versions');
+    const versions = await resp.json();
+    const list = Array.isArray(versions) ? versions : [];
+    document.getElementById('policyVersionCount').textContent = list.length;
+
+    if (list.length > 0) {
+      const current = list[list.length - 1];
+      document.getElementById('policyCurrentVersion').textContent = 'v' + current.version;
+      document.getElementById('policyRuleCount').textContent = current.rule_count || 0;
+    }
+
+    const tbody = document.getElementById('policyVersionsTable');
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No policy versions</p></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(v => {
+      const ts = v.timestamp ? new Date(v.timestamp).toLocaleString() : '-';
+      const isCurrent = v.version === list[list.length - 1].version;
+      const sourceColor = v.source === 'rollback' ? 'var(--accent-orange)' : v.source === 'reload' ? 'var(--accent-blue)' : 'var(--text-secondary)';
+      return `<tr>
+        <td><strong>v${v.version}</strong>${isCurrent ? ' <span style="color:var(--accent-green);font-size:11px;">(current)</span>' : ''}</td>
+        <td>${ts}</td>
+        <td>${v.rule_count || 0}</td>
+        <td>${v.default_decision || '-'}</td>
+        <td style="color:${sourceColor}">${v.source || '-'}</td>
+        <td>${!isCurrent ? `<button onclick="rollbackPolicy(${v.version})" style="background:var(--accent-orange);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">Rollback</button>` : '<span style="color:var(--text-muted)">-</span>'}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) { console.error('fetchPolicyVersions:', e); }
+}
+
+async function rollbackPolicy(version) {
+  if (!confirm('Rollback to policy version ' + version + '? This will replace the current rules immediately.')) return;
+  try {
+    const resp = await fetch('/admin/v1/policy-versions/' + version + '/rollback', { method: 'POST' });
+    if (resp.ok) {
+      fetchPolicyVersions();
+    } else {
+      alert('Rollback failed: ' + resp.status);
+    }
+  } catch (e) { alert('Rollback failed: ' + e.message); }
 }
 
 initCharts();
