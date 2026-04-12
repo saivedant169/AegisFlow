@@ -36,11 +36,35 @@ type DriftEvent struct {
 }
 
 // DriftDetector compares actual actions against a declared manifest.
-type DriftDetector struct{}
+type DriftDetector struct {
+	enforcementMode string // "warn" (default) or "enforce"
+}
 
 // NewDriftDetector creates a new DriftDetector.
 func NewDriftDetector() *DriftDetector {
 	return &DriftDetector{}
+}
+
+// SetEnforcementMode sets the enforcement mode ("warn" or "enforce").
+func (d *DriftDetector) SetEnforcementMode(mode string) {
+	d.enforcementMode = mode
+}
+
+// CheckWithEnforcement runs Check and returns whether the action should be blocked.
+// In "enforce" mode, any violation-severity event causes a block.
+func (d *DriftDetector) CheckWithEnforcement(manifest *TaskManifest, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) ([]DriftEvent, bool) {
+	events := d.Check(manifest, env, actionCount, currentBudget)
+	if len(events) == 0 {
+		return events, false
+	}
+	if d.enforcementMode == "enforce" {
+		for _, e := range events {
+			if e.Severity == "violation" {
+				return events, true
+			}
+		}
+	}
+	return events, false
 }
 
 // Check evaluates an action envelope against a manifest and returns any drift events.

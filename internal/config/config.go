@@ -147,6 +147,7 @@ type ManifestConfig struct {
 	Enabled           bool   `yaml:"enabled"`
 	DefaultExpiration string `yaml:"default_expiration"` // e.g., "1h", "24h"
 	DefaultRiskTier   string `yaml:"default_risk_tier"`  // low, medium, high
+	EnforcementMode   string `yaml:"enforcement_mode"`   // "warn" (default) or "enforce"
 }
 
 type CapabilityConfig struct {
@@ -838,6 +839,9 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Manifests.DefaultRiskTier == "" {
 		cfg.Manifests.DefaultRiskTier = "medium"
+	}
+	if cfg.Manifests.EnforcementMode == "" {
+		cfg.Manifests.EnforcementMode = "warn"
 	}
 
 	// Approval integration defaults

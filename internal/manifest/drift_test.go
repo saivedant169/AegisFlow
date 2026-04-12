@@ -228,3 +228,35 @@ func TestGlobMatchingInManifest(t *testing.T) {
 		t.Error("repos/other/whatever should NOT match repos/myorg/*")
 	}
 }
+
+func TestCheckWithEnforcementEnforceBlocks(t *testing.T) {
+	d := NewDriftDetector()
+	d.SetEnforcementMode("enforce")
+	m := makeTestManifest()
+	// "shell.rm" does not match allowed tools "github.*" or "git_push"
+	env := makeTestEnvelope("git", "shell.rm", "repos/myorg/myrepo", envelope.CapRead)
+
+	events, shouldBlock := d.CheckWithEnforcement(m, env, 1, 0.0)
+	if len(events) == 0 {
+		t.Error("expected drift events for disallowed tool")
+	}
+	if !shouldBlock {
+		t.Error("expected shouldBlock == true in enforce mode with violations")
+	}
+}
+
+func TestCheckWithEnforcementWarnDoesNotBlock(t *testing.T) {
+	d := NewDriftDetector()
+	d.SetEnforcementMode("warn")
+	m := makeTestManifest()
+	// "shell.rm" does not match allowed tools "github.*" or "git_push"
+	env := makeTestEnvelope("git", "shell.rm", "repos/myorg/myrepo", envelope.CapRead)
+
+	events, shouldBlock := d.CheckWithEnforcement(m, env, 1, 0.0)
+	if len(events) == 0 {
+		t.Error("expected drift events for disallowed tool")
+	}
+	if shouldBlock {
+		t.Error("expected shouldBlock == false in warn mode")
+	}
+}
