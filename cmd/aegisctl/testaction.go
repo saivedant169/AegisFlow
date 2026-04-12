@@ -97,7 +97,10 @@ func remoteTestAction(adminURL, protocol, tool, target, capability string, param
 		"capability": capability,
 		"params":     params,
 	}
-	data, _ := json.Marshal(body)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encoding request: %w", err)
+	}
 
 	resp, err := client.Post(adminURL+"/admin/v1/test-action", "application/json", bytes.NewReader(data))
 	if err != nil {

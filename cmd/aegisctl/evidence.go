@@ -16,7 +16,11 @@ func cmdEvidenceSessions(adminURL string) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		os.Exit(1)
+	}
 	if resp.StatusCode != 200 {
 		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
 		os.Exit(1)
@@ -67,7 +71,11 @@ func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		os.Exit(1)
+	}
 	if resp.StatusCode != 200 {
 		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
 		os.Exit(1)
@@ -80,7 +88,11 @@ func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
 		os.Exit(1)
 	}
 
-	formatted, _ := json.MarshalIndent(pretty, "", "  ")
+	formatted, err := json.MarshalIndent(pretty, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting JSON: %v\n", err)
+		os.Exit(1)
+	}
 
 	if outputFile != "" {
 		if err := os.WriteFile(outputFile, formatted, 0644); err != nil {

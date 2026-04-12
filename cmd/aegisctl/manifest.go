@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -89,7 +88,11 @@ func cmdManifestCreate(adminURL string, args []string) {
 		body["allowed_verbs"] = strings.Split(verbs, ",")
 	}
 
-	data, _ := json.Marshal(body)
+	data, err := marshalJSON(body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 	resp, err := client.Post(adminURL+"/admin/v1/manifests", "application/json", bytes.NewReader(data))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -97,14 +100,17 @@ func cmdManifestCreate(adminURL string, args []string) {
 	}
 	defer resp.Body.Close()
 
-	respData, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 201 {
+		respData, _ := io.ReadAll(resp.Body)
 		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(respData))
 		os.Exit(1)
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(respData, &result)
+	if err := decodeJSON(resp, &result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Printf("Manifest created:\n")
 	fmt.Printf("  ID:        %v\n", result["id"])
@@ -123,7 +129,10 @@ func cmdManifestList(adminURL string) {
 	defer resp.Body.Close()
 
 	var manifests []map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&manifests)
+	if err := decodeJSON(resp, &manifests); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	if len(manifests) == 0 {
 		fmt.Println("No active manifests.")
@@ -157,7 +166,10 @@ func cmdManifestDrift(adminURL string, id string) {
 	defer resp.Body.Close()
 
 	var events []map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&events)
+	if err := decodeJSON(resp, &events); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	if len(events) == 0 {
 		fmt.Println("No drift events recorded.")

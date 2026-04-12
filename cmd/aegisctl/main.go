@@ -2,9 +2,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -299,7 +297,10 @@ func cmdModels(gatewayURL string) {
 			Provider string `json:"provider"`
 		} `json:"data"`
 	}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := decodeJSON(resp, &result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "MODEL\tPROVIDER")
@@ -325,7 +326,10 @@ func cmdProviders(adminURL string) {
 		Healthy bool     `json:"healthy"`
 		Models  []string `json:"models"`
 	}
-	json.NewDecoder(resp.Body).Decode(&providers)
+	if err := decodeJSON(resp, &providers); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tHEALTH\tMODELS")
@@ -364,7 +368,10 @@ func cmdPolicies(adminURL string) {
 		Keywords []string `json:"keywords"`
 		Patterns []string `json:"patterns"`
 	}
-	json.NewDecoder(resp.Body).Decode(&policies)
+	if err := decodeJSON(resp, &policies); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tTYPE\tPHASE\tACTION\tRULES")
@@ -398,7 +405,10 @@ func cmdTenants(adminURL string) {
 		RequestsPerMinute int    `json:"requests_per_minute"`
 		TokensPerMinute   int    `json:"tokens_per_minute"`
 	}
-	json.NewDecoder(resp.Body).Decode(&tenants)
+	if err := decodeJSON(resp, &tenants); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tNAME\tKEYS\tREQ/MIN\tTOK/MIN")
@@ -439,7 +449,10 @@ func cmdTest(gatewayURL, apiKey, model, message string) {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := decodeJSON(resp, &result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	if resp.StatusCode != 200 {
 		errMsg := "unknown error"
@@ -473,9 +486,11 @@ func fetchJSON(url string) interface{} {
 	}
 	defer resp.Body.Close()
 
-	data, _ := io.ReadAll(resp.Body)
 	var result interface{}
-	json.Unmarshal(data, &result)
+	if err := decodeJSON(resp, &result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return nil
+	}
 	return result
 }
 
@@ -512,7 +527,10 @@ func cmdPending(adminURL string) {
 	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := decodeJSON(resp, &result); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	pending, _ := result["pending"].([]interface{})
 	if len(pending) == 0 {
@@ -532,7 +550,7 @@ func cmdPending(adminURL string) {
 }
 
 func cmdApprove(adminURL, id, comment string) {
-	body, _ := json.Marshal(map[string]string{"reviewer": "aegisctl", "comment": comment})
+	body, _ := marshalJSON(map[string]string{"reviewer": "aegisctl", "comment": comment})
 	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/approve", "application/json", bytes.NewReader(body))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -541,15 +559,18 @@ func cmdApprove(adminURL, id, comment string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		var result map[string]string
-		json.NewDecoder(resp.Body).Decode(&result)
-		fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		if err := decodeJSON(resp, &result); err != nil {
+			fmt.Fprintf(os.Stderr, "Error (%d): could not decode error response: %v\n", resp.StatusCode, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		}
 		os.Exit(1)
 	}
 	fmt.Printf("Approved: %s\n", id)
 }
 
 func cmdDeny(adminURL, id, comment string) {
-	body, _ := json.Marshal(map[string]string{"reviewer": "aegisctl", "comment": comment})
+	body, _ := marshalJSON(map[string]string{"reviewer": "aegisctl", "comment": comment})
 	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/deny", "application/json", bytes.NewReader(body))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -558,8 +579,11 @@ func cmdDeny(adminURL, id, comment string) {
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		var result map[string]string
-		json.NewDecoder(resp.Body).Decode(&result)
-		fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		if err := decodeJSON(resp, &result); err != nil {
+			fmt.Fprintf(os.Stderr, "Error (%d): could not decode error response: %v\n", resp.StatusCode, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "Failed: %s\n", result["error"])
+		}
 		os.Exit(1)
 	}
 	fmt.Printf("Denied: %s\n", id)

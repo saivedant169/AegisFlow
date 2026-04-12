@@ -115,7 +115,11 @@ func cmdSupplyChainSign(args []string) {
 	}
 
 	sigFile := filePath + ".sig"
-	sigData, _ := json.MarshalIndent(bundle, "", "  ")
+	sigData, err := json.MarshalIndent(bundle, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding signature: %v\n", err)
+		os.Exit(1)
+	}
 	if err := os.WriteFile(sigFile, sigData, 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing signature: %v\n", err)
 		os.Exit(1)

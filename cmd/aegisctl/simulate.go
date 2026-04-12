@@ -73,7 +73,10 @@ func remoteSimulate(adminURL, protocol, tool, target, capability string) (*simul
 		"target":     target,
 		"capability": capability,
 	}
-	data, _ := json.Marshal(body)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encoding request: %w", err)
+	}
 
 	resp, err := client.Post(adminURL+"/admin/v1/simulate", "application/json", bytes.NewReader(data))
 	if err != nil {
@@ -192,8 +195,12 @@ func cmdWhy(adminURL string, args []string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error (%d): could not read response body\n", resp.StatusCode)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		}
 		os.Exit(1)
 	}
 
