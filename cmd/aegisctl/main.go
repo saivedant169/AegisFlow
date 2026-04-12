@@ -231,17 +231,131 @@ Environment:
 
 func cmdStatus(gatewayURL, adminURL string) {
 	fmt.Println("AegisFlow Status")
-	fmt.Println("─────────────────")
+	fmt.Println("════════════════════════════════════════════════════")
 
+	// Health
 	gwOK := checkHealth(gatewayURL + "/health")
-	fmt.Printf("  Gateway  (%s):  %s\n", gatewayURL, statusIcon(gwOK))
-
 	adOK := checkHealth(adminURL + "/health")
-	fmt.Printf("  Admin    (%s):  %s\n", adminURL, statusIcon(adOK))
+	fmt.Printf("  Gateway:  %s  (%s)\n", statusIcon(gwOK), gatewayURL)
+	fmt.Printf("  Admin:    %s  (%s)\n", statusIcon(adOK), adminURL)
 
-	if !gwOK || !adOK {
+	if !adOK {
+		fmt.Println("\nAdmin API unreachable — cannot fetch detailed status.")
 		os.Exit(1)
 	}
+
+	// Providers
+	fmt.Println("\nProviders")
+	fmt.Println("────────────────────────────────────────────────────")
+	providers := fetchJSON(adminURL + "/admin/v1/providers")
+	if provList, ok := providers.([]interface{}); ok && len(provList) > 0 {
+		for _, p := range provList {
+			prov, ok := p.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			health := "unhealthy"
+			if h, ok := prov["healthy"].(bool); ok && h {
+				health = "healthy"
+			}
+			enabled := "disabled"
+			if e, ok := prov["enabled"].(bool); ok && e {
+				enabled = "enabled"
+			}
+			fmt.Printf("  %-20s %s / %s\n", prov["name"], enabled, health)
+		}
+	} else {
+		fmt.Println("  (none configured)")
+	}
+
+	// Pending approvals
+	fmt.Println("\nApprovals")
+	fmt.Println("────────────────────────────────────────────────────")
+	approvals := fetchJSON(adminURL + "/admin/v1/approvals")
+	pendingCount := 0
+	if appData, ok := approvals.(map[string]interface{}); ok {
+		if pending, ok := appData["pending"].([]interface{}); ok {
+			pendingCount = len(pending)
+		}
+	} else if appList, ok := approvals.([]interface{}); ok {
+		pendingCount = len(appList)
+	}
+	if pendingCount > 0 {
+		fmt.Printf("  %d pending (run: aegisctl pending)\n", pendingCount)
+	} else {
+		fmt.Println("  No pending approvals")
+	}
+
+	// Evidence sessions
+	fmt.Println("\nEvidence")
+	fmt.Println("────────────────────────────────────────────────────")
+	sessions := fetchJSON(adminURL + "/admin/v1/evidence/sessions")
+	if sessList, ok := sessions.([]interface{}); ok && len(sessList) > 0 {
+		fmt.Printf("  %d active session(s)\n", len(sessList))
+		for _, s := range sessList {
+			sess, ok := s.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			valid := "valid"
+			if v, ok := sess["chain_valid"].(bool); ok && !v {
+				valid = "INVALID"
+			}
+			fmt.Printf("    %s  actions=%.0f  chain=%s\n",
+				sess["session_id"], toFloat(sess["total_actions"]), valid)
+		}
+	} else {
+		fmt.Println("  No active sessions")
+	}
+
+	// Budget summary
+	fmt.Println("\nBudgets")
+	fmt.Println("────────────────────────────────────────────────────")
+	budgets := fetchJSON(adminURL + "/admin/v1/budgets")
+	if budgetData, ok := budgets.(map[string]interface{}); ok {
+		if statuses, ok := budgetData["statuses"].([]interface{}); ok && len(statuses) > 0 {
+			for _, st := range statuses {
+				s, ok := st.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				fmt.Printf("  %-20s spent=$%.2f  limit=$%.2f\n",
+					s["tenant_id"], toFloat(s["spent"]), toFloat(s["limit"]))
+			}
+		} else {
+			fmt.Println("  No budget data")
+		}
+	} else {
+		fmt.Println("  Budget tracking not enabled")
+	}
+
+	// Recent violations
+	fmt.Println("\nRecent Violations")
+	fmt.Println("────────────────────────────────────────────────────")
+	violations := fetchJSON(adminURL + "/admin/v1/violations")
+	if violList, ok := violations.([]interface{}); ok && len(violList) > 0 {
+		shown := len(violList)
+		if shown > 5 {
+			shown = 5
+		}
+		fmt.Printf("  %d total (showing last %d)\n", len(violList), shown)
+		for i := 0; i < shown; i++ {
+			v, ok := violList[i].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			fmt.Printf("    [%s] %s — %s\n", v["policy_name"], v["tenant_id"], v["action"])
+		}
+	} else {
+		fmt.Println("  No recent violations")
+	}
+
+	fmt.Println("\n════════════════════════════════════════════════════")
+	if !gwOK {
+		fmt.Println("WARNING: Gateway is DOWN")
+		os.Exit(1)
+	}
+	fmt.Println("All systems operational.")
 }
 
 func cmdUsage(adminURL string) {
