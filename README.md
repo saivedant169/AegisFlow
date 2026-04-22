@@ -150,7 +150,7 @@ docker compose -f deployments/docker-compose.yaml up
 ### Option 2: Run locally
 
 ```bash
-# Install Go 1.24+
+# Install Go 1.26.2+
 brew install go
 
 # Clone and build
@@ -571,6 +571,12 @@ AegisFlow/
 ├── examples/                   # WASM plugin SDK + examples
 └── .github/workflows/          # CI/CD pipelines
 ```
+
+---
+
+## Production Readiness
+
+Before exposing AegisFlow outside a local demo, review the [production checklist](docs/production-checklist.md). It covers secret-backed tenant keys, admin service exposure, health checks, observability, and release gates.
 
 ---
 

@@ -44,7 +44,7 @@ fi
 
 if [ "$HAS_DOCKER" = false ] && [ "$HAS_GO" = false ]; then
     echo ""
-    echo -e "${RED}Error: Need either Docker or Go 1.24+ installed.${NC}"
+    echo -e "${RED}Error: Need either Docker or Go 1.26.2+ installed.${NC}"
     echo "  Install Docker: https://docs.docker.com/get-docker/"
     echo "  Install Go:     https://go.dev/dl/"
     exit 1
