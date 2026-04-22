@@ -207,7 +207,7 @@ func main() {
 	case "help", "--help", "-h":
 		printUsage()
 	case "version":
-		fmt.Println("aegisctl v0.1.0")
+		fmt.Println("aegisctl v0.7.0")
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
 		printUsage()

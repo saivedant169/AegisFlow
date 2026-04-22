@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: AegisFlow API
   description: AI Gateway + Policy + Observability Control Plane
-  version: 0.4.0
+  version: 0.7.0
   license:
     name: Apache 2.0
 

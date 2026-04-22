@@ -54,7 +54,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
-const version = "v0.6.0"
+const version = "v0.7.0"
 const defaultConfigFile = "configs/aegisflow.yaml"
 
 var totalRequests uint64

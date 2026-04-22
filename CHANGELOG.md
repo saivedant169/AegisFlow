@@ -4,6 +4,35 @@ All notable changes to AegisFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while it is pre-1.0.
 
+## [0.7.0] - 2026-04-22
+
+This release focuses on production readiness: safer deployment defaults, stronger validation, release hygiene, and automated checks that make the runtime easier to operate with confidence.
+
+### Added
+
+- Docker Compose smoke test covering gateway health, admin health, a successful chat completion, and a policy-blocked request.
+- CI smoke job that runs the local production-style Docker Compose check.
+- CI vulnerability scan using `govulncheck`.
+- `make smoke` and `make vuln` targets for local production checks.
+- Production readiness checklist for operators.
+- Support for loading tenant API keys from environment-backed secrets with `key_env`.
+- Helm values and templates for secret-backed tenant API keys.
+- More admin and CLI coverage around invalid JSON, policy rollback, and startup config loading.
+
+### Changed
+
+- Go toolchain requirement updated to 1.26.2.
+- Docker builder image updated to `golang:1.26.2-alpine`.
+- Docker image now starts the built `aegisflow` binary directly.
+- Helm deployment now uses configured service ports and sets `AEGISFLOW_CONFIG`.
+- Release metadata aligned across CLI, dashboard, MCP gateway, OpenAPI, and Helm charts.
+
+### Fixed
+
+- Startup config validation now catches duplicate, empty, and conflicting tenant API key entries.
+- Docker build context now excludes local development and generated files through `.dockerignore`.
+- Go formatting is now enforced in CI.
+
 ## [0.6.0] - 2026-04-12
 
 This release wires up previously disconnected subsystems, hardens error handling and test coverage, and adds policy versioning — the ability to track, diff, and rollback policy changes at runtime.
