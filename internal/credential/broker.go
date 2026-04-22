@@ -8,11 +8,11 @@ import (
 // Credential represents a short-lived, task-scoped credential issued by a broker.
 type Credential struct {
 	ID        string    `json:"id"`
-	Type      string    `json:"type"`       // "github_app", "aws_sts", "vault", "static"
-	Token     string    `json:"token"`      // the actual credential value
+	Type      string    `json:"type"`  // "github_app", "aws_sts", "vault", "static"
+	Token     string    `json:"token"` // the actual credential value
 	ExpiresAt time.Time `json:"expires_at"`
-	Scope     string    `json:"scope"`      // what this credential can access
-	TaskID    string    `json:"task_id"`    // which task/session this was issued for
+	Scope     string    `json:"scope"`   // what this credential can access
+	TaskID    string    `json:"task_id"` // which task/session this was issued for
 	IssuedAt  time.Time `json:"issued_at"`
 }
 

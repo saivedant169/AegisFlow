@@ -10,14 +10,14 @@ import (
 // SessionAnalyzer tracks action history per session and runs behavioral
 // detection rules over action sequences to detect risky patterns.
 type SessionAnalyzer struct {
-	mu             sync.RWMutex
-	sessionID      string
-	history        []envelope.ActionEnvelope
-	alerts         []BehaviorAlert
-	rules          []Rule
+	mu              sync.RWMutex
+	sessionID       string
+	history         []envelope.ActionEnvelope
+	alerts          []BehaviorAlert
+	rules           []Rule
 	killSwitchScore int
-	windowMinutes  int
-	blocked        bool
+	windowMinutes   int
+	blocked         bool
 }
 
 // NewSessionAnalyzer creates a new analyzer for a given session.

@@ -22,14 +22,14 @@ import (
 
 // GitHubAppBroker issues short-lived installation access tokens via the GitHub App API.
 type GitHubAppBroker struct {
-	name          string
-	appID         int64
-	keyPath       string
-	installID     int64
-	defaultTTL    time.Duration
-	client        *http.Client
-	baseURL       string // defaults to "https://api.github.com"; override for testing
-	jwtFn         func() (string, error) // produces a JWT; injectable for testing
+	name       string
+	appID      int64
+	keyPath    string
+	installID  int64
+	defaultTTL time.Duration
+	client     *http.Client
+	baseURL    string                 // defaults to "https://api.github.com"; override for testing
+	jwtFn      func() (string, error) // produces a JWT; injectable for testing
 
 	mu      sync.Mutex
 	revoked map[string]bool
@@ -277,4 +277,3 @@ func splitJWT(token string) []string {
 	}
 	return parts
 }
-

@@ -13,26 +13,26 @@ import (
 
 // ActionEnvelope normalizes every agent action into a policy-evaluable object.
 type ActionEnvelope struct {
-	ID                  string         `json:"id"`
-	Timestamp           time.Time      `json:"timestamp"`
-	Actor               ActorInfo      `json:"actor"`
-	Task                string         `json:"task"`
-	Protocol            Protocol       `json:"protocol"`
-	Tool                string         `json:"tool"`
-	Target              string         `json:"target"`
-	Parameters          map[string]any `json:"parameters"`
-	RequestedCapability Capability     `json:"requested_capability"`
+	ID                  string             `json:"id"`
+	Timestamp           time.Time          `json:"timestamp"`
+	Actor               ActorInfo          `json:"actor"`
+	Task                string             `json:"task"`
+	Protocol            Protocol           `json:"protocol"`
+	Tool                string             `json:"tool"`
+	Target              string             `json:"target"`
+	Parameters          map[string]any     `json:"parameters"`
+	RequestedCapability Capability         `json:"requested_capability"`
 	Resource            *resource.Resource `json:"resource,omitempty"`
 	CredentialRef       string             `json:"credential_ref,omitempty"`
 	PolicyDecision      Decision           `json:"policy_decision"`
-	EvidenceHash        string         `json:"evidence_hash,omitempty"`
-	Justification       string         `json:"justification,omitempty"`
-	Result              *ActionResult  `json:"result,omitempty"`
+	EvidenceHash        string             `json:"evidence_hash,omitempty"`
+	Justification       string             `json:"justification,omitempty"`
+	Result              *ActionResult      `json:"result,omitempty"`
 }
 
 // ActorInfo identifies the entity performing the action.
 type ActorInfo struct {
-	Type      string `json:"type"`       // "user", "agent", "service"
+	Type      string `json:"type"` // "user", "agent", "service"
 	ID        string `json:"id"`
 	SessionID string `json:"session_id"`
 	TenantID  string `json:"tenant_id"`

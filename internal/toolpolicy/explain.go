@@ -10,7 +10,7 @@ import (
 type PolicyDecisionTrace struct {
 	Decision     string          `json:"decision"`
 	MatchedRule  *ToolRule       `json:"matched_rule,omitempty"`
-	MatchedIndex int             `json:"matched_index"`  // -1 if default
+	MatchedIndex int             `json:"matched_index"` // -1 if default
 	RulesChecked int             `json:"rules_checked"`
 	DefaultUsed  bool            `json:"default_used"`
 	CheckTrace   []RuleCheckStep `json:"check_trace"`

@@ -21,12 +21,15 @@ spec:
         - name: aegisflow
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: AEGISFLOW_CONFIG
+              value: /etc/aegisflow/aegisflow.yaml
           ports:
             - name: gateway
-              containerPort: 8080
+              containerPort: {{ .Values.service.gateway.port }}
               protocol: TCP
             - name: admin
-              containerPort: 8081
+              containerPort: {{ .Values.service.admin.port }}
               protocol: TCP
           livenessProbe:
             httpGet:

@@ -7,8 +7,8 @@ import (
 )
 
 type SpendScope struct {
-	Scope   string  // "global", "tenant", "tenant_model"
-	ScopeID string  // "global", "premium", "premium:gpt-4o"
+	Scope   string // "global", "tenant", "tenant_model"
+	ScopeID string // "global", "premium", "premium:gpt-4o"
 	Limit   float64
 	AlertAt int // percentage
 	WarnAt  int // percentage

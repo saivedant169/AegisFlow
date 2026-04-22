@@ -8,7 +8,7 @@ import (
 // ComponentHealth represents the health status of a single system component.
 type ComponentHealth struct {
 	Name      string    `json:"name"`
-	Status    string    `json:"status"`    // healthy, degraded, unhealthy
+	Status    string    `json:"status"` // healthy, degraded, unhealthy
 	LastCheck time.Time `json:"last_check"`
 	Message   string    `json:"message,omitempty"`
 	SafeMode  string    `json:"safe_mode"` // what happens when this component fails

@@ -133,8 +133,8 @@ func TestSemanticCacheStats(t *testing.T) {
 	sc := NewSemanticCache(newTestEmbedder(), 0.85, 100)
 
 	sc.SetSemantic("t1", makeReq("hello"), makeResp("world"))
-	sc.GetSemantic("t1", makeReq("hello"))     // hit
-	sc.GetSemantic("t1", makeReq("goodbye"))    // miss
+	sc.GetSemantic("t1", makeReq("hello"))   // hit
+	sc.GetSemantic("t1", makeReq("goodbye")) // miss
 
 	stats := sc.Stats()
 	if stats.Hits != 1 {

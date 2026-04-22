@@ -7,16 +7,16 @@ import (
 )
 
 type AuditEntry struct {
-	ID          int64     `json:"id"`
-	TenantID    string    `json:"tenant_id"`
-	Model       string    `json:"model"`
-	RequestBody string    `json:"request_body"`
-	ResponseBody string   `json:"response_body"`
-	StatusCode  int       `json:"status_code"`
-	LatencyMs   int64     `json:"latency_ms"`
-	PolicyAction string   `json:"policy_action"`
-	Cached      bool      `json:"cached"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	TenantID     string    `json:"tenant_id"`
+	Model        string    `json:"model"`
+	RequestBody  string    `json:"request_body"`
+	ResponseBody string    `json:"response_body"`
+	StatusCode   int       `json:"status_code"`
+	LatencyMs    int64     `json:"latency_ms"`
+	PolicyAction string    `json:"policy_action"`
+	Cached       bool      `json:"cached"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (s *PostgresStore) MigrateAudit() error {

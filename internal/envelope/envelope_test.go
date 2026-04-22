@@ -86,7 +86,7 @@ func TestHashChangesWhenContentChanges(t *testing.T) {
 
 func TestIsDestructive(t *testing.T) {
 	tests := []struct {
-		cap        Capability
+		cap         Capability
 		destructive bool
 	}{
 		{CapRead, false},

@@ -36,9 +36,9 @@ type Config struct {
 
 // Shedder manages admission control with priority-based load shedding.
 type Shedder struct {
-	cfg       Config
-	inflight  atomic.Int64
-	queue     chan struct{} // buffered channel used as a semaphore for queued slots
+	cfg      Config
+	inflight atomic.Int64
+	queue    chan struct{} // buffered channel used as a semaphore for queued slots
 }
 
 // New creates a new Shedder with the given configuration.

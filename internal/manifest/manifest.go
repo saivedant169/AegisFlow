@@ -10,9 +10,9 @@ import (
 // TaskManifest declares what an agent session intends to do.
 type TaskManifest struct {
 	ID               string    `json:"id"`
-	TaskID           string    `json:"task_id"`           // ticket/issue/runbook reference
+	TaskID           string    `json:"task_id"` // ticket/issue/runbook reference
 	Description      string    `json:"description"`
-	Owner            string    `json:"owner"`             // human sponsor
+	Owner            string    `json:"owner"` // human sponsor
 	CreatedAt        time.Time `json:"created_at"`
 	ExpiresAt        time.Time `json:"expires_at"`
 	AllowedTools     []string  `json:"allowed_tools"`     // glob patterns

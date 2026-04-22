@@ -5,12 +5,12 @@ import (
 )
 
 var costPerMillionTokens = map[string]float64{
-	"gpt-4o":                    5.0,
-	"gpt-4o-mini":               0.15,
-	"claude-sonnet-4-20250514":  3.0,
-	"llama3":                    0.0,
-	"mock":                      0.0,
-	"mock-fast":                 0.0,
+	"gpt-4o":                   5.0,
+	"gpt-4o-mini":              0.15,
+	"claude-sonnet-4-20250514": 3.0,
+	"llama3":                   0.0,
+	"mock":                     0.0,
+	"mock-fast":                0.0,
 }
 
 type Tracker struct {

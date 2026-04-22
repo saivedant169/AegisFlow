@@ -18,7 +18,7 @@ type SignedBundle struct {
 	Signature   string    `json:"signature"`    // HMAC-SHA256 of metadata+content_hash
 	SignedAt    time.Time `json:"signed_at"`
 	SignedBy    string    `json:"signed_by"`
-	TrustTier  string    `json:"trust_tier"` // "verified", "community", "unverified"
+	TrustTier   string    `json:"trust_tier"` // "verified", "community", "unverified"
 }
 
 // Signer creates and verifies HMAC-SHA256 signatures for extension bundles.
@@ -57,7 +57,7 @@ func (s *Signer) Sign(name, version, bundleType string, content []byte) (*Signed
 		Signature:   sig,
 		SignedAt:    time.Now().UTC(),
 		SignedBy:    "aegisflow-signer",
-		TrustTier:  "verified",
+		TrustTier:   "verified",
 	}, nil
 }
 

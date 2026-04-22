@@ -240,4 +240,3 @@ func SetupWebhooksWithManager(scheme *runtime.Scheme, webhookServer WebhookRegis
 type WebhookRegistrar interface {
 	Register(path string, hook http.Handler)
 }
-

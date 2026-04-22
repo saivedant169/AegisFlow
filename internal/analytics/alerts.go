@@ -10,12 +10,12 @@ import (
 
 type AlertManager struct {
 	mu             sync.RWMutex
-	active         map[string]*Alert  // keyed by dimension+metric
-	history        []*Alert           // resolved alerts
+	active         map[string]*Alert // keyed by dimension+metric
+	history        []*Alert          // resolved alerts
 	maxHistory     int
 	webhook        *webhook.Notifier
-	normalCounters map[string]int     // consecutive normal evaluations per dimension+metric
-	resolveAfter   int                // consecutive normal evals before auto-resolve
+	normalCounters map[string]int // consecutive normal evaluations per dimension+metric
+	resolveAfter   int            // consecutive normal evals before auto-resolve
 }
 
 func NewAlertManager(wh *webhook.Notifier) *AlertManager {

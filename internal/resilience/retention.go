@@ -38,7 +38,7 @@ type RetentionStats struct {
 // timestampedRecord is a generic record with a timestamp for retention
 // tracking in the in-memory store.
 type timestampedRecord struct {
-	Category  string    // "audit", "evidence", "approval"
+	Category  string // "audit", "evidence", "approval"
 	CreatedAt time.Time
 }
 
