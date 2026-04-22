@@ -9,7 +9,7 @@
 - Verify the evidence chain
 
 ## Prerequisites
-- Go 1.24+
+- Go 1.26.2+
 - Node.js
 - `jq` and `curl`
 - Claude Code (or any MCP-compatible agent)

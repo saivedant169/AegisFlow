@@ -145,6 +145,50 @@ tenants:
 `, "must be one of viewer, operator, admin")
 }
 
+func TestValidateTenantAPIKeyEnv(t *testing.T) {
+	t.Setenv("AEGISFLOW_TEST_TENANT_KEY", "env-key-a")
+
+	cfg, err := loadFromYAML(t, `
+tenants:
+  - id: "t1"
+    name: "Env Key"
+    api_keys:
+      - key_env: "AEGISFLOW_TEST_TENANT_KEY"
+        role: "operator"
+`)
+	if err != nil {
+		t.Fatalf("expected config with key_env to load, got: %v", err)
+	}
+	if match := cfg.FindTenantByAPIKey("env-key-a"); match == nil || match.Tenant.ID != "t1" {
+		t.Fatalf("expected key_env value to authenticate tenant t1, got %+v", match)
+	}
+}
+
+func TestValidateTenantAPIKeyEnvMissing(t *testing.T) {
+	expectValidationError(t, `
+tenants:
+  - id: "t1"
+    name: "Missing Env Key"
+    api_keys:
+      - key_env: "AEGISFLOW_TEST_MISSING_TENANT_KEY"
+        role: "operator"
+`, "environment variable")
+}
+
+func TestValidateTenantAPIKeyAndEnvAreExclusive(t *testing.T) {
+	t.Setenv("AEGISFLOW_TEST_TENANT_KEY", "env-key-a")
+
+	expectValidationError(t, `
+tenants:
+  - id: "t1"
+    name: "Ambiguous Key"
+    api_keys:
+      - key: "literal-key"
+        key_env: "AEGISFLOW_TEST_TENANT_KEY"
+        role: "operator"
+`, "specify either key or key_env")
+}
+
 func TestValidateDuplicateTenantIDs(t *testing.T) {
 	expectValidationError(t, `
 tenants:

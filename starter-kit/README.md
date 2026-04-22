@@ -16,7 +16,7 @@ This starter kit gets you from zero to governed agents in 15 minutes.
 
 You need one of:
 - **Docker** (recommended) -- Docker 20.10+ and Docker Compose v2
-- **Go 1.24+** -- if you want to build from source
+- **Go 1.26.2+** -- if you want to build from source
 - **Node.js 18+** -- only if you want to run the mock MCP server for testing
 
 ## 15-Minute Quickstart

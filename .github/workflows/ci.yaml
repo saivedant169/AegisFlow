@@ -28,6 +28,9 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
       - name: Test
         run: go test ./... -v -race -count=1 -coverprofile=coverage.out -covermode=atomic
 
@@ -37,3 +40,11 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Compose smoke test
+        run: bash scripts/compose_smoke.sh

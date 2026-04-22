@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -277,6 +278,30 @@ func (s *stubResilienceProvider) RetentionStats() interface{} {
 	return map[string]interface{}{"audit_log_days": 90}
 }
 
+type stubPolicyVersionProvider struct {
+	rolledBackTo int
+}
+
+func (s *stubPolicyVersionProvider) ListVersions() interface{} {
+	return []map[string]interface{}{{"version": 1}}
+}
+func (s *stubPolicyVersionProvider) GetVersion(version int) (interface{}, error) {
+	if version == 1 {
+		return map[string]interface{}{"version": version}, nil
+	}
+	return nil, errors.New("not found")
+}
+func (s *stubPolicyVersionProvider) CurrentVersion() interface{} {
+	return map[string]interface{}{"version": 1}
+}
+func (s *stubPolicyVersionProvider) Rollback(version int) error {
+	if version != 1 {
+		return errors.New("not found")
+	}
+	s.rolledBackTo = version
+	return nil
+}
+
 // stubToolPolicyProvider is a simple ToolPolicyProvider for testing.
 type stubToolPolicyProvider struct {
 	decision string
@@ -383,6 +408,24 @@ func TestHandleTestAction_MissingFields(t *testing.T) {
 	}
 }
 
+func TestHandleTestActionInvalidJSON(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader([]byte(`{`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid JSON") {
+		t.Fatalf("expected invalid JSON message, got %s", w.Body.String())
+	}
+}
+
 func TestAdminRBACIntegration(t *testing.T) {
 	server := newIntegrationAdminServer()
 	router := server.Router()
@@ -445,6 +488,45 @@ func TestAdminRBACIntegration(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 	})
+}
+
+func TestRolloutsCreateInvalidJSON(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/rollouts", bytes.NewReader([]byte(`{`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid JSON") {
+		t.Fatalf("expected invalid JSON message, got %s", w.Body.String())
+	}
+}
+
+func TestRolloutsCreateInvalidObservationWindow(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	payload := []byte(`{"route_model":"mock","canary_provider":"mock","stages":[10],"observation_window":"soon","error_threshold":1.5,"latency_p95_threshold":1000}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/rollouts", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid observation_window") {
+		t.Fatalf("expected invalid observation_window message, got %s", w.Body.String())
+	}
 }
 
 // --- Real-logic handler tests ---
@@ -597,6 +679,23 @@ func TestSimulateEndpointMissingFields(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestSimulateEndpointInvalidJSON(t *testing.T) {
+	server := newIntegrationAdminServer()
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/simulate", bytes.NewReader([]byte(`{`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid JSON") {
+		t.Fatalf("expected invalid JSON message, got %s", w.Body.String())
 	}
 }
 
@@ -1020,6 +1119,21 @@ func TestManifestCreateMissingTaskID(t *testing.T) {
 	}
 }
 
+func TestManifestCreateInvalidJSON(t *testing.T) {
+	server := newFullAdminServer()
+	router := server.Router()
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/manifests", bytes.NewReader([]byte(`{`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid JSON") {
+		t.Fatalf("expected invalid JSON message, got %s", w.Body.String())
+	}
+}
+
 func TestActionWhyEndpoint(t *testing.T) {
 	server := newFullAdminServer()
 	RecordActionTrace("act-1", map[string]interface{}{"decision": "allow", "action": "test"})
@@ -1040,6 +1154,9 @@ func TestActionWhyNotFound(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "no trace found for action nonexistent") {
+		t.Fatalf("expected missing trace message with action id, got %s", w.Body.String())
 	}
 }
 
@@ -1182,5 +1299,33 @@ func TestResilienceRetentionEndpoint(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- Policy versions ---
+
+func TestPolicyVersionRollbackEndpoint(t *testing.T) {
+	server := newFullAdminServer()
+	provider := &stubPolicyVersionProvider{}
+	server.policyVersionProvider = provider
+	router := server.Router()
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/v1/policy-versions/1/rollback", nil)
+	req.Header.Set("X-API-Key", "operator-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	if provider.rolledBackTo != 1 {
+		t.Fatalf("expected rollback to version 1, got %d", provider.rolledBackTo)
+	}
+	var body map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["status"] != "ok" || body["rolled_back_to"] != float64(1) {
+		t.Fatalf("unexpected rollback response: %+v", body)
 	}
 }

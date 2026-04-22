@@ -22,13 +22,19 @@ data:
         providers: ["mock"]
         strategy: "priority"
     tenants:
-      - id: "default"
-        name: "Default Tenant"
+      - id: {{ .Values.config.tenant.id | default "default" | quote }}
+        name: {{ .Values.config.tenant.name | default "Default Tenant" | quote }}
         api_keys:
-          - "aegis-test-default-001"
+          {{- if .Values.config.tenant.apiKeySecret.enabled }}
+          - key_env: {{ .Values.config.tenant.apiKeySecret.envName | default "AEGISFLOW_DEFAULT_API_KEY" | quote }}
+            role: {{ .Values.config.tenant.role | default "admin" | quote }}
+          {{- else }}
+          - key: {{ .Values.config.tenant.apiKey | default "aegis-test-default-001" | quote }}
+            role: {{ .Values.config.tenant.role | default "admin" | quote }}
+          {{- end }}
         rate_limit:
-          requests_per_minute: 60
-          tokens_per_minute: 100000
+          requests_per_minute: {{ .Values.config.tenant.rateLimit.requestsPerMinute | default 60 }}
+          tokens_per_minute: {{ .Values.config.tenant.rateLimit.tokensPerMinute | default 100000 }}
         allowed_models:
           - "*"
     rate_limit:

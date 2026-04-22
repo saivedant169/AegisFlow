@@ -543,8 +543,9 @@ type RouteMatch struct {
 }
 
 type APIKeyEntry struct {
-	Key  string `json:"key"  yaml:"key"`
-	Role string `json:"role" yaml:"role"`
+	Key    string `json:"key"     yaml:"key"`
+	KeyEnv string `json:"key_env" yaml:"key_env"`
+	Role   string `json:"role"    yaml:"role"`
 }
 
 // UnmarshalYAML handles both plain string ("key-value") and object ({key: "x", role: "admin"}) formats.
@@ -554,17 +555,35 @@ func (e *APIKeyEntry) UnmarshalYAML(value *yaml.Node) error {
 		e.Role = "operator"
 		return nil
 	}
-	type plain APIKeyEntry
-	var p plain
-	if err := value.Decode(&p); err != nil {
-		return err
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("api key entry must be a string or mapping")
 	}
-	e.Key = p.Key
-	e.Role = p.Role
+	for i := 0; i < len(value.Content); i += 2 {
+		key := value.Content[i].Value
+		val := value.Content[i+1].Value
+		switch key {
+		case "key":
+			e.Key = val
+		case "key_env":
+			e.KeyEnv = val
+		case "role":
+			e.Role = val
+		}
+	}
 	if e.Role == "" {
 		e.Role = "operator"
 	}
 	return nil
+}
+
+func (e APIKeyEntry) resolvedKey() string {
+	if strings.TrimSpace(e.Key) != "" {
+		return strings.TrimSpace(e.Key)
+	}
+	if strings.TrimSpace(e.KeyEnv) != "" {
+		return strings.TrimSpace(os.Getenv(strings.TrimSpace(e.KeyEnv)))
+	}
+	return ""
 }
 
 type TenantMatch struct {
@@ -649,10 +668,34 @@ func Load(path string) (*Config, error) {
 	}
 
 	setDefaults(cfg)
+	if err := resolveTenantAPIKeys(cfg); err != nil {
+		return nil, err
+	}
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func resolveTenantAPIKeys(cfg *Config) error {
+	for i := range cfg.Tenants {
+		for j := range cfg.Tenants[i].APIKeys {
+			entry := &cfg.Tenants[i].APIKeys[j]
+			entry.Key = strings.TrimSpace(entry.Key)
+			entry.KeyEnv = strings.TrimSpace(entry.KeyEnv)
+			if entry.Key != "" && entry.KeyEnv != "" {
+				return fmt.Errorf("tenant %q api_keys[%d]: specify either key or key_env, not both", cfg.Tenants[i].ID, j)
+			}
+			if entry.Key == "" && entry.KeyEnv != "" {
+				value := strings.TrimSpace(os.Getenv(entry.KeyEnv))
+				if value == "" {
+					return fmt.Errorf("tenant %q api_keys[%d]: environment variable %q is not set", cfg.Tenants[i].ID, j, entry.KeyEnv)
+				}
+				entry.Key = value
+			}
+		}
+	}
+	return nil
 }
 
 func setDefaults(cfg *Config) {
@@ -907,7 +950,11 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 	var match *TenantMatch
 	for i := range c.Tenants {
 		for _, entry := range c.Tenants[i].APIKeys {
-			keyHash := sha256.Sum256([]byte(entry.Key))
+			key := entry.resolvedKey()
+			if key == "" {
+				continue
+			}
+			keyHash := sha256.Sum256([]byte(key))
 			if subtle.ConstantTimeCompare(inputHash[:], keyHash[:]) == 1 {
 				match = &TenantMatch{
 					Tenant: &c.Tenants[i],

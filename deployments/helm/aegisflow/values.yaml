@@ -38,6 +38,20 @@ config:
     host: "0.0.0.0"
     port: 8080
     admin_port: 8081
+  tenant:
+    id: default
+    name: Default Tenant
+    role: admin
+    # Demo key for local chart trials. Use apiKeySecret for production.
+    apiKey: aegis-test-default-001
+    rateLimit:
+      requestsPerMinute: 60
+      tokensPerMinute: 100000
+    apiKeySecret:
+      enabled: false
+      name: ""
+      key: api-key
+      envName: AEGISFLOW_DEFAULT_API_KEY
 
 redis:
   enabled: true

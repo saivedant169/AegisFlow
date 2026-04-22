@@ -1,4 +1,4 @@
-.PHONY: build run test lint fmt fmt-check docker-build docker-up benchmark clean
+.PHONY: build run test lint vuln fmt fmt-check docker-build docker-up smoke benchmark clean
 
 BINARY=aegisflow
 CONFIG=configs/aegisflow.yaml
@@ -17,6 +17,9 @@ test:
 lint:
 	golangci-lint run ./...
 
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
 fmt:
 	gofmt -s -w $(GO_FILES)
 
@@ -33,6 +36,9 @@ docker-build:
 
 docker-up:
 	docker compose -f deployments/docker-compose.yaml up --build
+
+smoke:
+	bash scripts/compose_smoke.sh
 
 benchmark:
 	bash scripts/benchmark.sh

@@ -24,6 +24,13 @@ spec:
           env:
             - name: AEGISFLOW_CONFIG
               value: /etc/aegisflow/aegisflow.yaml
+            {{- if .Values.config.tenant.apiKeySecret.enabled }}
+            - name: {{ .Values.config.tenant.apiKeySecret.envName | default "AEGISFLOW_DEFAULT_API_KEY" | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "config.tenant.apiKeySecret.name is required when apiKeySecret.enabled=true" .Values.config.tenant.apiKeySecret.name | quote }}
+                  key: {{ .Values.config.tenant.apiKeySecret.key | default "api-key" | quote }}
+            {{- end }}
           ports:
             - name: gateway
               containerPort: {{ .Values.service.gateway.port }}
