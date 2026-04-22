@@ -20,41 +20,42 @@ import (
 
 	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
-	"github.com/saivedant169/AegisFlow/internal/behavioral"
+	"github.com/saivedant169/AegisFlow/internal/approval"
+	approvalint "github.com/saivedant169/AegisFlow/internal/approval/integrations"
 	"github.com/saivedant169/AegisFlow/internal/audit"
 	auditpg "github.com/saivedant169/AegisFlow/internal/audit/pgstore"
+	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/budget"
-	"github.com/saivedant169/AegisFlow/internal/costopt"
 	"github.com/saivedant169/AegisFlow/internal/cache"
+	"github.com/saivedant169/AegisFlow/internal/capability"
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/costopt"
+	"github.com/saivedant169/AegisFlow/internal/credential"
 	"github.com/saivedant169/AegisFlow/internal/eval"
+	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/federation"
 	"github.com/saivedant169/AegisFlow/internal/gateway"
 	"github.com/saivedant169/AegisFlow/internal/loadshed"
 	"github.com/saivedant169/AegisFlow/internal/logger"
+	"github.com/saivedant169/AegisFlow/internal/manifest"
+	"github.com/saivedant169/AegisFlow/internal/mcpgw"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/provider"
-	"github.com/saivedant169/AegisFlow/internal/resilience"
 	"github.com/saivedant169/AegisFlow/internal/ratelimit"
+	"github.com/saivedant169/AegisFlow/internal/resilience"
 	"github.com/saivedant169/AegisFlow/internal/rollout"
 	rolloutpg "github.com/saivedant169/AegisFlow/internal/rollout/pgstore"
 	"github.com/saivedant169/AegisFlow/internal/router"
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/internal/telemetry"
-	"github.com/saivedant169/AegisFlow/internal/approval"
-	approvalint "github.com/saivedant169/AegisFlow/internal/approval/integrations"
-	"github.com/saivedant169/AegisFlow/internal/capability"
-	"github.com/saivedant169/AegisFlow/internal/credential"
-	"github.com/saivedant169/AegisFlow/internal/evidence"
-	"github.com/saivedant169/AegisFlow/internal/usage"
-	"github.com/saivedant169/AegisFlow/internal/manifest"
-	"github.com/saivedant169/AegisFlow/internal/mcpgw"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
+	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/internal/webhook"
 )
 
 const version = "v0.6.0"
+const defaultConfigFile = "configs/aegisflow.yaml"
 
 var totalRequests uint64
 
@@ -74,7 +75,7 @@ func (a *notifierAdapter) NotifyDenied(item *approval.ApprovalItem) error {
 }
 
 func main() {
-	configPath := flag.String("config", "configs/aegisflow.yaml", "path to config file")
+	configPath := flag.String("config", defaultConfigPath(), "path to config file")
 	showVersion := flag.Bool("version", false, "print aegisflow version")
 	flag.Parse()
 
@@ -827,6 +828,13 @@ func main() {
 	adminSrv.Shutdown(ctx)
 	handler.Close()
 	log.Println("servers stopped")
+}
+
+func defaultConfigPath() string {
+	if path := strings.TrimSpace(os.Getenv("AEGISFLOW_CONFIG")); path != "" {
+		return path
+	}
+	return defaultConfigFile
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {

@@ -15,8 +15,8 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
-	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/cache"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
@@ -29,22 +29,22 @@ import (
 )
 
 type Handler struct {
-	registry       *provider.Registry
-	router         *router.Router
-	policy         *policy.Engine
-	usage          *usage.Tracker
-	cache          cache.Cache
-	webhook        *webhook.Notifier
-	store          *storage.PostgresStore
-	dbQueue        chan storage.UsageEvent
-	analytics      *analytics.Collector
-	maxBodySize    int64
-	recordSpend    func(tenantID, model string, cost float64)
-	budgetCheck    func(tenantID, model string) (bool, []string, string)
-	evalBuiltin    bool
-	evalMinTokens  int
-	evalLatencyMul float64
-	evalWebhook    *eval.WebhookEvaluator
+	registry             *provider.Registry
+	router               *router.Router
+	policy               *policy.Engine
+	usage                *usage.Tracker
+	cache                cache.Cache
+	webhook              *webhook.Notifier
+	store                *storage.PostgresStore
+	dbQueue              chan storage.UsageEvent
+	analytics            *analytics.Collector
+	maxBodySize          int64
+	recordSpend          func(tenantID, model string, cost float64)
+	budgetCheck          func(tenantID, model string) (bool, []string, string)
+	evalBuiltin          bool
+	evalMinTokens        int
+	evalLatencyMul       float64
+	evalWebhook          *eval.WebhookEvaluator
 	auditLog             func(actor, actorRole, action, resource, detail, tenantID, model string)
 	requestLog           *admin.RequestLog
 	dataPlaneName        string

@@ -12,21 +12,21 @@ import (
 // Ticket is a signed, one-purpose execution capability.
 type Ticket struct {
 	ID           string    `json:"id"`
-	Subject      string    `json:"subject"`                // agent/user ID
+	Subject      string    `json:"subject"` // agent/user ID
 	TaskID       string    `json:"task_id"`
 	SessionID    string    `json:"session_id"`
-	EnvelopeID   string    `json:"envelope_id"`             // the action this authorizes
-	Resource     string    `json:"resource"`                // exact resource
-	Verb         string    `json:"verb"`                    // exact verb
+	EnvelopeID   string    `json:"envelope_id"` // the action this authorizes
+	Resource     string    `json:"resource"`    // exact resource
+	Verb         string    `json:"verb"`        // exact verb
 	Protocol     string    `json:"protocol"`
 	Tool         string    `json:"tool"`
 	PolicyHash   string    `json:"policy_hash"`             // hash of the policy that authorized this
 	ApprovalHash string    `json:"approval_hash,omitempty"` // hash of approval if review path
 	IssuedAt     time.Time `json:"issued_at"`
 	ExpiresAt    time.Time `json:"expires_at"`
-	Nonce        string    `json:"nonce"`          // replay protection
-	EvidenceRef  string    `json:"evidence_ref"`   // evidence chain pointer
-	Signature    string    `json:"signature"`      // HMAC-SHA256 signature
+	Nonce        string    `json:"nonce"`        // replay protection
+	EvidenceRef  string    `json:"evidence_ref"` // evidence chain pointer
+	Signature    string    `json:"signature"`    // HMAC-SHA256 signature
 }
 
 // TicketRequest describes the parameters needed to issue a capability ticket.

@@ -18,7 +18,7 @@ type Rule interface {
 // POSTs data to an external host.
 type ExfiltrationPattern struct{}
 
-func (r ExfiltrationPattern) Name() string        { return "exfiltration_pattern" }
+func (r ExfiltrationPattern) Name() string { return "exfiltration_pattern" }
 func (r ExfiltrationPattern) Description() string {
 	return "Read sensitive resource then POST to external host"
 }
@@ -60,7 +60,7 @@ func (r ExfiltrationPattern) Detect(history []envelope.ActionEnvelope) *Behavior
 // PrivilegeEscalation detects when a session edits workflow/CI files then pushes or deploys.
 type PrivilegeEscalation struct{}
 
-func (r PrivilegeEscalation) Name() string        { return "privilege_escalation" }
+func (r PrivilegeEscalation) Name() string { return "privilege_escalation" }
 func (r PrivilegeEscalation) Description() string {
 	return "Edit workflow or CI configuration then push or deploy"
 }
@@ -102,7 +102,7 @@ func (r PrivilegeEscalation) Detect(history []envelope.ActionEnvelope) *Behavior
 // CredentialAbuse detects when a session reads secrets then makes multiple external calls.
 type CredentialAbuse struct{}
 
-func (r CredentialAbuse) Name() string        { return "credential_abuse" }
+func (r CredentialAbuse) Name() string { return "credential_abuse" }
 func (r CredentialAbuse) Description() string {
 	return "Read secrets then make multiple external calls"
 }
@@ -151,7 +151,7 @@ type DestructiveSequence struct {
 	Threshold int // number of consecutive deletes; defaults to 3
 }
 
-func (r DestructiveSequence) Name() string        { return "destructive_sequence" }
+func (r DestructiveSequence) Name() string { return "destructive_sequence" }
 func (r DestructiveSequence) Description() string {
 	return "Multiple delete operations in sequence"
 }
@@ -189,11 +189,11 @@ func (r DestructiveSequence) Detect(history []envelope.ActionEnvelope) *Behavior
 
 // SuspiciousFanOut detects a single session hitting many different targets rapidly.
 type SuspiciousFanOut struct {
-	MaxTargets    int           // threshold; defaults to 10
-	WindowSeconds int           // time window in seconds; defaults to 60
+	MaxTargets    int // threshold; defaults to 10
+	WindowSeconds int // time window in seconds; defaults to 60
 }
 
-func (r SuspiciousFanOut) Name() string        { return "suspicious_fan_out" }
+func (r SuspiciousFanOut) Name() string { return "suspicious_fan_out" }
 func (r SuspiciousFanOut) Description() string {
 	return "Single session hitting many different targets rapidly"
 }
@@ -247,7 +247,7 @@ type RepeatedEscalation struct {
 	WindowSeconds int // time window in seconds; defaults to 300 (5 min)
 }
 
-func (r RepeatedEscalation) Name() string        { return "repeated_escalation" }
+func (r RepeatedEscalation) Name() string { return "repeated_escalation" }
 func (r RepeatedEscalation) Description() string {
 	return "Multiple review or approval requests in short time"
 }

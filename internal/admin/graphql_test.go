@@ -47,16 +47,16 @@ func newGraphQLTestServer() *Server {
 		cfg,
 		registry,
 		NewRequestLog(10),
-		nil,                       // cache
-		&stubRolloutManager{},     // rollout
-		&stubAnalyticsProvider{},  // analytics
-		nil,                       // budget
+		nil,                        // cache
+		&stubRolloutManager{},      // rollout
+		&stubAnalyticsProvider{},   // analytics
+		nil,                        // budget
 		&verifyOnlyAuditProvider{}, // audit
-		nil,                       // federation
-		nil,                       // costopt
-		nil,                       // evidence
-		nil,                       // approval
-		nil,                       // credential
+		nil,                        // federation
+		nil,                        // costopt
+		nil,                        // evidence
+		nil,                        // approval
+		nil,                        // credential
 	)
 }
 

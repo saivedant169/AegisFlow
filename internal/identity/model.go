@@ -23,7 +23,7 @@ type Project struct {
 // Environment belongs to a Project and carries a risk tier.
 type Environment struct {
 	ID        string `json:"id" yaml:"id"`
-	Name      string `json:"name" yaml:"name"`             // dev, staging, prod
+	Name      string `json:"name" yaml:"name"` // dev, staging, prod
 	ProjectID string `json:"project_id" yaml:"project_id"`
 	RiskTier  string `json:"risk_tier" yaml:"risk_tier"` // low, medium, high, critical
 }

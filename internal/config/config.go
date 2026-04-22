@@ -5,43 +5,44 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	Providers  []ProviderConfig `yaml:"providers"`
-	Routes     []RouteConfig    `yaml:"routes"`
-	Tenants    []TenantConfig   `yaml:"tenants"`
-	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
-	Policies   PoliciesConfig   `yaml:"policies"`
-	Telemetry  TelemetryConfig  `yaml:"telemetry"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	Cache      CacheConfig      `yaml:"cache"`
-	Webhook    WebhookConfig    `yaml:"webhook"`
-	Database   DatabaseConfig   `yaml:"database"`
-	Admin      AdminConfig      `yaml:"admin"`
-	Aliases    AliasConfig      `yaml:"aliases"`
-	Transform  TransformConfig  `yaml:"transform"`
-	Analytics  AnalyticsConfig  `yaml:"analytics"`
-	Budgets    BudgetsConfig    `yaml:"budgets"`
-	CostOpt    CostOptConfig    `yaml:"cost_optimization"`
-	Eval       EvalConfig       `yaml:"eval"`
-	Federation FederationConfig `yaml:"federation"`
-	LoadShed     LoadShedConfig   `yaml:"load_shed"`
-	WebSocket    WebSocketConfig  `yaml:"websocket"`
-	ToolPolicies ToolPolicyConfig `yaml:"tool_policies"`
-	MCPGateway   MCPGatewayConfig   `yaml:"mcp_gateway"`
-	Credentials  CredentialConfig   `yaml:"credentials"`
-	ShellGate    ShellGateConfig    `yaml:"shell_gate"`
-	SQLGate      SQLGateConfig      `yaml:"sql_gate"`
-	GitHubGate   GitHubGateConfig   `yaml:"github_gate"`
-	HTTPGate     HTTPGateConfig     `yaml:"http_gate"`
-	Sandbox          SandboxConfig        `yaml:"sandbox"`
-	Capability       CapabilityConfig     `yaml:"capability"`
-	ResourcePolicies ResourcePolicyConfig `yaml:"resource_policies"`
+	Server               ServerConfig              `yaml:"server"`
+	Providers            []ProviderConfig          `yaml:"providers"`
+	Routes               []RouteConfig             `yaml:"routes"`
+	Tenants              []TenantConfig            `yaml:"tenants"`
+	RateLimit            RateLimitConfig           `yaml:"rate_limit"`
+	Policies             PoliciesConfig            `yaml:"policies"`
+	Telemetry            TelemetryConfig           `yaml:"telemetry"`
+	Logging              LoggingConfig             `yaml:"logging"`
+	Cache                CacheConfig               `yaml:"cache"`
+	Webhook              WebhookConfig             `yaml:"webhook"`
+	Database             DatabaseConfig            `yaml:"database"`
+	Admin                AdminConfig               `yaml:"admin"`
+	Aliases              AliasConfig               `yaml:"aliases"`
+	Transform            TransformConfig           `yaml:"transform"`
+	Analytics            AnalyticsConfig           `yaml:"analytics"`
+	Budgets              BudgetsConfig             `yaml:"budgets"`
+	CostOpt              CostOptConfig             `yaml:"cost_optimization"`
+	Eval                 EvalConfig                `yaml:"eval"`
+	Federation           FederationConfig          `yaml:"federation"`
+	LoadShed             LoadShedConfig            `yaml:"load_shed"`
+	WebSocket            WebSocketConfig           `yaml:"websocket"`
+	ToolPolicies         ToolPolicyConfig          `yaml:"tool_policies"`
+	MCPGateway           MCPGatewayConfig          `yaml:"mcp_gateway"`
+	Credentials          CredentialConfig          `yaml:"credentials"`
+	ShellGate            ShellGateConfig           `yaml:"shell_gate"`
+	SQLGate              SQLGateConfig             `yaml:"sql_gate"`
+	GitHubGate           GitHubGateConfig          `yaml:"github_gate"`
+	HTTPGate             HTTPGateConfig            `yaml:"http_gate"`
+	Sandbox              SandboxConfig             `yaml:"sandbox"`
+	Capability           CapabilityConfig          `yaml:"capability"`
+	ResourcePolicies     ResourcePolicyConfig      `yaml:"resource_policies"`
 	Manifests            ManifestConfig            `yaml:"manifests"`
 	ApprovalIntegrations ApprovalIntegrationConfig `yaml:"approval_integrations"`
 	Identity             IdentityConfig            `yaml:"identity"`
@@ -54,16 +55,16 @@ type Config struct {
 type SupplyChainConfig struct {
 	Enabled    bool   `yaml:"enabled"`
 	StrictMode bool   `yaml:"strict_mode"` // reject unsigned in strict
-	SigningKey  string `yaml:"signing_key"` // hex-encoded HMAC key
+	SigningKey string `yaml:"signing_key"` // hex-encoded HMAC key
 }
 
 // ResilienceConfig controls enterprise resilience features: health monitoring,
 // degradation modes, retention, backup, and circuit breakers.
 type ResilienceConfig struct {
-	Enabled        bool                `yaml:"enabled"`
-	HealthInterval time.Duration       `yaml:"health_interval"`
-	Retention      RetentionPolicyCfg  `yaml:"retention"`
-	BackupDir      string              `yaml:"backup_dir"`
+	Enabled        bool                 `yaml:"enabled"`
+	HealthInterval time.Duration        `yaml:"health_interval"`
+	Retention      RetentionPolicyCfg   `yaml:"retention"`
+	BackupDir      string               `yaml:"backup_dir"`
 	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
 }
 
@@ -91,9 +92,9 @@ type BehavioralConfig struct {
 
 // ApprovalIntegrationConfig configures external approval notification channels.
 type ApprovalIntegrationConfig struct {
-	Timeout time.Duration          `yaml:"timeout"` // auto-deny after this duration
-	GitHub  GitHubApprovalConfig   `yaml:"github"`
-	Slack   SlackApprovalConfig    `yaml:"slack"`
+	Timeout time.Duration        `yaml:"timeout"` // auto-deny after this duration
+	GitHub  GitHubApprovalConfig `yaml:"github"`
+	Slack   SlackApprovalConfig  `yaml:"slack"`
 }
 
 // GitHubApprovalConfig enables posting approval requests as PR comments.
@@ -218,7 +219,7 @@ type CredentialConfig struct {
 
 type CredentialProviderCfg struct {
 	Name            string        `yaml:"name"`
-	Type            string        `yaml:"type"` // "static", "github_app", "vault", "aws_sts"
+	Type            string        `yaml:"type"`  // "static", "github_app", "vault", "aws_sts"
 	Token           string        `yaml:"token"` // for static
 	GitHubAppID     int64         `yaml:"github_app_id"`
 	GitHubKeyPath   string        `yaml:"github_key_path"`
@@ -240,10 +241,9 @@ type ShellGateConfig struct {
 
 type SQLGateConfig struct {
 	Enabled         bool   `yaml:"enabled"`
-	BlockDangerous  bool   `yaml:"block_dangerous"`  // auto-block DROP, TRUNCATE, WHERE-less DELETE/UPDATE
+	BlockDangerous  bool   `yaml:"block_dangerous"` // auto-block DROP, TRUNCATE, WHERE-less DELETE/UPDATE
 	DefaultDecision string `yaml:"default_decision"`
 }
-
 
 // SandboxConfig holds architectural safety constraints for all protocol gates.
 type SandboxConfig struct {
@@ -254,14 +254,14 @@ type SandboxConfig struct {
 }
 
 type ShellSandboxConfig struct {
-	AllowedBinaries []string             `yaml:"allowed_binaries"`
-	BlockedBinaries []string             `yaml:"blocked_binaries"`
-	AllowedPaths    []string             `yaml:"allowed_paths"`
-	BlockedPaths    []string             `yaml:"blocked_paths"`
-	NetworkPolicy   NetworkPolicyConfig  `yaml:"network_policy"`
-	MaxDuration     string               `yaml:"max_duration"`
-	MaxOutputBytes  int64                `yaml:"max_output_bytes"`
-	EnvRedactions   []string             `yaml:"env_redactions"`
+	AllowedBinaries []string            `yaml:"allowed_binaries"`
+	BlockedBinaries []string            `yaml:"blocked_binaries"`
+	AllowedPaths    []string            `yaml:"allowed_paths"`
+	BlockedPaths    []string            `yaml:"blocked_paths"`
+	NetworkPolicy   NetworkPolicyConfig `yaml:"network_policy"`
+	MaxDuration     string              `yaml:"max_duration"`
+	MaxOutputBytes  int64               `yaml:"max_output_bytes"`
+	EnvRedactions   []string            `yaml:"env_redactions"`
 }
 
 type NetworkPolicyConfig struct {
@@ -957,6 +957,12 @@ func validateConfig(cfg *Config) error {
 
 	// --- Tenants ---
 	tenantIDs := make(map[string]bool, len(cfg.Tenants))
+	apiKeys := make(map[string]string)
+	validRoles := map[string]bool{
+		"viewer":   true,
+		"operator": true,
+		"admin":    true,
+	}
 	for i, tenant := range cfg.Tenants {
 		if tenant.ID == "" {
 			return fmt.Errorf("tenants[%d]: tenant id must not be empty", i)
@@ -967,6 +973,19 @@ func validateConfig(cfg *Config) error {
 		tenantIDs[tenant.ID] = true
 		if len(tenant.APIKeys) == 0 {
 			return fmt.Errorf("tenant %q: api_keys must not be empty", tenant.ID)
+		}
+		for j, entry := range tenant.APIKeys {
+			key := strings.TrimSpace(entry.Key)
+			if key == "" {
+				return fmt.Errorf("tenant %q api_keys[%d]: key must not be empty", tenant.ID, j)
+			}
+			if !validRoles[entry.Role] {
+				return fmt.Errorf("tenant %q api_keys[%d]: role %q must be one of viewer, operator, admin", tenant.ID, j, entry.Role)
+			}
+			if owner, exists := apiKeys[key]; exists {
+				return fmt.Errorf("tenant %q api_keys[%d]: duplicate api key already used by tenant %q", tenant.ID, j, owner)
+			}
+			apiKeys[key] = tenant.ID
 		}
 		if tenant.RateLimit.RequestsPerMinute < 0 {
 			return fmt.Errorf("tenant %q: requests_per_minute must not be negative", tenant.ID)

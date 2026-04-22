@@ -6,7 +6,8 @@
 // Unicode normalization, leet-speak decoding).
 //
 // Build:
-//   GOOS=wasip1 GOARCH=wasm go build -o profanity-filter.wasm .
+//
+//	GOOS=wasip1 GOARCH=wasm go build -o profanity-filter.wasm .
 package main
 
 import (

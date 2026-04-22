@@ -34,12 +34,12 @@ type anthropicMessage struct {
 }
 
 type anthropicResponse struct {
-	ID      string                   `json:"id"`
-	Type    string                   `json:"type"`
-	Role    string                   `json:"role"`
-	Content []anthropicContentBlock  `json:"content"`
-	Model   string                   `json:"model"`
-	Usage   anthropicUsage           `json:"usage"`
+	ID      string                  `json:"id"`
+	Type    string                  `json:"type"`
+	Role    string                  `json:"role"`
+	Content []anthropicContentBlock `json:"content"`
+	Model   string                  `json:"model"`
+	Usage   anthropicUsage          `json:"usage"`
 }
 
 type anthropicContentBlock struct {

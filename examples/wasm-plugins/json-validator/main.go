@@ -5,7 +5,8 @@
 // where a downstream tool expects JSON payloads.
 //
 // Build:
-//   GOOS=wasip1 GOARCH=wasm go build -o json-validator.wasm .
+//
+//	GOOS=wasip1 GOARCH=wasm go build -o json-validator.wasm .
 package main
 
 import (

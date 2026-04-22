@@ -16,4 +16,4 @@ COPY configs/policy-packs/ /app/configs/policy-packs/
 COPY scripts/demo.sh /app/scripts/
 RUN chmod +x /app/scripts/*.sh
 EXPOSE 8080 8081 8082
-ENTRYPOINT ["./aegisflow", "--config", "configs/aegisflow.yaml"]
+ENTRYPOINT ["./aegisflow"]

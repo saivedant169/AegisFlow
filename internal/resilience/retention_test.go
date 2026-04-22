@@ -17,7 +17,7 @@ func TestRetentionManager_Cleanup(t *testing.T) {
 
 	now := time.Now().UTC()
 	// Old records that should be cleaned up.
-	rm.AddRecord("audit", now.AddDate(0, 0, -60))    // 60 days old > 30 day policy
+	rm.AddRecord("audit", now.AddDate(0, 0, -60))     // 60 days old > 30 day policy
 	rm.AddRecord("evidence", now.AddDate(0, 0, -100)) // 100 days old > 90 day policy
 	rm.AddRecord("approval", now.AddDate(0, 0, -70))  // 70 days old > 60 day policy
 	// Recent records that should be kept.

@@ -108,13 +108,13 @@ func newIntegrationAdminServer() *Server {
 // --- Stub providers for testing ---
 
 type stubApprovalProvider struct {
-	pendingItems  []map[string]interface{}
-	historyItems  []map[string]interface{}
-	approveErr    error
-	denyErr       error
+	pendingItems []map[string]interface{}
+	historyItems []map[string]interface{}
+	approveErr   error
+	denyErr      error
 }
 
-func (s *stubApprovalProvider) Pending() interface{} { return s.pendingItems }
+func (s *stubApprovalProvider) Pending() interface{}          { return s.pendingItems }
 func (s *stubApprovalProvider) History(limit int) interface{} { return s.historyItems }
 func (s *stubApprovalProvider) Get(id string) (interface{}, error) {
 	for _, item := range s.pendingItems {

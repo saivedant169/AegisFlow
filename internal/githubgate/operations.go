@@ -46,8 +46,8 @@ var knownOperations = map[string]operationInfo{
 	"create_release":      {envelope.CapWrite, RiskMedium},
 
 	// Deploy operations — high risk
-	"merge_pull_request":  {envelope.CapDeploy, RiskHigh},
-	"create_deployment":   {envelope.CapDeploy, RiskHigh},
+	"merge_pull_request": {envelope.CapDeploy, RiskHigh},
+	"create_deployment":  {envelope.CapDeploy, RiskHigh},
 	"push":               {envelope.CapDeploy, RiskHigh},
 
 	// Delete operations — critical risk

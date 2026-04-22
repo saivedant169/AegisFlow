@@ -321,8 +321,8 @@ type errorFilter struct {
 	name string
 }
 
-func (f *errorFilter) Name() string       { return f.name }
-func (f *errorFilter) Action() Action     { return ActionBlock }
+func (f *errorFilter) Name() string            { return f.name }
+func (f *errorFilter) Action() Action          { return ActionBlock }
 func (f *errorFilter) Check(string) *Violation { return nil }
 func (f *errorFilter) CheckE(string) (*Violation, error) {
 	return nil, fmt.Errorf("simulated filter failure")

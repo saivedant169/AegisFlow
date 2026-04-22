@@ -60,10 +60,10 @@ func cmdSimulate(adminURL string, args []string) {
 }
 
 type simulateResponse struct {
-	Action   string                        `json:"action"`
-	Decision string                        `json:"decision"`
+	Action   string                          `json:"action"`
+	Decision string                          `json:"decision"`
 	Trace    *toolpolicy.PolicyDecisionTrace `json:"trace"`
-	Local    bool                          `json:"-"`
+	Local    bool                            `json:"-"`
 }
 
 func remoteSimulate(adminURL, protocol, tool, target, capability string) (*simulateResponse, error) {
@@ -216,7 +216,7 @@ func cmdWhy(adminURL string, args []string) {
 // --- aegisctl diff-policy ---
 
 type policyFile struct {
-	DefaultDecision string              `yaml:"default_decision"`
+	DefaultDecision string                `yaml:"default_decision"`
 	Rules           []toolpolicy.ToolRule `yaml:"rules"`
 }
 

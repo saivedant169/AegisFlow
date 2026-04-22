@@ -22,7 +22,7 @@ import (
 // STSCredentials holds the temporary credentials returned by STS AssumeRole.
 type STSCredentials struct {
 	AccessKeyID     string
-	SecretAccessKey  string
+	SecretAccessKey string
 	SessionToken    string
 	Expiration      time.Time
 }
@@ -326,7 +326,7 @@ func parseAssumeRoleResponse(data []byte) (*STSCredentials, error) {
 
 	return &STSCredentials{
 		AccessKeyID:     resp.Result.Credentials.AccessKeyId,
-		SecretAccessKey:  resp.Result.Credentials.SecretAccessKey,
+		SecretAccessKey: resp.Result.Credentials.SecretAccessKey,
 		SessionToken:    resp.Result.Credentials.SessionToken,
 		Expiration:      expiration,
 	}, nil

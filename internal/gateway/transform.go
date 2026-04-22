@@ -9,9 +9,9 @@ import (
 
 // TransformConfig holds request transformation rules.
 type TransformConfig struct {
-	SystemPromptPrefix string            // Prepend to system message
-	SystemPromptSuffix string            // Append to system message
-	DefaultSystemPrompt string           // Use if no system message exists
+	SystemPromptPrefix  string            // Prepend to system message
+	SystemPromptSuffix  string            // Append to system message
+	DefaultSystemPrompt string            // Use if no system message exists
 	HeaderInjections    map[string]string // Extra metadata to inject
 }
 
@@ -87,9 +87,9 @@ func mergeTransformConfig(global, tenant *TransformConfig) *TransformConfig {
 
 // ResponseTransformConfig holds response transformation rules.
 type ResponseTransformConfig struct {
-	StripPII     bool              // Replace PII patterns with placeholders
-	ContentSuffix string           // Append to response content
-	ContentPrefix string           // Prepend to response content
+	StripPII      bool              // Replace PII patterns with placeholders
+	ContentSuffix string            // Append to response content
+	ContentPrefix string            // Prepend to response content
 	Replacements  map[string]string // Literal string replacements
 }
 

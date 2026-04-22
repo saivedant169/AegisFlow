@@ -31,12 +31,12 @@ type BedrockProvider struct {
 }
 
 type bedrockRequest struct {
-	Messages []bedrockMessage `json:"messages"`
+	Messages        []bedrockMessage        `json:"messages"`
 	InferenceConfig *bedrockInferenceConfig `json:"inferenceConfig,omitempty"`
 }
 
 type bedrockMessage struct {
-	Role    string          `json:"role"`
+	Role    string           `json:"role"`
 	Content []bedrockContent `json:"content"`
 }
 

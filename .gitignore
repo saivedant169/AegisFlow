@@ -55,6 +55,7 @@ docs/specs/
 docs/plans/
 docs/superpowers/
 Awesome-LLMOps
+.claude/
 .claude/worktrees/
 
 # PR-writer installer artifacts

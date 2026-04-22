@@ -20,9 +20,12 @@ type testNotifier struct {
 	denyCalled    int
 }
 
-func (n *testNotifier) NotifyReview(item *approval.ApprovalItem) error   { n.reviewCalled++; return nil }
-func (n *testNotifier) NotifyApproved(item *approval.ApprovalItem) error { n.approveCalled++; return nil }
-func (n *testNotifier) NotifyDenied(item *approval.ApprovalItem) error   { n.denyCalled++; return nil }
+func (n *testNotifier) NotifyReview(item *approval.ApprovalItem) error { n.reviewCalled++; return nil }
+func (n *testNotifier) NotifyApproved(item *approval.ApprovalItem) error {
+	n.approveCalled++
+	return nil
+}
+func (n *testNotifier) NotifyDenied(item *approval.ApprovalItem) error { n.denyCalled++; return nil }
 
 func TestApprovalNotifierIntegrationE2E(t *testing.T) {
 	aq := approval.NewQueue(100)

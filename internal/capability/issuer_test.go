@@ -11,17 +11,17 @@ func testKey() []byte {
 
 func validRequest() TicketRequest {
 	return TicketRequest{
-		Subject:    "agent-007",
-		TaskID:     "task-123",
-		SessionID:  "session-abc",
-		EnvelopeID: "env-456",
-		Resource:   "repos/acme/widget",
-		Verb:       "write",
-		Protocol:   "http",
-		Tool:       "github",
-		PolicyHash: "abc123policydef",
+		Subject:     "agent-007",
+		TaskID:      "task-123",
+		SessionID:   "session-abc",
+		EnvelopeID:  "env-456",
+		Resource:    "repos/acme/widget",
+		Verb:        "write",
+		Protocol:    "http",
+		Tool:        "github",
+		PolicyHash:  "abc123policydef",
 		EvidenceRef: "evidence-xyz",
-		TTL:        5 * time.Minute,
+		TTL:         5 * time.Minute,
 	}
 }
 

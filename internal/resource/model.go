@@ -7,7 +7,7 @@ type Resource struct {
 	Type        ResourceType      `json:"type" yaml:"type"`
 	Provider    string            `json:"provider" yaml:"provider"`       // github, postgres, aws, shell
 	Environment string            `json:"environment" yaml:"environment"` // dev, staging, prod
-	Path        []string          `json:"path" yaml:"path"`              // hierarchical: [org, repo, branch] or [db, schema, table]
+	Path        []string          `json:"path" yaml:"path"`               // hierarchical: [org, repo, branch] or [db, schema, table]
 	Sensitivity Sensitivity       `json:"sensitivity" yaml:"sensitivity"`
 	Properties  map[string]string `json:"properties,omitempty" yaml:"properties,omitempty"`
 }

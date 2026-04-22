@@ -182,27 +182,27 @@ type ResilienceProvider interface {
 var dashboardHTML []byte
 
 type Server struct {
-	tracker    *usage.Tracker
-	cfg        *config.Config
-	registry   *provider.Registry
-	requestLog *RequestLog
-	cache              cache.Cache
-	rolloutMgr         RolloutManager
-	analyticsProvider  AnalyticsProvider
-	budgetProvider     BudgetProvider
-	auditProvider      AuditProvider
-	federationProvider FederationProvider
-	costOptProvider    CostOptProvider
-	evidenceProvider   EvidenceProvider
-	approvalProvider   ApprovalProvider
-	credentialProvider CredentialProvider
-	toolPolicyProvider   ToolPolicyProvider
-	manifestProvider     ManifestProvider
-	capabilityProvider   CapabilityProvider
-	supplyChainProvider  SupplyChainProvider
-	behavioralProvider      BehavioralProvider
-	resilienceProvider      ResilienceProvider
-	policyVersionProvider   PolicyVersionProvider
+	tracker               *usage.Tracker
+	cfg                   *config.Config
+	registry              *provider.Registry
+	requestLog            *RequestLog
+	cache                 cache.Cache
+	rolloutMgr            RolloutManager
+	analyticsProvider     AnalyticsProvider
+	budgetProvider        BudgetProvider
+	auditProvider         AuditProvider
+	federationProvider    FederationProvider
+	costOptProvider       CostOptProvider
+	evidenceProvider      EvidenceProvider
+	approvalProvider      ApprovalProvider
+	credentialProvider    CredentialProvider
+	toolPolicyProvider    ToolPolicyProvider
+	manifestProvider      ManifestProvider
+	capabilityProvider    CapabilityProvider
+	supplyChainProvider   SupplyChainProvider
+	behavioralProvider    BehavioralProvider
+	resilienceProvider    ResilienceProvider
+	policyVersionProvider PolicyVersionProvider
 }
 
 func NewServer(tracker *usage.Tracker, cfg *config.Config, registry *provider.Registry, reqLog *RequestLog, c cache.Cache, rm RolloutManager, ap AnalyticsProvider, bp BudgetProvider, aup AuditProvider, fp FederationProvider, cop CostOptProvider, ep EvidenceProvider, apvp ApprovalProvider, crp CredentialProvider, opts ...ServerOption) *Server {
@@ -534,13 +534,13 @@ func (s *Server) rolloutsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var req createRolloutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: "+err.Error())
 		return
 	}
 
 	obsWindow, err := time.ParseDuration(req.ObservationWindow)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid observation_window: " + err.Error())
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid observation_window: "+err.Error())
 		return
 	}
 
@@ -949,19 +949,19 @@ type testActionRequest struct {
 }
 
 type testActionResponse struct {
-	Decision              string      `json:"decision"`
-	EnvelopeID            string      `json:"envelope_id"`
-	EvidenceHash          string      `json:"evidence_hash"`
-	Message               string      `json:"message"`
-	ApprovalID            string      `json:"approval_id,omitempty"`
-	CredentialProvenance  interface{} `json:"credential_provenance,omitempty"`
-	DriftEvents           interface{} `json:"drift_events,omitempty"`
+	Decision             string      `json:"decision"`
+	EnvelopeID           string      `json:"envelope_id"`
+	EvidenceHash         string      `json:"evidence_hash"`
+	Message              string      `json:"message"`
+	ApprovalID           string      `json:"approval_id,omitempty"`
+	CredentialProvenance interface{} `json:"credential_provenance,omitempty"`
+	DriftEvents          interface{} `json:"drift_events,omitempty"`
 }
 
 func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	var req testActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: "+err.Error())
 		return
 	}
 
@@ -1046,7 +1046,7 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	var req testActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: "+err.Error())
 		return
 	}
 
@@ -1104,7 +1104,7 @@ func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
 
 	trace, ok := actionTraceStore[id]
 	if !ok {
-		writeAPIError(w, http.StatusNotFound, "not_found", "no trace found for action " + id)
+		writeAPIError(w, http.StatusNotFound, "not_found", "no trace found for action "+id)
 		return
 	}
 
@@ -1172,7 +1172,7 @@ func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
 
 	var req createManifestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: " + err.Error())
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON: "+err.Error())
 		return
 	}
 
@@ -1434,7 +1434,7 @@ func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":              "ok",
-		"rolled_back_to":      version,
+		"status":         "ok",
+		"rolled_back_to": version,
 	})
 }

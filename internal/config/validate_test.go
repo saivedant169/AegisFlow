@@ -109,6 +109,42 @@ tenants:
 `, "api_keys")
 }
 
+func TestValidateTenantEmptyAPIKey(t *testing.T) {
+	expectValidationError(t, `
+tenants:
+  - id: "t1"
+    name: "Empty Key"
+    api_keys:
+      - key: ""
+        role: "operator"
+`, "key must not be empty")
+}
+
+func TestValidateTenantDuplicateAPIKeys(t *testing.T) {
+	expectValidationError(t, `
+tenants:
+  - id: "t1"
+    name: "Tenant A"
+    api_keys: ["shared-key"]
+  - id: "t2"
+    name: "Tenant B"
+    api_keys:
+      - key: "shared-key"
+        role: "admin"
+`, "duplicate api key")
+}
+
+func TestValidateTenantInvalidAPIKeyRole(t *testing.T) {
+	expectValidationError(t, `
+tenants:
+  - id: "t1"
+    name: "Bad Role"
+    api_keys:
+      - key: "key-a"
+        role: "owner"
+`, "must be one of viewer, operator, admin")
+}
+
 func TestValidateDuplicateTenantIDs(t *testing.T) {
 	expectValidationError(t, `
 tenants:

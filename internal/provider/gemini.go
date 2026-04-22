@@ -27,7 +27,7 @@ type GeminiProvider struct {
 }
 
 type geminiRequest struct {
-	Contents         []geminiContent        `json:"contents"`
+	Contents         []geminiContent         `json:"contents"`
 	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
 }
 
@@ -47,8 +47,8 @@ type geminiGenerationConfig struct {
 }
 
 type geminiResponse struct {
-	Candidates []geminiCandidate `json:"candidates"`
-	UsageMetadata *geminiUsage   `json:"usageMetadata"`
+	Candidates    []geminiCandidate `json:"candidates"`
+	UsageMetadata *geminiUsage      `json:"usageMetadata"`
 }
 
 type geminiCandidate struct {

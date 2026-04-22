@@ -116,7 +116,7 @@ func (r *KeyRotator) activeUnlocked() []*managedKey {
 				k.state = keyStateActive
 				active = append(active, k)
 			}
-		// keyStateFailed: never re-admitted
+			// keyStateFailed: never re-admitted
 		}
 	}
 	return active

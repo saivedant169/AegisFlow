@@ -254,7 +254,7 @@ func TestSanitizeSessionName(t *testing.T) {
 	}{
 		{"aegisflow-task-123", "aegisflow-task-123"},
 		{"aegis flow!task#123", "aegisflowtask123"},
-		{"a", "aegisflow-session"}, // too short
+		{"a", "aegisflow-session"},                          // too short
 		{strings.Repeat("a", 100), strings.Repeat("a", 64)}, // too long
 	}
 	for _, tt := range tests {

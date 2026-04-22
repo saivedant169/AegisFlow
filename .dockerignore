@@ -1,0 +1,43 @@
+.git
+.github
+.DS_Store
+**/.DS_Store
+
+# Local configuration and run artifacts
+.env
+.env.*
+.aegisflow-run/
+.claude/
+.mcp.json
+
+# Build and test outputs
+bin/
+aegisflow
+aegisflow-operator
+aegisctl
+*.test
+*.out
+coverage.html
+
+# Local notes and media
+AegisFlow_Enterprise_Grade_Uplift_Plan_2026-04-06.md
+AegisFlow_Pivot_Plan_2026-04-06.md
+DEMO_GUIDE.txt
+DEVTO_ARTICLE.md
+INTERVIEW_NOTES.md
+LAUNCH_POSTS.txt
+ai_gateway_project_idea.md
+resume/
+*.gif
+*.mov
+*.mp4
+*.png
+
+# Generated and auxiliary docs
+docs/plans/
+docs/specs/
+docs/superpowers/
+Awesome-LLMOps
+
+# Example build artifacts
+examples/wasm-plugin/plugin.wasm

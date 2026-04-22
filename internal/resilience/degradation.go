@@ -7,8 +7,8 @@ import "sync"
 type DegradationMode struct {
 	Component    string `json:"component"`
 	Mode         string `json:"mode"`          // normal, degraded, emergency
-	Behavior     string `json:"behavior"`       // description of what changes
-	SafetyImpact string `json:"safety_impact"`  // what safety guarantees are affected
+	Behavior     string `json:"behavior"`      // description of what changes
+	SafetyImpact string `json:"safety_impact"` // what safety guarantees are affected
 }
 
 // DegradationManager tracks the degradation state of each component.
