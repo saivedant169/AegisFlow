@@ -18,7 +18,7 @@ variable "name_prefix" {
 variable "image_tag" {
   description = "Docker image tag to deploy"
   type        = string
-  default     = "latest"
+  default     = "0.7.0"
 }
 
 variable "task_cpu" {

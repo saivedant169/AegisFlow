@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: aegisflow
-  tag: latest
+  repository: saivedant169/aegisflow
+  tag: "0.7.0"
   pullPolicy: IfNotPresent
 
 service:
@@ -69,8 +69,8 @@ serviceMonitor:
 operator:
   enabled: false
   image:
-    repository: aegisflow-operator
-    tag: latest
+    repository: saivedant169/aegisflow-operator
+    tag: "0.7.0"
   resources:
     limits:
       cpu: 200m

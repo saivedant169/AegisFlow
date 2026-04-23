@@ -16,7 +16,7 @@ spec:
       serviceAccountName: aegisflow-operator
       containers:
         - name: operator
-          image: aegisflow-operator:latest
+          image: saivedant169/aegisflow-operator:0.7.0
           imagePullPolicy: IfNotPresent
           args:
             - --namespace=default

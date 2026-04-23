@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: saivedant169/aegisflow
-  tag: "latest"
+  tag: "0.7.0"
   pullPolicy: IfNotPresent
 
 service:
