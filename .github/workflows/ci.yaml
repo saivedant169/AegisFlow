@@ -38,11 +38,17 @@ jobs:
         run: go test ./... -v -race -count=1 -coverprofile=coverage.out -covermode=atomic
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.out
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          curl -Os https://cli.codecov.io/latest/linux/codecov
+          chmod +x codecov
+          if [ -n "${CODECOV_TOKEN}" ]; then
+            ./codecov --verbose upload-process --disable-search -t "${CODECOV_TOKEN}" -f coverage.out
+          else
+            ./codecov --verbose upload-process --disable-search -f coverage.out
+          fi
 
   smoke:
     runs-on: ubuntu-latest
