@@ -70,7 +70,7 @@ operator:
   enabled: false
   image:
     repository: saivedant169/aegisflow-operator
-    tag: "0.7.0"
+    tag: "0c4659a"
   resources:
     limits:
       cpu: 200m
