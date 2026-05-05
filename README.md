@@ -644,7 +644,7 @@ AegisFlow/
 
 ## Production Readiness
 
-Before exposing AegisFlow outside a local demo, review the [production checklist](docs/production-checklist.md). It covers secret-backed tenant keys, admin service exposure, health checks, observability, and release gates.
+Before exposing AegisFlow outside a local demo, review the [production checklist](docs/production-checklist.md) and [operations runbook](docs/operations-runbook.md). They cover secret-backed tenant keys, admin service exposure, health checks, observability, backup/restore, and release gates.
 
 ---
 
@@ -678,7 +678,7 @@ Before exposing AegisFlow outside a local demo, review the [production checklist
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [MAINTAINERS.md](MAINTAINERS.md) for project expectations.
 
 **Good first issues** are labeled and include specific files and acceptance criteria.
 

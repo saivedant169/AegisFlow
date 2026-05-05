@@ -44,6 +44,7 @@ kubectl create secret generic aegisflow-tenant-key \
 - Send one known-bad prompt and confirm it returns `403`.
 - Verify audit/evidence export for a real session.
 - Confirm approval flows work before allowing write or deploy actions.
+- Review the [operations runbook](operations-runbook.md) for backup, restore, and incident response commands.
 
 ## Observability
 
