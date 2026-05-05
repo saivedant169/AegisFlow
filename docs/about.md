@@ -2,16 +2,18 @@
 
 ## The One-Line Summary
 
-AegisFlow is an open-source control center that manages, secures, and monitors all the AI traffic flowing between your applications and the AI models they depend on.
+AegisFlow is a free, open-source control center that manages, secures, and monitors AI traffic between your applications, agents, tools, and model providers.
+
+It is local-first by design. The default setup runs with Docker Compose, a mock provider, YAML policies, local logs, local audit evidence, and Prometheus metrics. Real model providers are optional bring-your-own-key connectors, not a requirement.
 
 
 ## The Problem
 
-Companies today are integrating AI into nearly everything — customer support chatbots, internal copilots, content generation tools, code assistants, and more. Most of these products rely on third-party AI providers like OpenAI, Anthropic, Google, or self-hosted models.
+Companies, students, open-source maintainers, and small teams are integrating AI into nearly everything: customer support chatbots, internal assistants, content generation tools, code assistants, and personal automation. Some use third-party AI providers. Others use local or self-hosted models.
 
 The problem is that as AI usage grows inside a company, things get messy very quickly.
 
-Each AI provider has its own SDK, its own request format, its own pricing, and its own quirks. Teams end up writing different integration code for each provider, scattered across different services. There is no single place to see how much AI is being used, how much it costs, or whether it is working reliably. When a provider goes down, applications break. When someone accidentally sends sensitive customer data to an AI model, nobody knows until it is too late. There is no central way to enforce rules about which teams can use which models, how much they can spend, or what kind of content is allowed to pass through.
+Each AI provider has its own SDK, its own request format, its own pricing, and its own quirks. Teams end up writing different integration code for each provider, scattered across different services. There is no single place to see how much AI is being used, how much it might cost, or whether it is working reliably. When a provider goes down, applications break. When someone accidentally sends sensitive customer data to an AI model, nobody knows until it is too late. There is no central way to enforce rules about which teams can use which models, how much they can spend, or what kind of content is allowed to pass through.
 
 This is not a small problem. It is the same kind of problem that companies solved years ago for regular API traffic using tools like API gateways, load balancers, and firewalls. But for AI traffic specifically, the tooling is still immature and fragmented.
 
@@ -26,7 +28,7 @@ AegisFlow sits between your applications and your AI providers. Every AI request
 
 **It routes requests intelligently.** AegisFlow decides which provider should handle each request based on rules you define. You can route based on the model name, the cost of the provider, the latency, or any combination. If the primary provider fails, AegisFlow automatically falls back to a secondary provider. This means your application stays up even when a provider goes down.
 
-**It enforces rate limits and budgets.** You can set limits on how many requests each team or user can make per minute, and how many tokens they can consume. This prevents runaway costs and ensures fair usage across your organization. When a limit is hit, the caller gets a clear message telling them to slow down.
+**It enforces rate limits and budgets.** You can set limits on how many requests each team or user can make per minute, and how many tokens they can consume. This prevents runaway usage and helps people understand cost before it becomes a problem. When a limit is hit, the caller gets a clear message telling them to slow down.
 
 **It enforces security and content policies.** Before a request reaches any AI provider, AegisFlow checks it against a set of policies you define. It can block prompt injection attempts, where a user tries to trick the AI into ignoring its instructions. It can detect and flag personally identifiable information like email addresses, social security numbers, or credit card numbers before they leave your network. It can filter the AI's response on the way back to block unwanted or harmful content. Each policy can be configured to block the request, log a warning, or simply record the event for later review.
 
@@ -37,7 +39,11 @@ AegisFlow sits between your applications and your AI providers. Every AI request
 
 ## Who Is This For
 
-AegisFlow is built for engineering teams and platform teams at companies that are using AI in production and want to manage it responsibly. Specifically:
+AegisFlow is built for people who want control over AI usage without depending on a hosted gateway. Specifically:
+
+**Students and individual builders** who want a safe local gateway for experiments, learning, and personal projects.
+
+**Open-source maintainers** who want coding agents and automation to run with clear boundaries, review steps, and evidence.
 
 **Platform engineers** who are responsible for the infrastructure that other teams build on. AegisFlow gives them a standard way to offer AI access to their organization with proper guardrails, visibility, and control.
 
@@ -60,7 +66,7 @@ Second, it is not just a proxy. Most existing tools focus on routing requests an
 
 Third, it is designed to be extensible. Adding support for a new AI provider means implementing a single interface with six methods. Adding a new policy filter means implementing one function. This makes it easy for the community to contribute and for organizations to customize it for their specific needs.
 
-Fourth, it is fully open source under the Apache 2.0 license. There is no open-core model with essential features hidden behind a paywall. Everything is available, and you can run it on your own infrastructure without any vendor dependency.
+Fourth, it is fully open source under the Apache 2.0 license. There is no open-core model with essential features hidden behind a paywall. Everything needed for local demos, policy enforcement, gateway routing, observability, and evidence is available, and you can run it on your own infrastructure without any vendor dependency.
 
 
 ## How It Works at a High Level

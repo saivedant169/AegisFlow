@@ -1,11 +1,11 @@
 <p align="center">
   <h1 align="center">AegisFlow</h1>
   <p align="center">
-    <strong>Open-source runtime governance for tool-using agents</strong>
+    <strong>Free, local-first AI gateway and runtime governance for LLM traffic</strong>
   </p>
   <p align="center">
-    Verify every action before it runs. Issue least-privilege access just in time.<br/>
-    Export tamper-evident evidence of what happened.
+    Route provider requests, enforce policy, protect keys, review risky tool actions,<br/>
+    and keep tamper-evident evidence without requiring any paid cloud service.
   </p>
   <p align="center">
     <a href="#quickstart">Quickstart</a> |
@@ -25,7 +25,47 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
-> **Let coding agents draft PRs safely.** Install in 15 minutes. Block destructive actions. Review risky writes. Prove what happened. [See the full walkthrough →](docs/PR_WRITER.md)
+> **Free by default.** AegisFlow runs locally with a mock provider, Docker Compose, Prometheus metrics, local audit logs, and YAML policies. Real providers are optional bring-your-own-key connectors.
+
+## What Is AegisFlow?
+
+AegisFlow is a free, open-source AI gateway that helps individuals, teams, and communities use AI APIs safely, transparently, and under their own control.
+
+It sits between applications, coding agents, and AI providers. Every request can be authenticated, rate-limited, policy-checked, routed, logged, measured, and reviewed before it reaches a provider or tool.
+
+Use it when you need to:
+
+- run an OpenAI-compatible gateway without being locked into one provider
+- protect API keys behind one controlled boundary
+- block unsafe prompts, sensitive data leaks, and destructive tool actions
+- track usage and estimated spend locally
+- expose free Prometheus metrics and local audit evidence
+- keep demos, tests, and development fully cost-free
+
+## Five-Minute Local Demo
+
+No cloud account or provider key is required.
+
+```bash
+git clone https://github.com/saivedant169/AegisFlow.git
+cd AegisFlow
+./scripts/quickstart.sh
+./scripts/demo.sh
+```
+
+The demo starts AegisFlow with the mock provider and local policy config. It exercises allowed actions, blocked actions, human review, audit verification, and the admin dashboard.
+
+![AegisFlow demo](demo.gif)
+
+## Free-First Promise
+
+- **Local by default:** Docker Compose, mock provider, local logs, and YAML policies work without paid services.
+- **Bring your own key:** OpenAI, Anthropic, Azure OpenAI, and other provider connectors are optional.
+- **No forced SaaS:** CI, tests, examples, demos, and docs do not require paid infrastructure.
+- **Free observability:** Prometheus `/metrics`, local logs, audit APIs, and dashboard JSON can run on your own machine.
+- **Free policy engine:** Built-in YAML policies work first; advanced engines and external services stay optional.
+
+> **Let coding agents draft PRs safely.** Install in minutes. Block destructive actions. Review risky writes. Prove what happened. [See the full walkthrough](docs/PR_WRITER.md)
 
 ## Quickstart: Governed PR Writer
 
@@ -52,6 +92,20 @@ Other policy packs: `readonly`, `infra-review`. See [starter-kit/README.md](star
 ---
 
 ## Why AegisFlow?
+
+Most gateways route traffic. Most policy engines evaluate rules. AegisFlow combines routing, policy, observability, approvals, and evidence in one local-first control point.
+
+| Need | Plain reverse proxy | Generic policy engine | AegisFlow |
+|------|---------------------|-----------------------|-----------|
+| OpenAI-compatible routing | Partial | No | Yes |
+| Mock provider for free demos | No | No | Yes |
+| Input/output policy checks | No | Yes, with integration work | Yes |
+| Multi-tenant API keys and rate limits | Usually no | No | Yes |
+| Tool-action allow/review/block flow | No | Partial | Yes |
+| Human approval queue | No | No | Yes |
+| Tamper-evident evidence reports | No | No | Yes |
+| Prometheus metrics | Sometimes | No | Yes |
+| Optional real providers | Yes | No | Yes |
 
 Agents are no longer just generating text. They are using tools, writing code, querying databases, and triggering real-world changes. The missing layer is not another model proxy. The missing layer is runtime trust.
 

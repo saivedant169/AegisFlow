@@ -2,7 +2,28 @@
 
 ## System Overview
 
-AegisFlow is a single Go binary that acts as a reverse proxy and control plane for AI/LLM traffic. It intercepts requests between client applications and AI providers, adding authentication, rate limiting, policy enforcement, routing, usage tracking, and observability.
+AegisFlow is a single Go binary that acts as a reverse proxy, policy boundary, and control plane for AI/LLM traffic and tool-using agents. It intercepts requests between clients and providers, adding authentication, rate limiting, policy enforcement, routing, usage tracking, approvals, evidence, and observability.
+
+The default path is fully local and cost-free: a mock provider, YAML policies, in-memory storage, local audit evidence, and Prometheus metrics. Real providers, Redis, PostgreSQL, Kubernetes, and external policy systems are optional integrations.
+
+## Local-First Runtime
+
+```mermaid
+graph LR
+    App[App or coding agent] --> Gateway[AegisFlow gateway]
+    Gateway --> Auth[API key auth]
+    Auth --> Policy[YAML policy engine]
+    Policy --> Router[Router]
+    Router --> Mock[Mock provider]
+    Router -. optional .-> OpenAI[OpenAI-compatible provider]
+    Router -. optional .-> Anthropic[Anthropic provider]
+    Router -. optional .-> Azure[Azure OpenAI provider]
+    Gateway --> Audit[Local audit and evidence]
+    Gateway --> Metrics[Prometheus metrics]
+    Gateway --> Admin[Admin API and dashboard]
+```
+
+Nothing in the local path requires a hosted account. Optional providers only run when a user configures their own key.
 
 ## Component Diagram
 
@@ -23,14 +44,15 @@ graph TB
         Router --> PolicyOut --> Usage
     end
 
-    Router --> OpenAI[OpenAI API]
-    Router --> Anthropic[Anthropic API]
+    Router -. optional .-> OpenAI[OpenAI API]
+    Router -. optional .-> Anthropic[Anthropic API]
     Router --> Ollama[Ollama]
     Router --> Mock[Mock Provider]
 
     Usage --> Metrics[Prometheus /metrics]
     Usage --> Traces[OTel Traces]
     Usage --> Admin[Admin API :8081]
+    Usage --> Audit[Audit / evidence]
 ```
 
 ## Request Flow
@@ -91,6 +113,10 @@ sequenceDiagram
 **OpenAI-compatible API.** Any application using the OpenAI SDK can connect to AegisFlow by changing `base_url`. This is the most important adoption decision.
 
 **Provider interface.** All providers implement the same 6-method interface. Adding a new provider requires zero changes to the gateway, router, or middleware.
+
+**Mock provider first.** The mock provider is a real first-class route target. It keeps demos, tests, CI, and local development free and repeatable.
+
+**Optional external services.** Paid providers, cloud secret managers, hosted tracing backends, Redis, and PostgreSQL are optional. The project must remain useful without them.
 
 **Middleware chain.** Each cross-cutting concern (auth, rate limiting, logging, metrics) is an independent middleware that can be added or removed from the chain.
 
