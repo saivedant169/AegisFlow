@@ -6,6 +6,12 @@ cd "$ROOT_DIR"
 
 COMPOSE_FILE="deployments/docker-compose.demo.yaml"
 
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is not running. Start Docker Desktop or your Docker daemon, then run:"
+  echo "  make demo-local"
+  exit 1
+fi
+
 echo "Starting local AegisFlow demo with the mock provider..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
