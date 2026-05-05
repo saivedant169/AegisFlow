@@ -1,0 +1,39 @@
+# AegisFlow Policy Pack: Local AI Safety
+# Free default policy for local demos and personal projects.
+name: local-ai-safety
+description: "Local-first policy: allow normal use, block common unsafe prompts and secret requests"
+default_decision: allow
+
+rules:
+  - protocol: "http"
+    tool: "chat.completions"
+    target: "*ignore previous instructions*"
+    decision: block
+
+  - protocol: "http"
+    tool: "chat.completions"
+    target: "*ignore all instructions*"
+    decision: block
+
+  - protocol: "http"
+    tool: "chat.completions"
+    target: "*print the secret*"
+    decision: block
+
+  - protocol: "http"
+    tool: "chat.completions"
+    target: "*show me the api key*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.env"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.printenv"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.cat"
+    target: ".env"
+    decision: block

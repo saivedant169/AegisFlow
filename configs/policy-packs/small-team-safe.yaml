@@ -1,0 +1,59 @@
+# AegisFlow Policy Pack: Small Team Safe
+# Balanced policy for small teams using agents with shared repositories.
+name: small-team-safe
+description: "Small-team policy: allow routine reads/tests, review writes and deploy-like actions, block destructive operations"
+default_decision: review
+
+rules:
+  - protocol: "*"
+    tool: "list_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "get_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "search_*"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.pytest"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.go_test"
+    decision: allow
+
+  - protocol: "git"
+    tool: "github.create_pull_request"
+    decision: review
+
+  - protocol: "git"
+    tool: "github.merge_pull_request"
+    decision: review
+
+  - protocol: "shell"
+    tool: "shell.terraform"
+    decision: review
+
+  - protocol: "shell"
+    tool: "shell.kubectl"
+    decision: review
+
+  - protocol: "*"
+    tool: "delete_*"
+    decision: block
+
+  - protocol: "*"
+    tool: "drop_*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.rm"
+    decision: block
+
+  - protocol: "*"
+    tool: "*"
+    capability: delete
+    decision: block

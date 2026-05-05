@@ -56,6 +56,8 @@ Recommended local checks:
 - `aegisflow_requests_total`
 - `aegisflow_request_duration_seconds`
 
+See [observability.md](observability.md) for the included Prometheus scrape config and Grafana dashboard JSON.
+
 ## Audit And Evidence
 
 Verify the audit chain:

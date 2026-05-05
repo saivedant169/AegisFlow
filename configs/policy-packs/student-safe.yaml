@@ -1,0 +1,54 @@
+# AegisFlow Policy Pack: Student Safe
+# Conservative policy for learning environments.
+name: student-safe
+description: "Learning-friendly policy: allow reads and local tests, review writes, block destructive actions"
+default_decision: block
+
+rules:
+  - protocol: "*"
+    tool: "list_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "get_*"
+    decision: allow
+
+  - protocol: "*"
+    tool: "read_*"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.ls"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.cat"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.grep"
+    decision: allow
+
+  - protocol: "shell"
+    tool: "shell.go_test"
+    decision: allow
+
+  - protocol: "*"
+    tool: "create_*"
+    decision: review
+
+  - protocol: "*"
+    tool: "update_*"
+    decision: review
+
+  - protocol: "*"
+    tool: "delete_*"
+    decision: block
+
+  - protocol: "shell"
+    tool: "shell.rm"
+    decision: block
+
+  - protocol: "sql"
+    tool: "sql.drop_*"
+    decision: block

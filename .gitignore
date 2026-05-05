@@ -17,6 +17,10 @@ coverage.html
 # Go
 vendor/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # IDE
 .idea/
 .vscode/

@@ -135,6 +135,8 @@ make build
 ## Next Steps
 
 - [Architecture documentation](architecture.md)
+- [Observability guide](observability.md)
+- [Webhook guide](webhooks.md)
 - [Operations runbook](operations-runbook.md)
 - [Configuration reference](../configs/aegisflow.example.yaml)
 - [API specification](../api/openapi.yaml)

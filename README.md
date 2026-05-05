@@ -277,6 +277,12 @@ make build
 ./examples/requests/openai-compatible-curl.sh
 ```
 
+### Free observability assets
+
+- Prometheus scrape config: [`deployments/observability/prometheus.yml`](deployments/observability/prometheus.yml)
+- Grafana dashboard JSON: [`deployments/grafana/aegisflow-dashboard.json`](deployments/grafana/aegisflow-dashboard.json)
+- Observability docs: [`docs/observability.md`](docs/observability.md)
+
 ### Real-world MCP testing
 
 Test AegisFlow's governance pipeline end-to-end with a mock MCP server that
