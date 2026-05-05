@@ -113,7 +113,7 @@ Send a request through AegisFlow and confirm the plugin fires:
 ```bash
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"what is my password"}]}'
+  -d '{"model":"openai-chat","messages":[{"role":"user","content":"what is my password"}]}'
 ```
 
 You should get a policy violation response.
@@ -198,7 +198,7 @@ The host performs these steps in order:
 ```json
 {
   "tenant_id": "default",
-  "model": "gpt-4o",
+  "model": "openai-chat",
   "provider": "openai",
   "phase": "input"
 }

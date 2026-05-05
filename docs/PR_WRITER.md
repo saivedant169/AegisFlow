@@ -4,7 +4,7 @@
 
 Your coding agent can read your repo, run tests, edit code, and open PRs. But it cannot merge to main, deploy to prod, touch destructive shell commands, or use broad credentials. Everything risky gets reviewed by a human. Everything destructive gets blocked. You have cryptographic proof of what happened.
 
-AegisFlow sits between Claude Code (or Cursor, Copilot, Codex) and the tools it calls. One Go binary, one YAML policy file, one approval queue, one hash-chained evidence log.
+AegisFlow sits between a coding agent and the tools it calls. One Go binary, one YAML policy file, one approval queue, one hash-chained evidence log.
 
 ---
 

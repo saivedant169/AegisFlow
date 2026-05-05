@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](../LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
-AegisFlow sits between your coding agent (Claude Code, Cursor, Copilot, Codex) and the tools it uses. Every tool call passes through AegisFlow, which decides: **allow**, **review** (human approval), or **block**. You get least-privilege enforcement, an approval workflow, and a tamper-evident audit trail -- without changing your agent or your tools.
+AegisFlow sits between your coding agent and the tools it uses. Every tool call passes through AegisFlow, which decides: **allow**, **review** (human approval), or **block**. You get least-privilege enforcement, an approval workflow, and a tamper-evident audit trail -- without changing your agent or your tools.
 
 This starter kit gets you from zero to governed agents in 15 minutes.
 

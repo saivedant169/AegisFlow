@@ -32,7 +32,7 @@ Your WASM module must export these functions:
 
 ### Metadata (input)
 
-    {"tenant_id": "default", "model": "gpt-4o", "provider": "openai", "phase": "input"}
+    {"tenant_id": "default", "model": "openai-chat", "provider": "openai", "phase": "input"}
 
 ### Result (output on violation)
 

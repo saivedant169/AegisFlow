@@ -77,8 +77,8 @@ providers:
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
     models:
-      - "gpt-4o"
-      - "gpt-4o-mini"
+      - "openai-chat"
+      - "openai-fast"
 ```
 
 Set your API key and restart:
@@ -88,7 +88,7 @@ export OPENAI_API_KEY="sk-..."
 make run
 ```
 
-Now requests for `gpt-*` models will route to OpenAI with automatic fallback to the mock provider.
+Now requests for configured OpenAI-backed models will route to OpenAI with automatic fallback to the mock provider.
 
 ## Monitoring
 

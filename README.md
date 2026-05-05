@@ -438,7 +438,7 @@ providers:
     enabled: true
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
-    models: ["gpt-4o", "gpt-4o-mini"]
+    models: ["openai-chat", "openai-fast"]
 
   - name: "anthropic"
     type: "anthropic"
@@ -449,7 +449,7 @@ providers:
 
 routes:
   - match:
-      model: "gpt-*"
+      model: "openai-*"
     providers: ["openai", "mock"]
     strategy: "priority"
 
