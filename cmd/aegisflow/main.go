@@ -77,11 +77,12 @@ func (a *notifierAdapter) NotifyDenied(item *approval.ApprovalItem) error {
 func main() {
 	configPath := flag.String("config", defaultConfigPath(), "path to config file")
 	showVersion := flag.Bool("version", false, "print aegisflow version")
+	flag.BoolVar(showVersion, "v", false, "print aegisflow version (shorthand)")
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version)
-		return
+		fmt.Println("aegisflow", version)
+		os.Exit(0)
 	}
 
 	loadEnvFile(".env")
