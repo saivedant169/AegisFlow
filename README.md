@@ -1,18 +1,18 @@
 <p align="center">
   <h1 align="center">AegisFlow</h1>
   <p align="center">
-    <strong>Free, local-first AI gateway and runtime governance for LLM traffic</strong>
+    <strong>Local-first runtime governance for coding agents and tool-using agents</strong>
   </p>
   <p align="center">
-    Route provider requests, enforce policy, protect keys, review risky tool actions,<br/>
-    and keep tamper-evident evidence without requiring any paid cloud service.
+    Let agents read, test, edit, and open PRs safely. Block destructive actions,<br/>
+    review risky writes, mint short-lived credentials, and verify tamper-evident evidence.
   </p>
   <p align="center">
-    <a href="#quickstart">Quickstart</a> |
+    <a href="#start-here-governed-pr-writer">Start Here</a> |
+    <a href="#what-aegisflow-controls">What It Controls</a> |
     <a href="#how-it-works">How It Works</a> |
-    <a href="#features">Features</a> |
-    <a href="#configuration">Configuration</a> |
-    <a href="#api-reference">API Reference</a> |
+    <a href="#design-principles">Design Principles</a> |
+    <a href="#legacy--supporting-capabilities">Gateway Mode</a> |
     <a href="#contributing">Contributing</a>
   </p>
 </p>
@@ -25,48 +25,23 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/saivedant169/aegisflow)](https://hub.docker.com/r/saivedant169/aegisflow)
 
-> **Free by default.** AegisFlow runs locally with a mock provider, Docker Compose, Prometheus metrics, local audit logs, and YAML policies. Real providers are optional bring-your-own-key connectors.
+> **Start here:** See the governed PR-writer walkthrough with blocked shell actions, reviewed GitHub writes, scoped credentials, and verifiable evidence. → [docs/PR_WRITER.md](docs/PR_WRITER.md)
 
-## What Is AegisFlow?
+## What AegisFlow Is
 
-AegisFlow is a free, open-source AI gateway that helps individuals, teams, and communities use AI APIs safely, transparently, and under their own control.
+AegisFlow is runtime governance for agents that take real actions. Agents are no longer just generating text. They are using tools, writing code, querying databases, and opening pull requests. AegisFlow sits at the boundary between the agent and the tools it calls, normalizes every action into an `ActionEnvelope`, and decides: **allow**, **review**, or **block**.
 
-It sits between applications, coding agents, and AI providers. Every request can be authenticated, rate-limited, policy-checked, routed, logged, measured, and reviewed before it reaches a provider or tool.
+It is local-first, single-binary, and runs without paid cloud services.
 
-Use it when you need to:
+Use AegisFlow when you need to:
 
-- run an OpenAI-compatible gateway without being locked into one provider
-- protect API keys behind one controlled boundary
-- block unsafe prompts, sensitive data leaks, and destructive tool actions
-- track usage and estimated spend locally
-- expose free Prometheus metrics and local audit evidence
-- keep demos, tests, and development fully cost-free
+- let a coding agent open PRs without merging to main or running destructive shell
+- review risky GitHub, SQL, or infrastructure writes before they execute
+- mint short-lived, task-scoped credentials instead of handing over user tokens
+- keep tamper-evident, hash-chained evidence of what an agent did and why
+- enforce one policy boundary across MCP tools, HTTP APIs, shell, SQL, and Git
 
-## Five-Minute Local Demo
-
-No cloud account or provider key is required.
-
-```bash
-git clone https://github.com/saivedant169/AegisFlow.git
-cd AegisFlow
-make demo-local
-```
-
-The demo starts AegisFlow with the mock provider and local policy config. It exercises an OpenAI-compatible chat request, policy blocking, Prometheus metrics, and the admin dashboard.
-
-![AegisFlow demo](demo.gif)
-
-## Free-First Promise
-
-- **Local by default:** Docker Compose, mock provider, local logs, and YAML policies work without paid services.
-- **Bring your own key:** OpenAI, Anthropic, Azure OpenAI, and other provider connectors are optional.
-- **No forced SaaS:** CI, tests, examples, demos, and docs do not require paid infrastructure.
-- **Free observability:** Prometheus `/metrics`, local logs, audit APIs, and dashboard JSON can run on your own machine.
-- **Free policy engine:** Built-in YAML policies work first; advanced engines and external services stay optional.
-
-> **Let coding agents draft PRs safely.** Install in minutes. Block destructive actions. Review risky writes. Prove what happened. [See the full walkthrough](docs/PR_WRITER.md)
-
-## Quickstart: Governed PR Writer
+## Start Here: Governed PR Writer
 
 Install AegisFlow in front of your coding agent in under 3 minutes:
 
@@ -82,6 +57,7 @@ Then connect your agent:
 - [Claude Code setup](starter-kit/editors/claude-code.md)
 - [Cursor setup](starter-kit/editors/cursor.md)
 - [Full quickstart](starter-kit/QUICKSTART_PR_WRITER.md)
+- [Proof walkthrough](docs/PR_WRITER.md)
 
 **What your agent can do:** read the repo, run tests, edit code, open PRs.
 **What it cannot do:** merge to main, deploy to prod, run destructive shell commands, use broad credentials, make high-risk writes without review.
@@ -180,9 +156,11 @@ type ActionEnvelope struct {
 
 ---
 
-## Quickstart
+## Legacy / Supporting Capabilities
 
-### One-click demo
+> The sections below cover **gateway mode** — AegisFlow's earlier identity as an OpenAI-compatible AI gateway with policy, observability, and mock provider. Gateway mode is still fully supported and is what powers the governance plane internally, but the primary product story is governed agent execution above. If you arrived here looking for an AI gateway, this is the right place.
+
+### One-click gateway demo
 
 ```bash
 git clone https://github.com/saivedant169/AegisFlow.git
