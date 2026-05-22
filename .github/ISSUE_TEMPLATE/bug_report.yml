@@ -1,0 +1,81 @@
+name: Bug report
+description: Reproducible bug in AegisFlow runtime, CLI, or governance behavior.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Provide every field below — vague reports get auto-closed with a request for detail.
+        For install/setup issues, use the **Install problem** template instead.
+  - type: input
+    id: version
+    attributes:
+      label: AegisFlow version
+      description: Output of `aegisflow --version`
+      placeholder: aegisflow v0.7.0
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment mode
+      options:
+        - Docker Compose
+        - Binary (make build)
+        - Kubernetes / Helm
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS / kernel
+      placeholder: macOS 14.5 / Ubuntu 22.04 / Windows 11 WSL2
+    validations:
+      required: true
+  - type: input
+    id: policy_pack
+    attributes:
+      label: Policy pack used
+      placeholder: pr-writer / readonly / infra-review / custom
+    validations:
+      required: true
+  - type: textarea
+    id: action
+    attributes:
+      label: Command or action attempted
+      description: Exact CLI command, MCP tool call, or HTTP request that triggered the bug.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include verbatim error text. Do not paraphrase.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / evidence / screenshots
+      description: Paste relevant stderr, aegisflow logs, evidence bundle hash, or screenshots. Redact secrets.
+      render: shell
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and Discussions and this is not a duplicate
+          required: true
+        - label: I verified this reproduces on the latest release
+          required: true

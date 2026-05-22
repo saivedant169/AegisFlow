@@ -1,5 +1,8 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: Discussions
     url: https://github.com/saivedant169/AegisFlow/discussions
-    about: Ask questions and discuss ideas
+    about: Ask questions, share policy packs, and propose ideas. Use Issues only for reproducible bugs and concrete requests.
+  - name: Governed PR Writer walkthrough
+    url: https://github.com/saivedant169/AegisFlow/blob/main/docs/PR_WRITER.md
+    about: See the proof artifact before filing setup questions.

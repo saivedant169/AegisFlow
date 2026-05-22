@@ -1,0 +1,66 @@
+name: Install problem
+description: AegisFlow won't start, the starter kit fails, or the demo errors out.
+title: "[Install] "
+labels: ["install"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For install-time failures (build, Docker, starter kit, demo, dashboard not loading).
+        For runtime bugs after a successful install, use the **Bug report** template.
+  - type: input
+    id: version
+    attributes:
+      label: AegisFlow version or commit
+      placeholder: v0.7.0 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: path
+    attributes:
+      label: Install path attempted
+      options:
+        - starter-kit/install-pr-writer.sh
+        - make demo-local
+        - Docker Compose (deployments/docker-compose.yaml)
+        - make build + make run
+        - Kubernetes / Helm
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS / architecture
+      placeholder: macOS 14.5 arm64 / Ubuntu 22.04 amd64
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Docker / Go versions (if relevant)
+      placeholder: Docker 26.1.4 / Go 1.26.2
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Exact commands run
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Verbatim error output
+      description: Copy the full failing stderr/stdout. Do not summarize.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Relevant environment / config
+      description: Custom ports, proxies, corporate firewall, GitHub App config, .env values (redact secrets).
+    validations:
+      required: false

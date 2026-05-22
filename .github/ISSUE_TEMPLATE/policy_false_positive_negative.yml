@@ -1,0 +1,62 @@
+name: Policy false positive / false negative
+description: AegisFlow blocked an action that should have been allowed, or allowed something that should have been blocked or reviewed.
+title: "[Policy] "
+labels: ["policy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when the policy engine's decision (allow / review / block) is wrong for your use case.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Decision class
+      options:
+        - False positive (blocked or reviewed an action that should have been allowed)
+        - False negative (allowed an action that should have been reviewed or blocked)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AegisFlow version
+      placeholder: aegisflow v0.7.0
+    validations:
+      required: true
+  - type: input
+    id: policy_pack
+    attributes:
+      label: Policy pack
+      placeholder: pr-writer / readonly / infra-review / custom
+    validations:
+      required: true
+  - type: textarea
+    id: envelope
+    attributes:
+      label: ActionEnvelope (or closest reconstruction)
+      description: Tool, protocol, target, parameters, capability. Paste the JSON envelope from logs if you have it.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Policy decision returned
+      description: Decision + matched rule name + justification text.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What decision should have been returned, and why
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / logs
+      description: Relevant log lines, evidence hash, or `aegisctl evidence verify` output. Redact secrets.
+      render: shell
+    validations:
+      required: false

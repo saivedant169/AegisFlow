@@ -1,0 +1,58 @@
+name: Feature request
+description: Propose a concrete capability, policy pack, or DX improvement.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for scoped, concrete proposals. For open-ended ideas or design discussion, post in Discussions instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem you are trying to solve
+      description: Describe the agent / operator / security scenario this addresses. Not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: who
+    attributes:
+      label: Who needs this and why now
+      description: User type (coding agent operator, platform engineer, security reviewer, contributor) and the trigger.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed change
+      description: API shape, CLI flag, config field, policy rule, or workflow. Sketch is fine.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds considered
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Policy engine
+        - Starter kit / policy packs
+        - CLI / aegisctl
+        - Evidence / audit
+        - Credential broker
+        - Observability / metrics
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to open a PR for this with guidance
+          required: false
