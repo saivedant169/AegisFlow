@@ -17,6 +17,12 @@
   </p>
 </p>
 
+<!-- HERO VISUAL SLOT — replace with a GIF of the governed PR-writer flow:
+     agent reads repo -> runs tests -> blocked destructive shell -> reviewed GitHub write
+     -> scoped credential minted -> evidence verified. Recommended: docs/assets/hero-pr-writer.gif
+     <p align="center"><img src="docs/assets/hero-pr-writer.gif" alt="AegisFlow governing a coding agent opening a PR" width="800"/></p>
+-->
+
 ---
 
 [![CI](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml/badge.svg)](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml)
@@ -43,7 +49,7 @@ Use AegisFlow when you need to:
 
 ## Start Here: Governed PR Writer
 
-Install AegisFlow in front of your coding agent in under 3 minutes:
+### 3 commands to your first governed PR
 
 ```bash
 git clone https://github.com/saivedant169/AegisFlow.git
@@ -51,13 +57,13 @@ cd AegisFlow/starter-kit
 ./install-pr-writer.sh
 ```
 
-The installer builds AegisFlow, starts it with the tuned PR-writer policy pack, runs 3 sanity checks, and prints exactly what to do next. Tested install-to-verified time: **under 10 seconds**.
+That is the whole install. The script builds AegisFlow, starts it with the tuned PR-writer policy pack, runs 3 sanity checks, and prints exactly what to do next. Tested install-to-verified time: **under 10 seconds**.
 
 Then connect your agent:
 - [Claude Code setup](starter-kit/editors/claude-code.md)
 - [Cursor setup](starter-kit/editors/cursor.md)
 - [Full quickstart](starter-kit/QUICKSTART_PR_WRITER.md)
-- [Proof walkthrough](docs/PR_WRITER.md)
+- [Proof walkthrough](docs/PR_WRITER.md) — see one exact scenario end to end
 
 **What your agent can do:** read the repo, run tests, edit code, open PRs.
 **What it cannot do:** merge to main, deploy to prod, run destructive shell commands, use broad credentials, make high-risk writes without review.
