@@ -92,6 +92,13 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	// Surface non-fatal config warnings (e.g. tool-policy rules referencing
+	// an unknown protocol that will never match). These are debugging hints,
+	// not errors — do not exit.
+	for _, warning := range config.ValidateToolPolicies(cfg) {
+		log.Println(warning)
+	}
+
 	// Structured logger
 	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
 	defer logger.Sync()

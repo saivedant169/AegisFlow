@@ -975,3 +975,55 @@ providers:
 		t.Fatal("expected invalid retry config to be rejected")
 	}
 }
+
+func TestValidateToolPolicies_FlagsUnknownProtocol(t *testing.T) {
+	cfg := &Config{
+		ToolPolicies: ToolPolicyConfig{
+			Rules: []ToolPolicyRule{
+				{Protocol: "git", Tool: "github.get_*", Decision: "allow"},
+				{Protocol: "bogus", Tool: "*", Decision: "block"},
+				{Protocol: "shell", Tool: "shell.rm", Decision: "block"},
+				{Protocol: "carrierpigeon", Tool: "send", Decision: "review"},
+				{Protocol: "", Tool: "any", Decision: "allow"}, // empty == any, no warning
+			},
+		},
+	}
+
+	warnings := ValidateToolPolicies(cfg)
+	if len(warnings) != 2 {
+		t.Fatalf("expected 2 warnings, got %d: %v", len(warnings), warnings)
+	}
+
+	want1 := `[config] tool policy rule #1 references unknown protocol "bogus", rule will never match`
+	want2 := `[config] tool policy rule #3 references unknown protocol "carrierpigeon", rule will never match`
+	if warnings[0] != want1 {
+		t.Fatalf("warning[0] mismatch:\n got: %q\nwant: %q", warnings[0], want1)
+	}
+	if warnings[1] != want2 {
+		t.Fatalf("warning[1] mismatch:\n got: %q\nwant: %q", warnings[1], want2)
+	}
+}
+
+func TestValidateToolPolicies_AcceptsKnownProtocols(t *testing.T) {
+	cfg := &Config{
+		ToolPolicies: ToolPolicyConfig{
+			Rules: []ToolPolicyRule{
+				{Protocol: "*", Tool: "*", Decision: "review"},
+				{Protocol: "mcp", Tool: "github.list_*", Decision: "allow"},
+				{Protocol: "http", Tool: "api.GET", Decision: "allow"},
+				{Protocol: "sql", Tool: "select", Decision: "allow"},
+				{Protocol: "git", Tool: "github.create_pull_request", Decision: "review"},
+				{Protocol: "shell", Tool: "shell.pytest", Decision: "allow"},
+			},
+		},
+	}
+	if warnings := ValidateToolPolicies(cfg); len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got: %v", warnings)
+	}
+}
+
+func TestValidateToolPolicies_NilConfig(t *testing.T) {
+	if warnings := ValidateToolPolicies(nil); warnings != nil {
+		t.Fatalf("expected nil for nil config, got %v", warnings)
+	}
+}

@@ -1044,3 +1044,41 @@ func validateConfig(cfg *Config) error {
 
 	return nil
 }
+
+// knownToolPolicyProtocols enumerates the protocol identifiers the policy
+// engine actually evaluates against ActionEnvelopes. "*" is a wildcard.
+var knownToolPolicyProtocols = map[string]bool{
+	"*":     true,
+	"mcp":   true,
+	"http":  true,
+	"shell": true,
+	"sql":   true,
+	"git":   true,
+}
+
+// ValidateToolPolicies returns human-readable warnings for tool-policy rules
+// that look like they will never match (for example, references to a
+// protocol that is not in the known set). It deliberately never returns an
+// error: the goal is to surface debugging hints, not reject the config.
+//
+// Warning format matches the contract in issue #78:
+//
+//	[config] tool policy rule #N references unknown protocol %q, rule will never match
+func ValidateToolPolicies(cfg *Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	var warnings []string
+	for i, rule := range cfg.ToolPolicies.Rules {
+		proto := strings.TrimSpace(rule.Protocol)
+		if proto == "" {
+			// An empty protocol means "any" in the engine; not a warning.
+			continue
+		}
+		if !knownToolPolicyProtocols[proto] {
+			warnings = append(warnings,
+				fmt.Sprintf("[config] tool policy rule #%d references unknown protocol %q, rule will never match", i, proto))
+		}
+	}
+	return warnings
+}
