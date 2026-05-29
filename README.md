@@ -182,6 +182,8 @@ cd AegisFlow
 docker compose -f deployments/docker-compose.yaml up
 ```
 
+Putting nginx or Caddy in front for TLS, SSE buffering, and admin-port isolation: see [docs/deploy/reverse-proxy.md](docs/deploy/reverse-proxy.md). Hit a snag? [docs/troubleshooting.md](docs/troubleshooting.md) covers port conflicts, Docker daemon issues, GitHub App config, invalid policy files, and evidence-verify failures.
+
 ### Option 2: Run locally
 
 ```bash
