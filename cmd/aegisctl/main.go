@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -55,7 +56,13 @@ func main() {
 			os.Exit(1)
 		}
 	case "status":
-		cmdStatus(gatewayURL, adminURL)
+		jsonOut := false
+		for _, a := range os.Args[2:] {
+			if a == "--json" || a == "-json" {
+				jsonOut = true
+			}
+		}
+		cmdStatus(gatewayURL, adminURL, jsonOut)
 	case "usage":
 		cmdUsage(adminURL)
 	case "models":
@@ -225,7 +232,7 @@ Commands:
   evidence    Evidence management (sessions, export, report)
   policy-pack Manage policy packs (list, show)
   plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
-  status      Check gateway and admin health
+  status      Check gateway and admin health (add --json for machine output)
   usage       Show usage per tenant and model
   models      List available models
   providers   List configured providers with health
@@ -250,13 +257,21 @@ Environment:
   AEGISFLOW_ADMIN_URL    Admin URL (default: http://localhost:8081)`)
 }
 
-func cmdStatus(gatewayURL, adminURL string) {
-	fmt.Println("AegisFlow Status")
-	fmt.Println("════════════════════════════════════════════════════")
-
+func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	// Health
 	gwOK := checkHealth(gatewayURL + "/health")
 	adOK := checkHealth(adminURL + "/health")
+
+	if jsonOut {
+		emitStatusJSON(gatewayURL, adminURL, gwOK, adOK)
+		if !gwOK || !adOK {
+			os.Exit(1)
+		}
+		return
+	}
+
+	fmt.Println("AegisFlow Status")
+	fmt.Println("════════════════════════════════════════════════════")
 	fmt.Printf("  Gateway:  %s  (%s)\n", statusIcon(gwOK), gatewayURL)
 	fmt.Printf("  Admin:    %s  (%s)\n", statusIcon(adOK), adminURL)
 
@@ -377,6 +392,43 @@ func cmdStatus(gatewayURL, adminURL string) {
 		os.Exit(1)
 	}
 	fmt.Println("All systems operational.")
+}
+
+// emitStatusJSON prints a machine-readable snapshot of the same checks
+// cmdStatus surfaces in human mode. Used by `aegisctl status --json`.
+func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) {
+	out := map[string]interface{}{
+		"gateway":     map[string]interface{}{"url": gatewayURL, "healthy": gwOK},
+		"admin":       map[string]interface{}{"url": adminURL, "healthy": adOK},
+		"pending":     0,
+		"sessions":    0,
+		"chain_valid": true,
+		"healthy":     gwOK && adOK,
+	}
+
+	if adOK {
+		if approvals, ok := fetchJSON(adminURL + "/admin/v1/approvals").(map[string]interface{}); ok {
+			if pending, ok := approvals["pending"].([]interface{}); ok {
+				out["pending"] = len(pending)
+			}
+		}
+		if sess, ok := fetchJSON(adminURL + "/admin/v1/evidence/sessions").([]interface{}); ok {
+			out["sessions"] = len(sess)
+			for _, s := range sess {
+				if m, ok := s.(map[string]interface{}); ok {
+					if v, ok := m["chain_valid"].(bool); ok && !v {
+						out["chain_valid"] = false
+						out["healthy"] = false
+						break
+					}
+				}
+			}
+		}
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
 }
 
 func cmdUsage(adminURL string) {
