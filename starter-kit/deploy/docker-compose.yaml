@@ -1,3 +1,6 @@
+# Production deployments should put nginx/Caddy in front of these ports.
+# See ../../docs/deploy/reverse-proxy.md for working nginx + Caddy snippets
+# (TLS, SSE buffering, WebSocket upgrade, admin-port isolation).
 services:
   aegisflow:
     build:
