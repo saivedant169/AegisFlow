@@ -115,3 +115,43 @@ func TestLocalTestAction_ReviewGitPush(t *testing.T) {
 		t.Fatal("expected approval ID for review decision")
 	}
 }
+
+func TestFormatTestActionOutput_DryRun(t *testing.T) {
+	result := &testActionResult{
+		Decision:     "block",
+		EnvelopeID:   "dry-uuid",
+		EvidenceHash: "dryhash",
+		Message:      "Action is blocked by policy",
+		Local:        true,
+		DryRun:       true,
+	}
+	out := formatTestActionOutput(result)
+	if !strings.Contains(out, "dry run") {
+		t.Fatal("expected dry run notice in output")
+	}
+	if strings.Contains(out, "admin server not reachable") {
+		t.Fatal("dry run must not show the fallback notice")
+	}
+	if !strings.Contains(out, "BLOCKED") {
+		t.Fatal("expected BLOCKED in dry-run output")
+	}
+}
+
+func TestLocalTestAction_DryRunNoSideEffects(t *testing.T) {
+	// localTestAction is pure: it must never touch the network. We assert it
+	// returns a decision and a hash without any admin URL in scope.
+	result := localTestAction("mcp", "github.delete_repo", "foo", "delete", nil)
+	if result.Decision == "" {
+		t.Fatal("expected a decision from local evaluation")
+	}
+	if result.EvidenceHash == "" {
+		t.Fatal("expected an evidence hash from local evaluation")
+	}
+	// The dry-run path sets DryRun=true on top of this; verify the flag is
+	// independent of decision content.
+	result.DryRun = true
+	out := formatTestActionOutput(result)
+	if !strings.Contains(out, "dry run") {
+		t.Fatal("expected dry-run notice once flag is set")
+	}
+}

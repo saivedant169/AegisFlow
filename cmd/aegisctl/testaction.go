@@ -27,14 +27,18 @@ type testActionResult struct {
 	Message      string `json:"message"`
 	ApprovalID   string `json:"approval_id,omitempty"`
 	Local        bool   `json:"-"`
+	DryRun       bool   `json:"-"`
 }
 
 func cmdTestAction(adminURL string, args []string) {
 	var protocol, tool, target, capability, paramsStr string
+	dryRun := false
 
 	// Parse flags manually to match the existing CLI pattern.
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--dry-run":
+			dryRun = true
 		case "--protocol":
 			if i+1 < len(args) {
 				protocol = args[i+1]
@@ -64,7 +68,7 @@ func cmdTestAction(adminURL string, args []string) {
 	}
 
 	if protocol == "" || tool == "" || target == "" {
-		fmt.Println("Usage: aegisctl test-action --protocol <mcp|shell|sql|git|http> --tool <tool_name> --target <target> [--capability <read|write|delete|deploy>] [--params key=value,...]")
+		fmt.Println("Usage: aegisctl test-action [--dry-run] --protocol <mcp|shell|sql|git|http> --tool <tool_name> --target <target> [--capability <read|write|delete|deploy>] [--params key=value,...]")
 		os.Exit(1)
 	}
 
@@ -77,6 +81,15 @@ func cmdTestAction(adminURL string, args []string) {
 				params[kv[0]] = kv[1]
 			}
 		}
+	}
+
+	// --dry-run: evaluate locally only. No admin API call, no evidence
+	// recorded, no approval queued. Same output shape as the normal path.
+	if dryRun {
+		result := localTestAction(protocol, tool, target, capability, params)
+		result.DryRun = true
+		printTestActionResult(result)
+		return
 	}
 
 	// Try remote evaluation first
@@ -185,7 +198,9 @@ func localTestAction(protocol, tool, target, capability string, params map[strin
 func formatTestActionOutput(result *testActionResult) string {
 	var sb strings.Builder
 
-	if result.Local {
+	if result.DryRun {
+		sb.WriteString("(dry run - local evaluation only, nothing recorded)\n\n")
+	} else if result.Local {
 		sb.WriteString("(local evaluation - admin server not reachable)\n\n")
 	}
 
