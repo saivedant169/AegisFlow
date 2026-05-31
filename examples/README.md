@@ -32,6 +32,32 @@ Available configs:
 
 No request in this directory calls a paid provider.
 
+## CLI Automation
+
+`examples/cli-automation.sh` shows how to drive AegisFlow from scripts and CI with the machine-readable CLI surface:
+
+```bash
+./examples/cli-automation.sh           # safe: reports only
+APPROVE=1 ./examples/cli-automation.sh # also acts on the first pending item
+```
+
+It covers three patterns:
+
+- **Test a policy without executing it** — `aegisctl test-action --dry-run` evaluates the policy locally and prints the decision. No admin API call, no audit entry, no approval queued. Use it while iterating on a policy pack.
+- **Parse pending approvals programmatically** — `aegisctl pending --json` emits the raw array; pipe it into `jq` to script approve/deny logic.
+- **Gate a pipeline on health** — `aegisctl status --json` exits `0` when healthy, `1` when the gateway/admin is down or the evidence chain is invalid.
+
+```bash
+# dry-run a risky tool: see the decision, change nothing
+aegisctl test-action --dry-run --protocol mcp --tool github.delete_repo --target acme/widgets
+
+# count pending items in CI
+aegisctl pending --json | jq 'length'
+
+# fail a deploy step if AegisFlow is unhealthy
+aegisctl status --json | jq -e '.healthy == true'
+```
+
 ## Webhook Example
 
 Run the local webhook sink:
