@@ -74,7 +74,13 @@ func main() {
 	case "tenants":
 		cmdTenants(adminURL)
 	case "pending":
-		cmdPending(adminURL)
+		jsonOut := false
+		for _, a := range os.Args[2:] {
+			if a == "--json" || a == "-json" {
+				jsonOut = true
+			}
+		}
+		cmdPending(adminURL, jsonOut)
 	case "approve":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: aegisctl approve <id> [comment]")
@@ -238,7 +244,7 @@ Commands:
   providers   List configured providers with health
   policies    List configured policies
   tenants     List tenants with rate limits
-  pending     List pending approval items
+  pending     List pending approval items (add --json for machine output)
   approve     Approve a pending item: aegisctl approve <id> [comment]
   deny        Deny a pending item: aegisctl deny <id> [comment]
   policy      Policy versioning (history, current, rollback)
@@ -247,7 +253,7 @@ Commands:
   diff-policy Diff two policy files: aegisctl diff-policy <old.yaml> <new.yaml>
   manifest    Manage task manifests and drift detection (create, list, drift)
   supply-chain Manage supply chain trust (list, sign, verify)
-  test-action Simulate an agent action through governance pipeline
+  test-action Run an agent action through governance pipeline (add --dry-run for local-only, no audit/queue)
   test [msg]  Send a test chat completion
   version     Show version
   help        Show this help
@@ -712,7 +718,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func cmdPending(adminURL string) {
+func cmdPending(adminURL string, jsonOut bool) {
 	resp, err := client.Get(adminURL + "/admin/v1/approvals")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -726,6 +732,18 @@ func cmdPending(adminURL string) {
 	}
 
 	pending, _ := result["pending"].([]interface{})
+
+	// Machine-readable: emit the raw pending array (empty array if none).
+	if jsonOut {
+		if pending == nil {
+			pending = []interface{}{}
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(pending)
+		return
+	}
+
 	if len(pending) == 0 {
 		fmt.Println("No pending approvals.")
 		return
