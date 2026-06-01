@@ -244,8 +244,9 @@ func (h *Handler) processWSRequest(ctx context.Context, tenantID string, req *ty
 	// Route to provider
 	routed, err := h.router.RouteWithProvider(ctx, req)
 	if err != nil {
+		log.Printf("websocket: provider routing error: %v", err)
 		h.recordAnalytics(tenantID, req.Model, "", http.StatusBadGateway, startTime, 0)
-		return nil, h.wsErrorEnvelope("", http.StatusBadGateway, "provider_error", err.Error())
+		return nil, h.wsErrorEnvelope("", http.StatusBadGateway, "provider_error", "upstream provider error")
 	}
 	resp := routed.Response
 	providerName := routed.Provider

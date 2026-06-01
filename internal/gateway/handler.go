@@ -253,9 +253,10 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	routed, err := h.router.RouteWithProvider(r.Context(), &req)
 	if err != nil {
+		log.Printf("chat completion: provider routing error: %v", err)
 		h.recordAnalytics(tenantID, req.Model, "", http.StatusBadGateway, startTime, 0)
 		h.logRequest(startTime, r, tenantID, req.Model, "", http.StatusBadGateway, 0, false, "")
-		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
+		writeError(w, http.StatusBadGateway, "provider_error", "upstream provider error")
 		return
 	}
 	resp := routed.Response
@@ -378,7 +379,8 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 
 	stream, err := h.router.RouteStream(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "provider_error", err.Error())
+		log.Printf("chat completion stream: provider routing error: %v", err)
+		writeError(w, http.StatusBadGateway, "provider_error", "upstream provider error")
 		return
 	}
 	defer stream.Close()
@@ -405,6 +407,11 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 			// Accumulate for policy scanning
 			if h.policy != nil {
 				accumulated.Write(chunk)
+				if accumulated.Len() > maxAccumulatedStreamBytes {
+					s := accumulated.String()
+					accumulated.Reset()
+					accumulated.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
+				}
 				bytesScanned += n
 
 				if bytesScanned >= checkInterval {
