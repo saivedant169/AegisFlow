@@ -257,6 +257,18 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		tenantID = t.ID
 	}
 
+	// Apply the same model aliasing + request transforms the OpenAI path uses,
+	// so configured governance (system-prompt injection, aliases, per-tenant
+	// overrides) applies consistently regardless of wire format.
+	if h.modelAliases != nil {
+		ApplyModelAlias(req, h.modelAliases)
+	}
+	var tenantTransform *TransformConfig
+	if tenantID != "" && h.tenantTransforms != nil {
+		tenantTransform = h.tenantTransforms[tenantID]
+	}
+	TransformRequestWithTenant(req, h.transformCfg, tenantTransform)
+
 	// Input policy + audit, before anything leaves for the provider.
 	if h.policy != nil {
 		inputContent := extractContent(req.Messages)
@@ -343,6 +355,26 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+
+// CountTokens handles POST /v1/messages/count_tokens. The Anthropic SDK and
+// Claude Code call it to budget context-window usage. AegisFlow has no
+// upstream tokenizer, so it returns a byte-based estimate; the value is
+// advisory. Response shape: {"input_tokens": N}.
+func (h *Handler) CountTokens(w http.ResponseWriter, r *http.Request) {
+	var in anthropicMessagesRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, h.maxBodySize)).Decode(&in); err != nil {
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "failed to parse request body")
+		return
+	}
+	if len(in.Messages) == 0 && len(in.System) == 0 {
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "messages is required")
+		return
+	}
+	req := translateMessagesRequest(&in)
+	tokens := estimateTokens(extractContent(req.Messages))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"input_tokens": tokens})
 }
 
 // writeSSE writes one Anthropic SSE event (named event + JSON data) and flushes.

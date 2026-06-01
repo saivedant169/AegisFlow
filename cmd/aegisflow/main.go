@@ -413,6 +413,7 @@ func main() {
 	r.Get("/health", healthHandler)
 	r.Post("/v1/chat/completions", handler.ChatCompletion)
 	r.Post("/v1/messages", handler.Messages)
+	r.Post("/v1/messages/count_tokens", handler.CountTokens)
 	r.Get("/v1/models", handler.ListModels)
 
 	// WebSocket endpoint
