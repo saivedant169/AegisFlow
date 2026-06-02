@@ -14,6 +14,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/approval"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
+	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
 
@@ -266,6 +267,7 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 
 	decision := g.policyEngine.Evaluate(env)
 	env.PolicyDecision = decision
+	middleware.RecordPolicyDecision(string(decision), string(env.Protocol))
 	if g.evidence != nil {
 		g.evidence.Record(env)
 	}
@@ -341,6 +343,7 @@ func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
 	// Evaluate policy
 	decision := g.policyEngine.Evaluate(env)
 	env.PolicyDecision = decision
+	middleware.RecordPolicyDecision(string(decision), string(env.Protocol))
 
 	// Record in evidence chain
 	if g.evidence != nil {
