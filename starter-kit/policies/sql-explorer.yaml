@@ -1,0 +1,107 @@
+# AegisFlow Policy Pack: SQL Explorer
+#
+# Use this when a coding/BI agent should explore a database read-first to
+# answer questions, without being able to mutate or destroy data.
+# Good for: data analysts, BI assistants, ad-hoc analytics, schema discovery.
+#
+# What's allowed:
+#   SQL:    SELECT (always)
+#   GitHub: list_*, get_* (to find schema/migration files in a repo)
+#   Shell:  read-only inspection (ls, cat, grep, find, head, tail, wc)
+#
+# What needs human review:
+#   SQL:    INSERT, UPDATE  (a human confirms scope before any write lands)
+#
+# What's blocked outright:
+#   SQL:    DELETE, DROP, TRUNCATE, GRANT, REVOKE
+#   GitHub: any write
+#   Shell:  anything not on the read-only allow list
+#
+# Default decision is BLOCK: anything not matched below is denied.
+#
+# Note: rules match on protocol + tool (+ optional target). Enforcing
+# "UPDATE must have a WHERE clause" is a SQL-content concern, not a tool-name
+# concern, so INSERT/UPDATE are sent to review rather than allowed. See
+# sql-explorer-tuning-notes.md.
+
+tool_policies:
+  enabled: true
+  default_decision: "block"
+  rules:
+    # === SQL: dangerous operations are blocked first (first match wins) ===
+    - protocol: "sql"
+      tool: "sql.delete"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.drop_*"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.truncate"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.grant"
+      decision: "block"
+    - protocol: "sql"
+      tool: "sql.revoke"
+      decision: "block"
+
+    # === SQL: writes go to human review ===
+    - protocol: "sql"
+      tool: "sql.insert"
+      decision: "review"
+    - protocol: "sql"
+      tool: "sql.update"
+      decision: "review"
+
+    # === SQL: reads are always allowed ===
+    - protocol: "sql"
+      tool: "sql.select"
+      decision: "allow"
+
+    # === GitHub: read-only, to locate schemas/migrations (git + mcp) ===
+    - protocol: "git"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "git"
+      tool: "github.get_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.list_*"
+      decision: "allow"
+    - protocol: "mcp"
+      tool: "github.get_*"
+      decision: "allow"
+
+    # === Shell: read-only inspection only; secrets are blocked first ===
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: ".env"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.cat"
+      target: "/etc/shadow"
+      decision: "block"
+    - protocol: "shell"
+      tool: "shell.ls"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.cat"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.grep"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.find"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.head"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.tail"
+      decision: "allow"
+    - protocol: "shell"
+      tool: "shell.wc"
+      decision: "allow"
+
+    # Everything else (sql.* writes not listed, github writes, other shell,
+    # http, etc.) falls through to default_decision: block.
