@@ -4,6 +4,38 @@ All notable changes to AegisFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while it is pre-1.0.
 
+## [0.8.0] - 2026-06-03
+
+Runtime-governance identity, an Anthropic-native gateway path, and operator DX. This release lets Claude Code and the Anthropic SDK route through AegisFlow so their prompts are governed and audited before they reach a provider, surfaces policy decisions in Prometheus, adds a data-explorer policy pack, and sharpens the CLI and docs.
+
+### Added
+
+- **Inbound Anthropic Messages API** (`POST /v1/messages`): route Claude Code (via `ANTHROPIC_BASE_URL`) and the Anthropic SDK through the gateway. Prompts run through the same input/output policy + audit pipeline as the OpenAI path, with streaming re-framed as Anthropic SSE events and tool-use requests rejected loudly rather than silently degraded. (#102)
+- `POST /v1/messages/count_tokens` so Anthropic clients can budget context (estimate).
+- Request transforms and model aliasing now apply on the `/v1/messages` path, matching the OpenAI handler.
+- **Prometheus `aegisflow_policy_decisions_total{decision,protocol}`** counter, incremented in the MCP gateway and exposed on `/metrics`. (#79)
+- **`sql-explorer` policy pack** for BI/data agents: `SELECT` allowed, `INSERT`/`UPDATE` reviewed, `DELETE`/`DROP`/`TRUNCATE`/`GRANT`/`REVOKE` blocked. Includes tuning notes and a contract test. (#87)
+- `aegisctl status --json`, `aegisctl pending --json`, and `aegisctl test-action --dry-run` for automation and safe policy iteration. (#86, #77, #83)
+- `--version` / `-v` flags on the `aegisflow` binary. (#96)
+- Config startup warnings for tool-policy rules referencing an unknown protocol. (#78)
+- nginx + Caddy reverse-proxy guide, a troubleshooting guide, and a CLI automation example. (#84)
+- GitHub Discussions and structured issue forms for community reports.
+
+### Changed
+
+- README repositioned to lead with runtime governance for coding agents; legacy gateway content moved under a supporting section.
+
+### Fixed
+
+- MCP stdio bridge now returns a JSON-RPC error when the gateway is unreachable instead of echoing an empty line that left clients hung on "connecting".
+- Upstream provider errors are redacted to a generic message for clients (detail logged server-side) on the chat, stream, and WebSocket paths. (#103)
+- Streaming policy-scan buffers are bounded to a sliding window so memory and scan cost stay linear on long streams. (#103)
+- `golang.org/x/net` updated to v0.55.0 for GO-2026-5026.
+
+### Security
+
+- Audit-log `detail` is built with `json.Marshal` instead of string concatenation, preventing malformed or forgeable audit JSON when a prompt or policy message contains quotes; prompt truncation is now UTF-8 rune-safe.
+
 ## [0.7.0] - 2026-04-22
 
 This release focuses on production readiness: safer deployment defaults, stronger validation, release hygiene, and automated checks that make the runtime easier to operate with confidence.
