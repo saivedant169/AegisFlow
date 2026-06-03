@@ -36,7 +36,7 @@ echo "==========================================="
 hdr "1) Checking prerequisites"
 
 if ! command -v go >/dev/null 2>&1; then
-    fail "Go not found (need 1.26.2+)"
+    fail "Go not found (need 1.26.4+)"
     cleanup_fail
 fi
 GO_VER=$(go version | awk '{print $3}' | sed 's/go//')
@@ -46,8 +46,8 @@ GO_PATCH=$(echo "$GO_VER" | cut -d. -f3)
 GO_PATCH="${GO_PATCH:-0}"
 if [ "$GO_MAJOR" -lt 1 ] || \
    { [ "$GO_MAJOR" -eq 1 ] && [ "$GO_MINOR" -lt 26 ]; } || \
-   { [ "$GO_MAJOR" -eq 1 ] && [ "$GO_MINOR" -eq 26 ] && [ "$GO_PATCH" -lt 2 ]; }; then
-    fail "Go $GO_VER too old (need 1.26.2+)"
+   { [ "$GO_MAJOR" -eq 1 ] && [ "$GO_MINOR" -eq 26 ] && [ "$GO_PATCH" -lt 4 ]; }; then
+    fail "Go $GO_VER too old (need 1.26.4+)"
     cleanup_fail
 fi
 pass "Go $GO_VER"

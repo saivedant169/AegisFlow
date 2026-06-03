@@ -187,7 +187,7 @@ Putting nginx or Caddy in front for TLS, SSE buffering, and admin-port isolation
 ### Option 2: Run locally
 
 ```bash
-# Install Go 1.26.2+
+# Install Go 1.26.4+
 brew install go
 
 # Clone and build
