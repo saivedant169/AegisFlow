@@ -89,19 +89,48 @@ func (s *Store) Add(tenantID, providerName, model string, u types.Usage, cost fl
 	pm.EstimatedCostUSD += cost
 }
 
+// clone returns a deep copy of a TenantUsage, including its inner maps, so the
+// caller can read or JSON-encode it without racing concurrent Add calls.
+func (t *TenantUsage) clone() *TenantUsage {
+	if t == nil {
+		return nil
+	}
+	c := &TenantUsage{
+		TenantID:         t.TenantID,
+		TotalRequests:    t.TotalRequests,
+		TotalTokens:      t.TotalTokens,
+		EstimatedCostUSD: t.EstimatedCostUSD,
+		ByModel:          make(map[string]*ModelUsage, len(t.ByModel)),
+		ByProviderModel:  make(map[string]*ProviderModelUsage, len(t.ByProviderModel)),
+	}
+	for k, v := range t.ByModel {
+		m := *v
+		c.ByModel[k] = &m
+	}
+	for k, v := range t.ByProviderModel {
+		pm := *v
+		c.ByProviderModel[k] = &pm
+	}
+	return c
+}
+
+// Get returns a deep copy of one tenant's usage (nil if unknown). Returning the
+// live pointer would race the maps mutated by Add.
 func (s *Store) Get(tenantID string) *TenantUsage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.tenants[tenantID]
+	return s.tenants[tenantID].clone()
 }
 
+// GetAll returns deep copies of every tenant's usage, safe to read or encode
+// while Add keeps running.
 func (s *Store) GetAll() map[string]*TenantUsage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	result := make(map[string]*TenantUsage, len(s.tenants))
 	for k, v := range s.tenants {
-		result[k] = v
+		result[k] = v.clone()
 	}
 	return result
 }

@@ -1,6 +1,7 @@
 package usage
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/saivedant169/AegisFlow/pkg/types"
@@ -35,4 +36,40 @@ func TestStoreAddsProviderBreakdown(t *testing.T) {
 	if anthropic == nil || anthropic.Requests != 1 {
 		t.Fatalf("expected anthropic entry to have 1 request, got %+v", anthropic)
 	}
+}
+
+func TestStoreGetAllRaceSafe(t *testing.T) {
+	s := NewStore()
+	var wg sync.WaitGroup
+
+	// Writer: keep adding usage for several tenants/models.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 2000; i++ {
+			s.Add("t1", "openai", "gpt-4o", types.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2}, 0.01)
+			s.Add("t2", "anthropic", "claude", types.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2}, 0.02)
+		}
+	}()
+
+	// Readers: iterate the returned snapshot the way the admin/GraphQL handlers
+	// do. With live pointers this raced and panicked on the inner maps.
+	for r := 0; r < 4; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 2000; i++ {
+				for _, tu := range s.GetAll() {
+					for _, m := range tu.ByModel {
+						_ = m.TotalTokens
+					}
+				}
+				if g := s.Get("t1"); g != nil {
+					for range g.ByProviderModel {
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
