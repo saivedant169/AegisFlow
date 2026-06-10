@@ -391,49 +391,73 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	// Streaming with output policy scanning
-	var accumulated strings.Builder
+	// Output policy is enforced check-before-release: bytes are buffered and
+	// scanned before they go to the client, so blocked content never leaves the
+	// gateway. (The old code wrote each chunk first and scanned afterwards,
+	// which meant the violating bytes had already reached the client by the
+	// time we noticed.) With no policy configured there's nothing to scan, so we
+	// pass bytes straight through.
 	buf := make([]byte, 4096)
-	checkInterval := 500 // check policy every N bytes
-	bytesScanned := 0
+
+	if h.policy == nil {
+		for {
+			n, err := stream.Read(buf)
+			if n > 0 {
+				w.Write(buf[:n])
+				flusher.Flush()
+			}
+			if err != nil {
+				break
+			}
+		}
+		return
+	}
+
+	var scanWindow strings.Builder // bounded tail used for the policy scan
+	var pending []byte             // bytes scanned-but-not-yet-released
+	const checkInterval = 500
+
+	// release scans the current window and, unless blocked, sends the buffered
+	// bytes to the client. Returns false if the stream was blocked (the caller
+	// must stop); the SSE error event is already written in that case.
+	release := func() bool {
+		if len(pending) == 0 {
+			return true
+		}
+		if v, checkErr := h.policy.CheckOutput(scanWindow.String()); checkErr != nil {
+			log.Printf("policy engine stream check error: %v", checkErr)
+		} else if v != nil && v.Action == policy.ActionBlock {
+			h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
+			errPayload, _ := json.Marshal(map[string]string{
+				"error":   "policy_violation",
+				"message": v.Message,
+			})
+			w.Write([]byte("data: "))
+			w.Write(errPayload)
+			w.Write([]byte("\n\n"))
+			flusher.Flush()
+			log.Printf("stream terminated: %s", policy.FormatViolation(v))
+			return false
+		}
+		w.Write(pending)
+		flusher.Flush()
+		pending = pending[:0]
+		return true
+	}
 
 	for {
 		n, err := stream.Read(buf)
 		if n > 0 {
-			chunk := buf[:n]
-			w.Write(chunk)
-			flusher.Flush()
-
-			// Accumulate for policy scanning
-			if h.policy != nil {
-				accumulated.Write(chunk)
-				if accumulated.Len() > maxAccumulatedStreamBytes {
-					s := accumulated.String()
-					accumulated.Reset()
-					accumulated.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
-				}
-				bytesScanned += n
-
-				if bytesScanned >= checkInterval {
-					if v, checkErr := h.policy.CheckOutput(accumulated.String()); checkErr != nil {
-						log.Printf("policy engine stream check error: %v", checkErr)
-					} else if v != nil {
-						if v.Action == policy.ActionBlock {
-							h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-							// Send error event in SSE format to terminate stream
-							errPayload, _ := json.Marshal(map[string]string{
-								"error":   "policy_violation",
-								"message": v.Message,
-							})
-							w.Write([]byte("data: "))
-							w.Write(errPayload)
-							w.Write([]byte("\n\n"))
-							flusher.Flush()
-							log.Printf("stream terminated: %s", policy.FormatViolation(v))
-							return
-						}
-					}
-					bytesScanned = 0
+			pending = append(pending, buf[:n]...)
+			scanWindow.Write(buf[:n])
+			if scanWindow.Len() > maxAccumulatedStreamBytes {
+				s := scanWindow.String()
+				scanWindow.Reset()
+				scanWindow.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
+			}
+			if len(pending) >= checkInterval {
+				if !release() {
+					return
 				}
 			}
 		}
@@ -444,6 +468,8 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 			break
 		}
 	}
+	// Scan and release whatever's left below the interval.
+	release()
 }
 
 func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {

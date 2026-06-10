@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -779,5 +780,46 @@ func TestClose(t *testing.T) {
 	_, ok := <-h2.dbQueue
 	if ok {
 		t.Error("expected dbQueue channel to be closed")
+	}
+}
+
+// TestChatCompletionStreamOutputBlockedBeforeRelease checks that when the
+// streamed output trips an output policy, the offending text never reaches the
+// client. The mock streams a sentence containing "streaming"; an output filter
+// blocks that word. The client should see the policy_violation error and none
+// of the blocked content.
+func TestChatCompletionStreamOutputBlockedBeforeRelease(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{
+		{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"},
+	}
+	rt := router.NewRouter(routes, registry)
+	outputFilters := []policy.Filter{
+		policy.NewKeywordFilter("block-out", policy.ActionBlock, []string{"streaming"}),
+	}
+	pe := policy.NewEngine(nil, outputFilters)
+	ut := usage.NewTracker(usage.NewStore())
+	h := NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, nil, nil)
+
+	body, _ := json.Marshal(types.ChatCompletionRequest{
+		Model:    "mock",
+		Messages: []types.Message{{Role: "user", Content: "go"}},
+		Stream:   true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.ChatCompletion(w, req)
+
+	out := w.Body.String()
+	if !strings.Contains(out, "policy_violation") {
+		t.Fatalf("expected a policy_violation error event, got:\n%s", out)
+	}
+	// "You said" is part of the mock's streamed reply, not the error message, so
+	// it's a clean marker for whether any blocked content was released.
+	if strings.Contains(out, "You said") {
+		t.Fatalf("blocked content reached the client before the policy check:\n%s", out)
 	}
 }
