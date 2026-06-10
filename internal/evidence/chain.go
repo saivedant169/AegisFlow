@@ -2,8 +2,10 @@ package evidence
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -77,18 +79,32 @@ func (c *SessionChain) Count() int {
 }
 
 func computeRecordHash(r Record) string {
-	data := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s",
-		r.Index,
+	// Length-prefix each field so its contents can't shift the boundaries; the
+	// old "%d|%s|..." join was ambiguous when a field contained '|'.
+	return canonicalHash(
+		strconv.Itoa(r.Index),
 		r.Timestamp.UTC().Format(time.RFC3339Nano),
 		r.Envelope.ID,
 		r.Envelope.Tool,
-		r.Envelope.PolicyDecision,
+		string(r.Envelope.PolicyDecision),
 		r.Envelope.Hash(),
-		r.Envelope.RequestedCapability,
+		string(r.Envelope.RequestedCapability),
 		r.PreviousHash,
 	)
-	hash := sha256.Sum256([]byte(data))
-	return fmt.Sprintf("%x", hash)
+}
+
+// canonicalHash hashes an injective encoding of its fields: each is written as
+// a 4-byte big-endian length followed by its bytes, so no field can be mistaken
+// for a delimiter or shift another's boundary.
+func canonicalHash(fields ...string) string {
+	h := sha256.New()
+	var lenBuf [4]byte
+	for _, f := range fields {
+		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(f)))
+		h.Write(lenBuf[:])
+		h.Write([]byte(f))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Export returns the full chain as JSON bytes.

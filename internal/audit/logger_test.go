@@ -312,3 +312,13 @@ func TestMemoryStoreLastHashWithEntries(t *testing.T) {
 		t.Errorf("expected 64 char hex hash, got %d chars", len(hash))
 	}
 }
+
+// TestComputeHashNoDelimiterCollision makes sure two entries that only differ
+// in where a '|' falls hash to different values. The old join collided here.
+func TestComputeHashNoDelimiterCollision(t *testing.T) {
+	a := Entry{Actor: "alice|admin", ActorRole: "operator"}
+	b := Entry{Actor: "alice", ActorRole: "admin|operator"}
+	if computeHash(a) == computeHash(b) {
+		t.Fatal("entries differing only by delimiter placement collided")
+	}
+}

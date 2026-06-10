@@ -2,6 +2,8 @@ package audit
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"sync"
@@ -111,9 +113,26 @@ func (l *Logger) Query(filters QueryFilters) ([]Entry, error) {
 }
 
 func computeHash(e Entry) string {
-	data := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s",
+	// Length-prefix every field so the boundaries are unambiguous. The old
+	// "%s|%s|..." join let a '|' inside a field (e.g. attacker-controlled
+	// Detail/Actor) shift the boundaries, so two different entries could hash
+	// to the same value and a forged record could still pass Verify.
+	return canonicalHash(
 		e.Timestamp.UTC().Format(time.RFC3339Nano),
-		e.Actor, e.ActorRole, e.Action, e.Resource, e.Detail, e.TenantID, e.PreviousHash)
-	hash := sha256.Sum256([]byte(data))
-	return fmt.Sprintf("%x", hash)
+		e.Actor, e.ActorRole, e.Action, e.Resource, e.Detail, e.TenantID, e.PreviousHash,
+	)
+}
+
+// canonicalHash hashes an injective encoding of its fields: each field is
+// written as a 4-byte big-endian length followed by its bytes, so no field's
+// contents can be mistaken for a delimiter or shift another field's boundary.
+func canonicalHash(fields ...string) string {
+	h := sha256.New()
+	var lenBuf [4]byte
+	for _, f := range fields {
+		binary.BigEndian.PutUint32(lenBuf[:], uint32(len(f)))
+		h.Write(lenBuf[:])
+		h.Write([]byte(f))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }

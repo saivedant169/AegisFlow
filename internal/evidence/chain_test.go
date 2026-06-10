@@ -162,3 +162,12 @@ func TestExportWithRecords(t *testing.T) {
 		t.Fatalf("expected 2 records in array, got %d", len(records))
 	}
 }
+
+func TestCanonicalHashInjective(t *testing.T) {
+	if canonicalHash("a|b", "c") == canonicalHash("a", "b|c") {
+		t.Fatal("canonicalHash is not injective across field boundaries")
+	}
+	if canonicalHash("x", "y") == canonicalHash("xy", "") {
+		t.Fatal("canonicalHash collided on concatenation")
+	}
+}
