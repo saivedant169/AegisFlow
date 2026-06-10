@@ -176,6 +176,7 @@ func main() {
 			cfg.Cache.Semantic.Threshold,
 			cfg.Cache.Semantic.MaxSize,
 		)
+		defer semanticCache.Close()
 		log.Printf("[init] semantic cache enabled (threshold=%.2f, max=%d)",
 			cfg.Cache.Semantic.Threshold, cfg.Cache.Semantic.MaxSize)
 	}

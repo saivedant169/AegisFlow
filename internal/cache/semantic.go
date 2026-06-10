@@ -26,15 +26,61 @@ type SemanticCache struct {
 	entries   []semanticEntry
 	hits      int64
 	misses    int64
+
+	storeCh   chan storeJob
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+// storeJob is a deferred insert handled off the request's critical path. text
+// is prebuilt so the worker never needs the request, and embedding carries the
+// vector already computed during lookup so the worker skips a second embed call.
+type storeJob struct {
+	tenantID  string
+	model     string
+	text      string
+	embedding []float64
+	resp      *types.ChatCompletionResponse
 }
 
 func NewSemanticCache(embedder Embedder, threshold float64, maxSize int) *SemanticCache {
-	return &SemanticCache{
+	sc := &SemanticCache{
 		embedder:  embedder,
 		threshold: threshold,
 		maxSize:   maxSize,
 		entries:   make([]semanticEntry, 0, maxSize),
+		storeCh:   make(chan storeJob, 256),
+		done:      make(chan struct{}),
 	}
+	go sc.storeWorker()
+	return sc
+}
+
+// storeWorker drains queued inserts so embedding-on-store and the insert itself
+// stay off the request path.
+func (sc *SemanticCache) storeWorker() {
+	for {
+		select {
+		case <-sc.done:
+			return
+		case job := <-sc.storeCh:
+			vec := job.embedding
+			if vec == nil {
+				v, err := sc.embedder.Embed(context.Background(), job.text)
+				if err != nil {
+					log.Printf("[semantic-cache] embedding failed on async store: %v", err)
+					continue
+				}
+				vec = v
+			}
+			sc.insert(job.tenantID, job.model, vec, job.resp)
+		}
+	}
+}
+
+// Close stops the background store worker.
+func (sc *SemanticCache) Close() {
+	sc.closeOnce.Do(func() { close(sc.done) })
 }
 
 func (sc *SemanticCache) buildText(req *types.ChatCompletionRequest) string {
@@ -47,13 +93,22 @@ func (sc *SemanticCache) buildText(req *types.ChatCompletionRequest) string {
 
 // GetSemantic searches for a semantically similar cached response.
 func (sc *SemanticCache) GetSemantic(tenantID string, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, bool) {
+	resp, _, ok := sc.GetSemanticWithEmbedding(tenantID, req)
+	return resp, ok
+}
+
+// GetSemanticWithEmbedding is GetSemantic but also returns the embedding it
+// computed for the request. On a miss the caller can hand that vector to
+// StoreAsync so the store doesn't embed the same text a second time — turning
+// the previous two embedding round-trips per miss into one.
+func (sc *SemanticCache) GetSemanticWithEmbedding(tenantID string, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, []float64, bool) {
 	vec, err := sc.embedder.Embed(context.Background(), sc.buildText(req))
 	if err != nil {
 		log.Printf("[semantic-cache] embedding failed: %v", err)
 		sc.mu.Lock()
 		sc.misses++
 		sc.mu.Unlock()
-		return nil, false
+		return nil, nil, false
 	}
 
 	sc.mu.RLock()
@@ -78,21 +133,47 @@ func (sc *SemanticCache) GetSemantic(tenantID string, req *types.ChatCompletionR
 
 	if bestResp != nil && bestScore >= sc.threshold {
 		sc.hits++
-		return bestResp, true
+		return bestResp, vec, true
 	}
 
 	sc.misses++
-	return nil, false
+	return nil, vec, false
 }
 
-// SetSemantic stores a response with its embedding for semantic matching.
+// SetSemantic stores a response, embedding the request synchronously. Kept for
+// the Cache contract and callers that want a blocking insert; the hot request
+// path uses StoreAsync with a reused embedding instead.
 func (sc *SemanticCache) SetSemantic(tenantID string, req *types.ChatCompletionRequest, resp *types.ChatCompletionResponse) {
 	vec, err := sc.embedder.Embed(context.Background(), sc.buildText(req))
 	if err != nil {
 		log.Printf("[semantic-cache] embedding failed on set: %v", err)
 		return
 	}
+	sc.insert(tenantID, req.Model, vec, resp)
+}
 
+// StoreAsync queues a response for insertion off the request's critical path.
+// embedding is the vector already computed by GetSemanticWithEmbedding; pass nil
+// to have the worker embed lazily. If the queue is full the insert is dropped
+// (the cache is best-effort).
+func (sc *SemanticCache) StoreAsync(tenantID string, req *types.ChatCompletionRequest, resp *types.ChatCompletionResponse, embedding []float64) {
+	job := storeJob{
+		tenantID:  tenantID,
+		model:     req.Model,
+		text:      sc.buildText(req),
+		embedding: embedding,
+		resp:      resp,
+	}
+	select {
+	case <-sc.done:
+	case sc.storeCh <- job:
+	default:
+		log.Printf("[semantic-cache] store queue full — dropping insert")
+	}
+}
+
+// insert appends an entry under lock, evicting the oldest past maxSize.
+func (sc *SemanticCache) insert(tenantID, model string, vec []float64, resp *types.ChatCompletionResponse) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -102,7 +183,7 @@ func (sc *SemanticCache) SetSemantic(tenantID string, req *types.ChatCompletionR
 
 	sc.entries = append(sc.entries, semanticEntry{
 		tenantID:  tenantID,
-		model:     req.Model,
+		model:     model,
 		embedding: vec,
 		response:  resp,
 		createdAt: time.Now(),

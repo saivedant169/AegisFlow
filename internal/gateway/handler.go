@@ -227,15 +227,20 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Semantic cache lookup (non-streaming only)
+	// Semantic cache lookup (non-streaming only). Keep the embedding it computes
+	// so a miss can reuse it for the store instead of embedding the same text
+	// again.
+	var semanticEmbedding []float64
 	if h.semanticCache != nil {
-		if cached, ok := h.semanticCache.GetSemantic(tenantID, &req); ok {
+		cached, embedding, ok := h.semanticCache.GetSemanticWithEmbedding(tenantID, &req)
+		if ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-AegisFlow-Cache", "SEMANTIC-HIT")
 			h.logRequest(startTime, r, tenantID, req.Model, "semantic-cache", http.StatusOK, cached.Usage.TotalTokens, true, "")
 			json.NewEncoder(w).Encode(cached)
 			return
 		}
+		semanticEmbedding = embedding
 	}
 
 	// Check cache (non-streaming only)
@@ -297,7 +302,8 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		h.cache.Set(cacheKey, resp)
 	}
 	if h.semanticCache != nil {
-		h.semanticCache.SetSemantic(tenantID, &req, resp)
+		// Reuse the lookup embedding and insert off the request path.
+		h.semanticCache.StoreAsync(tenantID, &req, resp, semanticEmbedding)
 	}
 
 	// Track usage
