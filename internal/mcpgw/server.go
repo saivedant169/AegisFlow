@@ -58,7 +58,7 @@ type UpstreamConfig struct {
 // Gateway is an MCP gateway proxy that intercepts tool calls for policy evaluation.
 type Gateway struct {
 	policyEngine *toolpolicy.Engine
-	evidence     *evidence.SessionChain
+	evidence     evidence.Recorder
 	approvals    *approval.Queue
 	upstreams    []UpstreamConfig
 	client       *http.Client
@@ -68,7 +68,7 @@ type Gateway struct {
 
 // NewGateway creates a new MCP gateway.
 // evidence and approvals may be nil if not available.
-func NewGateway(pe *toolpolicy.Engine, ev *evidence.SessionChain, aq *approval.Queue, upstreams []UpstreamConfig) *Gateway {
+func NewGateway(pe *toolpolicy.Engine, ev evidence.Recorder, aq *approval.Queue, upstreams []UpstreamConfig) *Gateway {
 	g := &Gateway{
 		policyEngine: pe,
 		evidence:     ev,

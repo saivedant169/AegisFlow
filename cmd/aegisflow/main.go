@@ -526,11 +526,13 @@ func main() {
 		log.Printf("[init] cost optimization engine enabled")
 	}
 
-	// Evidence chain — sign records so the chain can't be quietly rewritten by
-	// anyone who only has access to the store.
-	evidenceChain := evidence.NewSignedSessionChain("aegisflow-main", loadEvidenceKey())
-	evidenceAdapter := evidence.NewAdminAdapter(evidenceChain)
-	log.Printf("[init] evidence chain enabled (session: %s)", evidenceChain.SessionID())
+	// Evidence — one signed chain per session, so sessions append in parallel
+	// and idle ones are evicted instead of one global chain growing forever.
+	// Records are signed so they can't be quietly rewritten from the store.
+	evidenceRegistry := evidence.NewChainRegistry(loadEvidenceKey())
+	defer evidenceRegistry.Close()
+	evidenceAdapter := evidence.NewRegistryAdminAdapter(evidenceRegistry)
+	log.Printf("[init] evidence enabled (per-session signed chains)")
 
 	// Approval queue
 	approvalQueue := approval.NewQueue(1000)
@@ -786,7 +788,7 @@ func main() {
 		// second engine here left the gateway frozen on the startup rules.
 		// Record MCP tool decisions in the evidence chain — without this the
 		// flagship tamper-evident log captured nothing for real tool calls.
-		mcpGateway := mcpgw.NewGateway(tpEngine, evidenceChain, approvalQueue, upstreams)
+		mcpGateway := mcpgw.NewGateway(tpEngine, evidenceRegistry, approvalQueue, upstreams)
 		mcpAddr := fmt.Sprintf("%s:%d", cfg.MCPGateway.Host, cfg.MCPGateway.Port)
 
 		var mcpHandler http.Handler = mcpGateway
