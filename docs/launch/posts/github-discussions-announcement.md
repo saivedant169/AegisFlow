@@ -58,7 +58,7 @@ A coding agent that drafts PRs, kept on a short leash:
 6. **PR opens** with a **scoped, 10-minute credential** — never the user's real token.
 7. **Evidence exported and verified** — a hash-chained, tamper-evident chain you can independently check.
 
-The governance decision itself adds single-digit microseconds. On the throughput side, AegisFlow sustains 58,000+ requests/sec with ~1.1 ms p50 latency, so it sits in the path without getting in the way.
+The governance decision itself adds single-digit microseconds. On the throughput side, the in-process governance pipeline benchmarks at ~58,000 evaluations/sec with ~1.1 ms p50 — overhead, not end-to-end HTTP throughput, so it stays out of the way.
 
 Walkthrough with real envelopes, decisions, and log lines: https://github.com/saivedant169/AegisFlow/blob/main/docs/PR_WRITER.md
 

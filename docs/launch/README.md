@@ -40,6 +40,6 @@ verifiable evidence. Proof: [docs/PR_WRITER.md](../PR_WRITER.md).
 
 ## Facts you may cite (and only these)
 
-58,000+ req/s · 1.1 ms p50 · single-digit-microsecond governance overhead ·
+58,000+ evals/sec (in-process governance benchmark) · 1.1 ms p50 · single-digit-microsecond governance overhead ·
 ~80% test coverage · Apache-2.0 · Go single binary · v0.8.0. No star/user
 counts. Honest about pre-1.0.

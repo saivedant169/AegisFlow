@@ -10,7 +10,7 @@ That's what AegisFlow does.
 
 > AegisFlow lets coding agents read, test, edit, and open PRs safely — while blocking destructive actions, reviewing risky writes, minting scoped credentials, and proving what happened.
 
-It's an Apache-2.0, single Go binary that runs locally with no paid cloud services for the core. It sits at the boundary between a coding agent and the tools it calls (MCP, shell, SQL, GitHub, HTTP). Every action is normalized into an `ActionEnvelope`, and a policy engine decides **allow / review / block**. The governance decision itself adds single-digit microseconds; the gateway sustains 58,000+ requests/sec at 1.1 ms p50.
+It's an Apache-2.0, single Go binary that runs locally with no paid cloud services for the core. It sits at the boundary between a coding agent and the tools it calls (MCP, shell, SQL, GitHub, HTTP). Every action is normalized into an `ActionEnvelope`, and a policy engine decides **allow / review / block**. The governance decision itself adds single-digit microseconds; the in-process governance pipeline runs ~58,000 evaluations/sec at 1.1 ms p50 (single-threaded micro-benchmark, not end-to-end HTTP throughput).
 
 This is pre-1.0 (v0.8.0), so treat it accordingly — but the workflow below is real and runs end to end.
 

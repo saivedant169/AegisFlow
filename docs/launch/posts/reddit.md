@@ -11,7 +11,7 @@ It sits at the boundary between a coding agent and the tools it calls — MCP, s
 - Instead of handing the agent your token, it **mints short-lived, task-scoped credentials** (think a 10-minute scoped cred for one job).
 - It records a **hash-chained, tamper-evident evidence log** you can export and verify after the fact, so you can actually prove what the agent did.
 
-The governance decision itself adds single-digit microseconds; in benchmarking the gateway it handles 58,000+ requests/sec with ~1.1 ms p50. Test coverage is around 80%. Being upfront: it's pre-1.0, so treat it accordingly.
+The governance decision itself adds single-digit microseconds; the in-process governance pipeline benchmarks at ~58,000 evaluations/sec, ~1.1 ms p50 (not end-to-end HTTP throughput). Test coverage is around 80%. Being upfront: it's pre-1.0, so treat it accordingly.
 
 **The example I'd point at: a governed PR-writer**
 
