@@ -413,9 +413,62 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 		return
 	}
 
-	var scanWindow strings.Builder // bounded tail used for the policy scan
-	var pending []byte             // bytes scanned-but-not-yet-released
+	var pending []byte // bytes scanned-but-not-yet-released
 	const checkInterval = 500
+
+	emitBlock := func(v *policy.Violation) {
+		h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
+		errPayload, _ := json.Marshal(map[string]string{
+			"error":   "policy_violation",
+			"message": v.Message,
+		})
+		w.Write([]byte("data: "))
+		w.Write(errPayload)
+		w.Write([]byte("\n\n"))
+		flusher.Flush()
+		log.Printf("stream terminated: %s", policy.FormatViolation(v))
+	}
+
+	flushPending := func() {
+		if len(pending) > 0 {
+			w.Write(pending)
+			flusher.Flush()
+			pending = pending[:0]
+		}
+	}
+
+	// When every output filter supports incremental matching, scan each chunk
+	// once as it arrives (O(total bytes)) instead of re-scanning the whole
+	// accumulated window every checkInterval (O(n^2)). Bytes are still scanned
+	// before release, so blocked content never egresses.
+	if matcher, ok := h.policy.NewOutputStreamMatcher(); ok {
+		for {
+			n, err := stream.Read(buf)
+			if n > 0 {
+				if v := matcher.Write(buf[:n]); v != nil && v.Action == policy.ActionBlock {
+					emitBlock(v)
+					return
+				}
+				pending = append(pending, buf[:n]...)
+				if len(pending) >= checkInterval {
+					flushPending()
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		if v := matcher.Close(); v != nil && v.Action == policy.ActionBlock {
+			emitBlock(v)
+			return
+		}
+		flushPending()
+		return
+	}
+
+	// Fallback: some output filter can match an unbounded span (regex/PII/WASM),
+	// so re-scan a bounded accumulated window before releasing each batch.
+	var scanWindow strings.Builder // bounded tail used for the policy scan
 
 	// release scans the current window and, unless blocked, sends the buffered
 	// bytes to the client. Returns false if the stream was blocked (the caller
@@ -427,21 +480,10 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 		if v, checkErr := h.policy.CheckOutput(scanWindow.String()); checkErr != nil {
 			log.Printf("policy engine stream check error: %v", checkErr)
 		} else if v != nil && v.Action == policy.ActionBlock {
-			h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-			errPayload, _ := json.Marshal(map[string]string{
-				"error":   "policy_violation",
-				"message": v.Message,
-			})
-			w.Write([]byte("data: "))
-			w.Write(errPayload)
-			w.Write([]byte("\n\n"))
-			flusher.Flush()
-			log.Printf("stream terminated: %s", policy.FormatViolation(v))
+			emitBlock(v)
 			return false
 		}
-		w.Write(pending)
-		flusher.Flush()
-		pending = pending[:0]
+		flushPending()
 		return true
 	}
 

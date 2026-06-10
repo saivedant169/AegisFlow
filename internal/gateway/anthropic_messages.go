@@ -442,24 +442,38 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	const checkInterval = 500
 	finishReason := ""
 
-	// flushPending scans the current window and, unless blocked, releases the
-	// buffered deltas to the client. Returns false if the stream was blocked
-	// (caller must stop). The error event, if any, is already written.
+	// When every output filter supports incremental matching, scan each delta
+	// once as it arrives (O(total bytes)) instead of re-scanning the whole
+	// window every checkInterval (O(n^2)). Otherwise fall back to the windowed
+	// CheckOutput scan below.
+	var matcher policy.StreamMatcher
+	incremental := false
+	if h.policy != nil {
+		matcher, incremental = h.policy.NewOutputStreamMatcher()
+	}
+
+	emitStreamBlock := func(v *policy.Violation) {
+		h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, model, v.Message)
+		// Anthropic error events are terminal — nothing follows.
+		writeSSE(w, flusher, "error", anthropicErrorEnvelope{
+			Type:  "error",
+			Error: anthropicErrorBody{Type: "permission_error", Message: v.Message},
+		})
+		log.Printf("stream terminated: %s", policy.FormatViolation(v))
+	}
+
+	// flushPending releases the buffered deltas to the client. In windowed mode
+	// it re-scans the bounded window first; in incremental mode the deltas were
+	// already scanned as they arrived. Returns false if the stream was blocked.
 	flushPending := func() (ok bool) {
 		if pending.Len() == 0 {
 			return true
 		}
-		if h.policy != nil {
+		if h.policy != nil && !incremental {
 			if v, checkErr := h.policy.CheckOutput(scanWindow.String()); checkErr != nil {
 				log.Printf("policy engine stream check error: %v", checkErr)
 			} else if v != nil && v.Action == policy.ActionBlock {
-				h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, model, v.Message)
-				// Anthropic error events are terminal — nothing follows.
-				writeSSE(w, flusher, "error", anthropicErrorEnvelope{
-					Type:  "error",
-					Error: anthropicErrorBody{Type: "permission_error", Message: v.Message},
-				})
-				log.Printf("stream terminated: %s", policy.FormatViolation(v))
+				emitStreamBlock(v)
 				return false
 			}
 		}
@@ -504,12 +518,19 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		pendingBytes += len(delta)
 		totalOut += len(delta)
 
-		// Maintain a bounded sliding window for the policy scan.
-		scanWindow.WriteString(delta)
-		if scanWindow.Len() > maxAccumulatedStreamBytes {
-			s := scanWindow.String()
-			scanWindow.Reset()
-			scanWindow.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
+		if incremental {
+			if v := matcher.Write([]byte(delta)); v != nil && v.Action == policy.ActionBlock {
+				emitStreamBlock(v)
+				return
+			}
+		} else {
+			// Maintain a bounded sliding window for the policy scan.
+			scanWindow.WriteString(delta)
+			if scanWindow.Len() > maxAccumulatedStreamBytes {
+				s := scanWindow.String()
+				scanWindow.Reset()
+				scanWindow.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
+			}
 		}
 
 		if pendingBytes >= checkInterval {
@@ -529,6 +550,15 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		})
 		h.recordAnalytics(tenantID, model, "", http.StatusBadGateway, startTime, int64(totalOut))
 		return
+	}
+
+	// Flush the matcher's carried trailing bytes; a keyword ending on the very
+	// last byte of the stream is only caught here.
+	if incremental {
+		if v := matcher.Close(); v != nil && v.Action == policy.ActionBlock {
+			emitStreamBlock(v)
+			return
+		}
 	}
 
 	// Final scan + release of the sub-threshold tail.
