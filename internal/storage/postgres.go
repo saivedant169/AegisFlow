@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -106,6 +107,48 @@ func (s *PostgresStore) RecordEvent(ctx context.Context, event UsageEvent) error
 		event.EstimatedCostUSD, event.Cached, event.StatusCode, event.LatencyMs,
 		event.CreatedAt,
 	)
+	return err
+}
+
+// usageInsertColumns is the column count per row in the usage_events insert,
+// used to lay out positional placeholders for the batch insert.
+const usageInsertColumns = 11
+
+// buildUsageInsert builds a single multi-row INSERT for the given events and
+// its flattened argument list. Kept separate from RecordEvents so the
+// placeholder layout can be tested without a database.
+func buildUsageInsert(events []UsageEvent) (string, []any) {
+	var b strings.Builder
+	b.WriteString("INSERT INTO usage_events (tenant_id, model, provider, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd, cached, status_code, latency_ms, created_at) VALUES ")
+	args := make([]any, 0, len(events)*usageInsertColumns)
+	for i, e := range events {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		n := i * usageInsertColumns
+		fmt.Fprintf(&b, "($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8, n+9, n+10, n+11)
+		args = append(args,
+			e.TenantID, e.Model, e.Provider,
+			e.PromptTokens, e.CompletionTokens, e.TotalTokens,
+			e.EstimatedCostUSD, e.Cached, e.StatusCode, e.LatencyMs,
+			e.CreatedAt,
+		)
+	}
+	return b.String(), args
+}
+
+// RecordEvents inserts many usage events in one multi-row INSERT, so a batch of
+// N events costs a single round-trip instead of N.
+func (s *PostgresStore) RecordEvents(ctx context.Context, events []UsageEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+	if len(events) == 1 {
+		return s.RecordEvent(ctx, events[0])
+	}
+	query, args := buildUsageInsert(events)
+	_, err := s.db.ExecContext(ctx, query, args...)
 	return err
 }
 

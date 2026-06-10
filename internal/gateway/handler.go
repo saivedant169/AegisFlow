@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"context"
 	"time"
@@ -37,6 +38,7 @@ type Handler struct {
 	webhook              *webhook.Notifier
 	store                *storage.PostgresStore
 	dbQueue              chan storage.UsageEvent
+	dbWG                 sync.WaitGroup
 	analytics            *analytics.Collector
 	maxBodySize          int64
 	recordSpend          func(tenantID, model string, cost float64)
@@ -100,6 +102,14 @@ func (h *Handler) SetBehavioralRegistry(reg *behavioral.Registry) {
 const (
 	dbQueueSize        = 1024
 	defaultMaxBodySize = 10 * 1024 * 1024
+
+	// dbBatchSize is the most events a worker coalesces into one multi-row
+	// INSERT; dbFlushInterval bounds how long a partial batch waits so low
+	// traffic still gets persisted promptly. dbWorkerCount writers drain the
+	// shared queue in parallel.
+	dbBatchSize     = 128
+	dbFlushInterval = 250 * time.Millisecond
+	dbWorkerCount   = 2
 )
 
 func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engine, ut *usage.Tracker, c cache.Cache, wh *webhook.Notifier, store *storage.PostgresStore, ac *analytics.Collector, maxBodySize int64, recordSpend func(string, string, float64), budgetCheck func(string, string) (bool, []string, string)) *Handler {
@@ -109,25 +119,58 @@ func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engin
 	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, maxBodySize: maxBodySize, recordSpend: recordSpend, budgetCheck: budgetCheck}
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
-		go h.dbWorker()
+		for i := 0; i < dbWorkerCount; i++ {
+			h.dbWG.Add(1)
+			go h.dbWorker()
+		}
 	}
 	return h
 }
 
-// dbWorker drains the queue and writes events to the database sequentially,
-// preventing unbounded goroutine growth when the DB is slow.
+// dbWorker drains the queue, coalescing events into a single multi-row INSERT
+// per batch instead of one round-trip per event. A batch flushes when it fills
+// or when dbFlushInterval elapses, so a slow trickle still lands promptly. A
+// bounded set of these workers shares the queue, capping goroutine growth.
 func (h *Handler) dbWorker() {
-	for event := range h.dbQueue {
-		if err := h.store.RecordEvent(context.Background(), event); err != nil {
-			log.Printf("db worker: failed to record event: %v", err)
+	defer h.dbWG.Done()
+
+	batch := make([]storage.UsageEvent, 0, dbBatchSize)
+	ticker := time.NewTicker(dbFlushInterval)
+	defer ticker.Stop()
+
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		if err := h.store.RecordEvents(context.Background(), batch); err != nil {
+			log.Printf("db worker: failed to record %d events: %v", len(batch), err)
+		}
+		batch = batch[:0]
+	}
+
+	for {
+		select {
+		case event, ok := <-h.dbQueue:
+			if !ok {
+				flush() // queue closed — persist the partial batch before exiting
+				return
+			}
+			batch = append(batch, event)
+			if len(batch) >= dbBatchSize {
+				flush()
+			}
+		case <-ticker.C:
+			flush()
 		}
 	}
 }
 
-// Close shuts down the handler's background workers cleanly.
+// Close shuts down the handler's background workers cleanly, waiting for queued
+// events to be flushed.
 func (h *Handler) Close() {
 	if h.dbQueue != nil {
 		close(h.dbQueue)
+		h.dbWG.Wait()
 	}
 }
 
