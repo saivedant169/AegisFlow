@@ -63,18 +63,32 @@ type Gateway struct {
 	upstreams    []UpstreamConfig
 	client       *http.Client
 	sse          *SSEManager
+	stop         chan struct{}
 }
 
 // NewGateway creates a new MCP gateway.
 // evidence and approvals may be nil if not available.
 func NewGateway(pe *toolpolicy.Engine, ev *evidence.SessionChain, aq *approval.Queue, upstreams []UpstreamConfig) *Gateway {
-	return &Gateway{
+	g := &Gateway{
 		policyEngine: pe,
 		evidence:     ev,
 		approvals:    aq,
 		upstreams:    upstreams,
 		client:       &http.Client{Timeout: 30 * time.Second},
 		sse:          NewSSEManager(),
+		stop:         make(chan struct{}),
+	}
+	// Evict abandoned SSE sessions so the map doesn't grow forever.
+	g.sse.StartJanitor(g.stop, time.Minute, 30*time.Minute)
+	return g
+}
+
+// Close stops the gateway's background maintenance (the SSE janitor).
+func (g *Gateway) Close() {
+	select {
+	case <-g.stop:
+	default:
+		close(g.stop)
 	}
 }
 

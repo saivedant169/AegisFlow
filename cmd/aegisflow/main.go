@@ -805,6 +805,7 @@ func main() {
 			}
 		}()
 		defer mcpSrv.Shutdown(context.Background())
+		defer mcpGateway.Close()
 		log.Printf("[init] MCP gateway enabled (%d upstreams, port %d)", len(upstreams), cfg.MCPGateway.Port)
 	}
 

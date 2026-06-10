@@ -75,6 +75,25 @@ func (m *SSEManager) RemoveSession(id string) {
 	}
 }
 
+// StartJanitor runs a background loop that evicts sessions older than maxAge
+// every interval, until stop is closed. Without it the sessions map only ever
+// shrinks via RemoveSession, which doesn't fire for every disconnect, so the
+// map grew without bound under real traffic.
+func (m *SSEManager) StartJanitor(stop <-chan struct{}, interval, maxAge time.Duration) {
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				m.CleanupStale(maxAge)
+			}
+		}
+	}()
+}
+
 // CleanupStale removes sessions older than maxAge.
 func (m *SSEManager) CleanupStale(maxAge time.Duration) {
 	now := time.Now()

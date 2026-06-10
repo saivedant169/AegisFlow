@@ -337,3 +337,23 @@ func readMessageEvent(t *testing.T, resp *http.Response) JSONRPCResponse {
 		return JSONRPCResponse{}
 	}
 }
+
+func TestSSEJanitorEvictsStaleSessions(t *testing.T) {
+	m := NewSSEManager()
+	s := m.CreateSession()
+	// Backdate it so the next sweep treats it as stale.
+	s.Created = time.Now().Add(-time.Hour)
+
+	stop := make(chan struct{})
+	defer close(stop)
+	m.StartJanitor(stop, 10*time.Millisecond, time.Minute)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if m.GetSession(s.ID) == nil {
+			return // evicted
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("stale SSE session was not evicted by the janitor")
+}
