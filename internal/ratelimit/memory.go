@@ -16,13 +16,55 @@ type MemoryLimiter struct {
 	windows map[string]*window
 	limit   int
 	period  time.Duration
+	stop    chan struct{}
 }
 
 func NewMemoryLimiter(limit int, period time.Duration) *MemoryLimiter {
-	return &MemoryLimiter{
+	m := &MemoryLimiter{
 		windows: make(map[string]*window),
 		limit:   limit,
 		period:  period,
+		stop:    make(chan struct{}),
+	}
+	// Without a sweep the windows map grows once per distinct key (tenant, IP,
+	// ...) and never shrinks. Evict windows whose period has elapsed; the next
+	// request for that key just recreates one.
+	go m.janitor()
+	return m
+}
+
+func (m *MemoryLimiter) janitor() {
+	t := time.NewTicker(m.period)
+	defer t.Stop()
+	for {
+		select {
+		case <-m.stop:
+			return
+		case now := <-t.C:
+			m.cleanup(now)
+		}
+	}
+}
+
+func (m *MemoryLimiter) cleanup(now time.Time) {
+	m.mu.Lock()
+	for k, w := range m.windows {
+		w.mu.Lock()
+		expired := now.After(w.resetAt)
+		w.mu.Unlock()
+		if expired {
+			delete(m.windows, k)
+		}
+	}
+	m.mu.Unlock()
+}
+
+// Stop ends the background eviction loop.
+func (m *MemoryLimiter) Stop() {
+	select {
+	case <-m.stop:
+	default:
+		close(m.stop)
 	}
 }
 

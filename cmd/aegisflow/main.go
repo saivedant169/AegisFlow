@@ -367,6 +367,7 @@ func main() {
 		}
 	}
 	limiter := ratelimit.NewMemoryLimiter(maxRPM, time.Minute)
+	defer limiter.Stop()
 
 	// Token rate limiter
 	maxTPM := 100000
@@ -376,6 +377,7 @@ func main() {
 		}
 	}
 	tokenLimiter := ratelimit.NewMemoryLimiter(maxTPM, time.Minute)
+	defer tokenLimiter.Stop()
 
 	// Gateway router
 	r := chi.NewRouter()

@@ -80,3 +80,28 @@ func TestMemoryLimiterCost(t *testing.T) {
 		t.Error("cost=3 should be allowed (7+3 = 10)")
 	}
 }
+
+func TestMemoryLimiterEvictsExpiredWindows(t *testing.T) {
+	m := NewMemoryLimiter(10, time.Minute)
+	defer m.Stop()
+
+	if _, err := m.Allow("tenant-a", 1); err != nil {
+		t.Fatal(err)
+	}
+	m.mu.RLock()
+	n := len(m.windows)
+	m.mu.RUnlock()
+	if n != 1 {
+		t.Fatalf("expected 1 window after a request, got %d", n)
+	}
+
+	// Sweep with a time well past the window's reset.
+	m.cleanup(time.Now().Add(2 * time.Minute))
+
+	m.mu.RLock()
+	n = len(m.windows)
+	m.mu.RUnlock()
+	if n != 0 {
+		t.Fatalf("expected the expired window to be evicted, %d left", n)
+	}
+}
