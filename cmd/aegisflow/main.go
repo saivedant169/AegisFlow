@@ -775,23 +775,13 @@ func main() {
 				Tools: u.Tools,
 			}
 		}
-		toolPolicyEngine := toolpolicy.NewEngine(nil, cfg.ToolPolicies.DefaultDecision)
-		if cfg.ToolPolicies.Enabled {
-			rules := make([]toolpolicy.ToolRule, len(cfg.ToolPolicies.Rules))
-			for i, r := range cfg.ToolPolicies.Rules {
-				rules[i] = toolpolicy.ToolRule{
-					Protocol:   r.Protocol,
-					Tool:       r.Tool,
-					Target:     r.Target,
-					Capability: r.Capability,
-					Decision:   r.Decision,
-				}
-			}
-			toolPolicyEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
-		}
+		// Reuse the same engine the admin endpoint uses (tpEngine). It's the one
+		// registered with the config watcher, so editing tool-policy rules at
+		// runtime actually reaches the live MCP enforcement path. Building a
+		// second engine here left the gateway frozen on the startup rules.
 		// Record MCP tool decisions in the evidence chain — without this the
 		// flagship tamper-evident log captured nothing for real tool calls.
-		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, evidenceChain, approvalQueue, upstreams)
+		mcpGateway := mcpgw.NewGateway(tpEngine, evidenceChain, approvalQueue, upstreams)
 		mcpAddr := fmt.Sprintf("%s:%d", cfg.MCPGateway.Host, cfg.MCPGateway.Port)
 
 		var mcpHandler http.Handler = mcpGateway

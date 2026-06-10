@@ -383,3 +383,37 @@ func TestToolCallRecordedInEvidenceChain(t *testing.T) {
 		t.Fatalf("expected the blocked tool call to be recorded once, got %d records", got)
 	}
 }
+
+func TestGatewayReflectsEngineRuleChanges(t *testing.T) {
+	engine := toolpolicy.NewEngine([]toolpolicy.ToolRule{
+		{Protocol: "mcp", Tool: "github.delete_repo", Decision: "allow"},
+	}, "block")
+	gw := NewGateway(engine, nil, nil, nil)
+
+	call := func() *JSONRPCResponse {
+		body, _ := json.Marshal(JSONRPCRequest{
+			JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "tools/call",
+			Params: json.RawMessage(`{"name":"github.delete_repo","arguments":{}}`),
+		})
+		req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
+		rec := httptest.NewRecorder()
+		gw.ServeHTTP(rec, req)
+		var resp JSONRPCResponse
+		json.NewDecoder(rec.Body).Decode(&resp)
+		return &resp
+	}
+
+	// allow rule (no upstream configured -> -32003, not a policy block)
+	if r := call(); r.Error != nil && r.Error.Code == -32001 {
+		t.Fatal("expected the tool to be allowed by the initial rule")
+	}
+
+	// Simulate a hot reload swapping the rule to block.
+	engine.ReplaceRules([]toolpolicy.ToolRule{
+		{Protocol: "mcp", Tool: "github.delete_repo", Decision: "block"},
+	}, "block")
+
+	if r := call(); r.Error == nil || r.Error.Code != -32001 {
+		t.Fatalf("expected a policy block after the rule change, got %+v", r.Error)
+	}
+}
