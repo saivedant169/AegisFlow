@@ -6,7 +6,7 @@ AegisFlow governs the boundary instead.
 **2/**
 It sits between the agent and the tools it calls. Every action — MCP, shell, SQL, GitHub, HTTP — is normalized into one ActionEnvelope a policy engine can reason about.
 
-The governance decision adds single-digit microseconds. ~58k req/s, 1.1 ms p50.
+The governance decision adds single-digit microseconds — ~58k evals/sec, 1.1 ms p50 in an in-process benchmark.
 
 **3/**
 Three outcomes per action: allow, review, block.

@@ -276,7 +276,7 @@ Every allow, block, and review above passes through the full pipeline: envelope 
 | Full allow (policy + evidence + credential) | ~5.2 µs | ~7.0 µs | 194K+ |
 | Review path (policy + queue submit) | ~1.3 µs | ~1.8 µs | 779K+ |
 
-The governance decision itself is single-digit microseconds. End to end the gateway sustains 58,000+ req/s at 1.1 ms p50. Reproduce locally:
+The governance decision itself is single-digit microseconds. The full in-process pipeline (policy + evidence + credential) runs at ~58,000 evaluations/sec at 1.1 ms p50 — a single-threaded micro-benchmark, not end-to-end HTTP throughput. Reproduce locally:
 
 ```bash
 ./scripts/run_benchmarks.sh

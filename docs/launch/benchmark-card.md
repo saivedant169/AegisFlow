@@ -7,7 +7,7 @@ A single shareable card of the real numbers. Reproduce locally with
 ┌─────────────────────────────────────────────────────────────┐
 │  AegisFlow — governance at the agent/tool boundary          │
 ├─────────────────────────────────────────────────────────────┤
-│  Gateway throughput        58,000+ req/s                    │
+│  Governance pipeline       58,000+ evals/s                    │
 │  Latency  p50 / p95 / p99  1.1 ms / 4.2 ms / 7.3 ms         │
 │                                                             │
 │  Governance decision cost (Apple M1, micro-benchmarks):     │
@@ -23,7 +23,7 @@ A single shareable card of the real numbers. Reproduce locally with
 
 | Metric | Value |
 |--------|-------|
-| Gateway throughput | 58,000+ req/s |
+| Governance pipeline throughput | 58,000+ evals/sec |
 | p50 latency | 1.1 ms |
 | p95 latency | 4.2 ms |
 | p99 latency | 7.3 ms |

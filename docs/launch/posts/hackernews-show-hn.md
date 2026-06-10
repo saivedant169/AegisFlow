@@ -8,7 +8,7 @@ AegisFlow is a single Go binary that sits between a coding agent (or any tool-us
 
 The workflow I'd point at is the governed PR writer: agent reads the repo, runs the tests, gets blocked from destructive shell, has its PR open held for review, gets a scoped 10-minute credential after approval, and the whole session exports as one verifiable bundle. Walkthrough with the actual JSON-RPC responses: https://github.com/saivedant169/AegisFlow/blob/main/docs/PR_WRITER.md
 
-**Numbers.** On an M1 the governance decision itself is single-digit microseconds. End to end the gateway sustains ~58,000 req/s at 1.1 ms p50. About 80% test coverage. Benchmarks are reproducible with the scripts in the repo.
+**Numbers.** On an M1 the governance decision itself is single-digit microseconds. The in-process governance pipeline runs ~58,000 evaluations/sec at 1.1 ms p50 — a single-threaded micro-benchmark of the policy/evidence/credential path, not end-to-end HTTP throughput (I'd rather be upfront than quote a number the server hasn't actually hit). About 80% test coverage. Benchmarks are reproducible with the scripts in the repo.
 
 **What it does NOT do yet (it's pre-1.0):**
 - The Anthropic path (point Claude Code or the SDK at `ANTHROPIC_BASE_URL=http://localhost:8080` so prompts are policy-checked and audited before reaching the provider) does NOT support tool-use passthrough yet — it governs the prompt/completion path, not in-flight tool calls on that route.

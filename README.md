@@ -396,15 +396,19 @@ These features support the governance plane and remain fully functional:
 
 ## Performance
 
-Benchmarked on MacBook Air M1 (8GB RAM) with full middleware pipeline:
+These are **in-process governance-pipeline** numbers — a single-threaded
+micro-benchmark of policy evaluation + evidence + credential issuance on a
+MacBook Air M1 (8GB RAM). They are **not** end-to-end HTTP throughput (no
+server, JSON codec, or network); treat them as the overhead the governance
+layer adds, and run your own load test for capacity planning.
 
 | Metric | Value |
 |--------|-------|
-| **Throughput** | 58,000+ requests/sec |
-| **p50 Latency** | 1.1 ms |
-| **p95 Latency** | 4.2 ms |
-| **p99 Latency** | 7.3 ms |
-| **Memory** | ~29 MB RSS after 10K requests |
+| **Governance throughput** | 58,000+ evaluations/sec |
+| **p50** | 1.1 ms |
+| **p95** | 4.2 ms |
+| **p99** | 7.3 ms |
+| **Memory** | ~29 MB RSS after 10K iterations |
 | **Binary Size** | ~15 MB |
 
 ### Governance Overhead
