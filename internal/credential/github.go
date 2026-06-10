@@ -1,6 +1,7 @@
 package credential
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/rsa"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -90,7 +92,20 @@ func (b *GitHubAppBroker) Issue(ctx context.Context, req CredentialRequest) (*Cr
 	}
 
 	url := fmt.Sprintf("%s/app/installations/%d/access_tokens", b.baseURL, b.installID)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+
+	// Scope the token to the requested repository and capability. With a nil
+	// body GitHub mints a token carrying the full installation's permissions on
+	// every repo — the opposite of a least-privilege broker.
+	var httpReq *http.Request
+	if body, scoped := githubTokenRequestBody(req); scoped {
+		httpReq, err = http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err == nil {
+			httpReq.Header.Set("Content-Type", "application/json")
+		}
+	} else {
+		log.Printf("[credential] WARNING: minting an UNSCOPED GitHub token for task %s — capability %q not recognized, so the token carries the full installation's access", req.TaskID, req.Capability)
+		httpReq, err = http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -276,4 +291,55 @@ func splitJWT(token string) []string {
 		return nil
 	}
 	return parts
+}
+
+// githubTokenRequestBody builds the JSON body for the installation access-token
+// request, scoping it to the requested repository and capability. It returns
+// (body, true) when it can derive a sane scope, or (nil, false) when the
+// capability is unknown — in which case the caller falls back to an unscoped
+// token and logs a warning.
+func githubTokenRequestBody(req CredentialRequest) ([]byte, bool) {
+	perms := githubPermissions(req.Capability)
+	if perms == nil {
+		return nil, false
+	}
+	body := map[string]any{"permissions": perms}
+	if repo := githubRepoName(req.Target); repo != "" {
+		body["repositories"] = []string{repo}
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, false
+	}
+	return b, true
+}
+
+// githubPermissions maps a requested capability to the narrowest GitHub App
+// permission set that still lets the action through.
+func githubPermissions(capability string) map[string]string {
+	switch capability {
+	case "read":
+		return map[string]string{"contents": "read", "metadata": "read", "pull_requests": "read"}
+	case "write":
+		return map[string]string{"contents": "write", "pull_requests": "write", "metadata": "read"}
+	case "deploy":
+		return map[string]string{"deployments": "write", "contents": "read", "metadata": "read"}
+	case "delete":
+		return map[string]string{"contents": "write", "metadata": "read"}
+	default:
+		return nil
+	}
+}
+
+// githubRepoName extracts the repository name from a target like "owner/repo"
+// or "repo". A wildcard or empty target yields "" (no repository scoping).
+func githubRepoName(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" || strings.ContainsAny(target, "*?") {
+		return ""
+	}
+	if i := strings.LastIndex(target, "/"); i >= 0 {
+		return target[i+1:]
+	}
+	return target
 }
