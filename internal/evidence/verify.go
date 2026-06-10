@@ -1,5 +1,7 @@
 package evidence
 
+import "crypto/hmac"
+
 // VerifyResult contains the result of evidence chain verification.
 type VerifyResult struct {
 	Valid        bool   `json:"valid"`
@@ -44,4 +46,26 @@ func Verify(records []Record) VerifyResult {
 		TotalRecords: len(records),
 		Message:      "evidence chain integrity verified",
 	}
+}
+
+// VerifySignatures checks that every record carries a valid HMAC signature
+// under key, on top of the structural Verify. Use it when the chain was built
+// with NewSignedSessionChain. A missing or wrong signature fails verification,
+// which is what catches a record that was rewritten by someone without the key.
+func VerifySignatures(records []Record, key []byte) VerifyResult {
+	base := Verify(records)
+	if !base.Valid {
+		return base
+	}
+	for i, rec := range records {
+		if rec.Signature == "" || !hmac.Equal([]byte(rec.Signature), []byte(signHash(key, rec.Hash))) {
+			return VerifyResult{
+				Valid:        false,
+				TotalRecords: len(records),
+				ErrorAtIndex: i,
+				Message:      "signature mismatch at record " + rec.Envelope.ID,
+			}
+		}
+	}
+	return VerifyResult{Valid: true, TotalRecords: len(records), Message: "evidence chain signatures verified"}
 }

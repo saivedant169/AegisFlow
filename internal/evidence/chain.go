@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -12,13 +13,18 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 )
 
-// Record is a single hash-linked entry in the evidence chain.
+// Record is a single hash-linked entry in the evidence chain. Hash is the
+// content hash (anyone can recompute it to check the chain links). Signature,
+// when present, is an HMAC of Hash under the chain's secret key — only a
+// key-holder can produce or verify it, which is what makes a record
+// tamper-evident against someone who only has read/write access to the store.
 type Record struct {
 	Index        int                      `json:"index"`
 	Timestamp    time.Time                `json:"timestamp"`
 	Envelope     *envelope.ActionEnvelope `json:"envelope"`
 	PreviousHash string                   `json:"previous_hash"`
 	Hash         string                   `json:"hash"`
+	Signature    string                   `json:"signature,omitempty"`
 }
 
 // SessionChain is a hash-linked chain of action records for a single session.
@@ -27,12 +33,24 @@ type SessionChain struct {
 	sessionID string
 	records   []Record
 	lastHash  string
+	key       []byte // optional HMAC key; when set, records are signed
 }
 
 func NewSessionChain(sessionID string) *SessionChain {
 	return &SessionChain{
 		sessionID: sessionID,
 		records:   make([]Record, 0),
+	}
+}
+
+// NewSignedSessionChain is like NewSessionChain but signs each record with an
+// HMAC under key, so the chain can't be silently rewritten by anyone who
+// doesn't hold the key.
+func NewSignedSessionChain(sessionID string, key []byte) *SessionChain {
+	return &SessionChain{
+		sessionID: sessionID,
+		records:   make([]Record, 0),
+		key:       key,
 	}
 }
 
@@ -52,6 +70,9 @@ func (c *SessionChain) Record(env *envelope.ActionEnvelope) (*Record, error) {
 		PreviousHash: c.lastHash,
 	}
 	rec.Hash = computeRecordHash(rec)
+	if len(c.key) > 0 {
+		rec.Signature = signHash(c.key, rec.Hash)
+	}
 	c.lastHash = rec.Hash
 	c.records = append(c.records, rec)
 
@@ -120,4 +141,11 @@ func (c *SessionChain) Export() ([]byte, error) {
 		"exported_at": time.Now().UTC(),
 	}
 	return json.MarshalIndent(bundle, "", "  ")
+}
+
+// signHash returns the hex HMAC-SHA256 of a record hash under key.
+func signHash(key []byte, hash string) string {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(hash))
+	return hex.EncodeToString(mac.Sum(nil))
 }

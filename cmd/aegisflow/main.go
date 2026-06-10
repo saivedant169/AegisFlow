@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -525,8 +526,9 @@ func main() {
 		log.Printf("[init] cost optimization engine enabled")
 	}
 
-	// Evidence chain
-	evidenceChain := evidence.NewSessionChain("aegisflow-main")
+	// Evidence chain — sign records so the chain can't be quietly rewritten by
+	// anyone who only has access to the store.
+	evidenceChain := evidence.NewSignedSessionChain("aegisflow-main", loadEvidenceKey())
 	evidenceAdapter := evidence.NewAdminAdapter(evidenceChain)
 	log.Printf("[init] evidence chain enabled (session: %s)", evidenceChain.SessionID())
 
@@ -1029,4 +1031,21 @@ func loadEnvFile(path string) {
 			}
 		}
 	}
+}
+
+// loadEvidenceKey returns the HMAC key used to sign the evidence chain. It
+// prefers AEGISFLOW_EVIDENCE_KEY so verification survives restarts; if that's
+// unset it generates an ephemeral key (good within a single run only) and says
+// so loudly.
+func loadEvidenceKey() []byte {
+	if v := strings.TrimSpace(os.Getenv("AEGISFLOW_EVIDENCE_KEY")); v != "" {
+		return []byte(v)
+	}
+	b := make([]byte, 32)
+	if _, err := cryptorand.Read(b); err != nil {
+		log.Printf("WARNING: could not generate an evidence signing key (%v) — evidence will be unsigned", err)
+		return nil
+	}
+	log.Printf("WARNING: AEGISFLOW_EVIDENCE_KEY is not set — using an ephemeral signing key. Evidence verifies within this run but not across restarts; set AEGISFLOW_EVIDENCE_KEY for durable, tamper-evident verification.")
+	return b
 }

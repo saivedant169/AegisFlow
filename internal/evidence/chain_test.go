@@ -171,3 +171,60 @@ func TestCanonicalHashInjective(t *testing.T) {
 		t.Fatal("canonicalHash collided on concatenation")
 	}
 }
+
+func sampleEnv2(id string) *envelope.ActionEnvelope {
+	return &envelope.ActionEnvelope{
+		ID:                  id,
+		Tool:                "github.create_pull_request",
+		Target:              "acme/widgets",
+		PolicyDecision:      envelope.DecisionReview,
+		RequestedCapability: envelope.CapWrite,
+	}
+}
+
+func TestSignedChainVerifies(t *testing.T) {
+	key := []byte("test-evidence-key")
+	c := NewSignedSessionChain("s1", key)
+	for i := 0; i < 3; i++ {
+		c.Record(sampleEnv2("e" + string(rune('a'+i))))
+	}
+	recs := c.Records()
+	for _, r := range recs {
+		if r.Signature == "" {
+			t.Fatal("signed chain produced an unsigned record")
+		}
+	}
+	if res := VerifySignatures(recs, key); !res.Valid {
+		t.Fatalf("expected valid signatures, got: %s", res.Message)
+	}
+}
+
+func TestSignedChainRejectsWrongKey(t *testing.T) {
+	c := NewSignedSessionChain("s1", []byte("real-key"))
+	c.Record(sampleEnv2("e1"))
+	if res := VerifySignatures(c.Records(), []byte("attacker-key")); res.Valid {
+		t.Fatal("verification passed with the wrong key")
+	}
+}
+
+func TestSignedChainDetectsTamper(t *testing.T) {
+	key := []byte("k")
+	c := NewSignedSessionChain("s1", key)
+	c.Record(sampleEnv2("e1"))
+	c.Record(sampleEnv2("e2"))
+	recs := c.Records()
+	// Attacker rewrites a record's content hash; they can't produce the matching
+	// signature without the key.
+	recs[1].Hash = "deadbeef"
+	if res := VerifySignatures(recs, key); res.Valid {
+		t.Fatal("tampered record was accepted")
+	}
+}
+
+func TestUnsignedChainFailsSignatureCheck(t *testing.T) {
+	c := NewSessionChain("s1") // no key -> no signatures
+	c.Record(sampleEnv2("e1"))
+	if res := VerifySignatures(c.Records(), []byte("k")); res.Valid {
+		t.Fatal("unsigned records should not pass a signature check")
+	}
+}
