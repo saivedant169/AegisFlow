@@ -33,6 +33,7 @@ type ApprovalItem struct {
 	ReviewedAt    *time.Time               `json:"reviewed_at,omitempty"`
 	Reviewer      string                   `json:"reviewer,omitempty"`
 	ReviewComment string                   `json:"review_comment,omitempty"`
+	consumed      bool                     // set once the approval has been used
 }
 
 // Queue manages pending approval items.
@@ -173,6 +174,32 @@ func (q *Queue) IsApprovedForTool(tool string) bool {
 
 	for _, item := range q.history {
 		if item.Status == StatusApproved && item.Envelope != nil && item.Envelope.Tool == tool {
+			return true
+		}
+	}
+	return false
+}
+
+// ConsumeApprovalForEnvelope returns true at most once for an approved action
+// whose fingerprint (tool + target + arguments + capability, via Envelope.Hash)
+// matches env and that was approved within the queue timeout. Matching on the
+// hash rather than the tool name stops a single approval from green-lighting
+// every other call of the same tool with different arguments, and consuming the
+// item makes each approval good for exactly one execution.
+func (q *Queue) ConsumeApprovalForEnvelope(env *envelope.ActionEnvelope) bool {
+	if env == nil {
+		return false
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	now := time.Now()
+	h := env.Hash()
+	for _, item := range q.history {
+		if item.Status == StatusApproved && !item.consumed && item.Envelope != nil &&
+			item.Envelope.Hash() == h &&
+			item.ReviewedAt != nil && now.Sub(*item.ReviewedAt) <= q.Timeout {
+			item.consumed = true
 			return true
 		}
 	}

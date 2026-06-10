@@ -292,7 +292,7 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32001, Message: "tool call blocked by policy: " + params.Name}}
 	case envelope.DecisionReview:
 		// Check if this tool was already approved
-		if g.approvals != nil && g.approvals.IsApprovedForTool(params.Name) {
+		if g.approvals != nil && g.approvals.ConsumeApprovalForEnvelope(env) {
 			log.Printf("[mcpgw] PREVIOUSLY APPROVED tool call: %s", params.Name)
 			upstream := g.findUpstream(params.Name)
 			if upstream == nil {
@@ -372,7 +372,7 @@ func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
 
 	case envelope.DecisionReview:
 		// Check if this tool was already approved
-		if g.approvals != nil && g.approvals.IsApprovedForTool(params.Name) {
+		if g.approvals != nil && g.approvals.ConsumeApprovalForEnvelope(env) {
 			log.Printf("[mcpgw] PREVIOUSLY APPROVED tool call: %s", params.Name)
 			upstream := g.findUpstream(params.Name)
 			if upstream == nil {

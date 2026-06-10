@@ -282,3 +282,37 @@ func TestHistory(t *testing.T) {
 		t.Fatalf("expected 2 history items, got %d", len(hist))
 	}
 }
+
+func envWithTarget(tool, target string) *envelope.ActionEnvelope {
+	e := testEnv(tool)
+	e.Target = target
+	return e
+}
+
+func TestConsumeApprovalForEnvelope_ScopedAndSingleUse(t *testing.T) {
+	q := NewQueue(100)
+	envA := envWithTarget("github.create_pr", "repo/a")
+	id, _ := q.Submit(envA)
+	q.Approve(id, "admin", "ok")
+
+	// An approval for repo/a must not cover the same tool on repo/b.
+	envB := envWithTarget("github.create_pr", "repo/b")
+	if q.ConsumeApprovalForEnvelope(envB) {
+		t.Fatal("approval scoped to repo/a wrongly covered repo/b")
+	}
+
+	// The exact action is approved — once.
+	if !q.ConsumeApprovalForEnvelope(envA) {
+		t.Fatal("expected the matching envelope to be approved")
+	}
+	if q.ConsumeApprovalForEnvelope(envA) {
+		t.Fatal("approval should be single-use, but was accepted twice")
+	}
+}
+
+func TestConsumeApprovalForEnvelope_NilSafe(t *testing.T) {
+	q := NewQueue(10)
+	if q.ConsumeApprovalForEnvelope(nil) {
+		t.Fatal("nil envelope must not be approved")
+	}
+}
