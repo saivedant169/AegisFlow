@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -45,7 +46,7 @@ func NewAzureOpenAIProvider(name, endpoint, apiKeyEnv, apiVersion string, models
 		apiKey:     apiKey,
 		apiVersion: apiVersion,
 		models:     models,
-		client:     &http.Client{Timeout: timeout},
+		client:     httpx.Client(timeout),
 		retry:      newRetryPolicy(config.RetryConfig{MaxAttempts: 1}),
 		sleep:      time.Sleep,
 	}

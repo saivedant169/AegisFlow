@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"time"
 
 	"github.com/saivedant169/AegisFlow/pkg/types"
@@ -43,7 +45,7 @@ func NewOllamaProvider(name, baseURL string, models []string) *OllamaProvider {
 		name:    name,
 		baseURL: baseURL,
 		models:  models,
-		client:  &http.Client{Timeout: 120 * time.Second},
+		client:  httpx.Client(120 * time.Second),
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"strings"
 	"time"
@@ -75,7 +77,7 @@ func NewBedrockProvider(name, region, accessKeyEnv, secretKeyEnv string, models 
 		accessKey: os.Getenv(accessKeyEnv),
 		secretKey: os.Getenv(secretKeyEnv),
 		models:    models,
-		client:    &http.Client{Timeout: timeout},
+		client:    httpx.Client(timeout),
 	}
 }
 

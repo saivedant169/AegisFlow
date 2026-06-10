@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"time"
 
@@ -62,7 +64,7 @@ func NewAnthropicProvider(name, baseURL, apiKeyEnv string, models []string, time
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		models:  models,
-		client:  &http.Client{Timeout: timeout},
+		client:  httpx.Client(timeout),
 	}
 }
 

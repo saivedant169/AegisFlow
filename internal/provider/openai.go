@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -42,7 +43,7 @@ func NewOpenAIProvider(name, baseURL, apiKeyEnv string, models []string, timeout
 		baseURL:    baseURL,
 		keys:       NewKeyRotator([]string{key}, "round-robin", 0),
 		models:     models,
-		client:     &http.Client{Timeout: timeout},
+		client:     httpx.Client(timeout),
 		maxRetries: maxRetries,
 		retry:      newRetryPolicy(config.RetryConfig{MaxAttempts: 1}),
 		sleep:      time.Sleep,
@@ -62,7 +63,7 @@ func NewOpenAIProviderWithKeys(name, baseURL string, keys *KeyRotator, models []
 		baseURL:    baseURL,
 		keys:       keys,
 		models:     models,
-		client:     &http.Client{Timeout: timeout},
+		client:     httpx.Client(timeout),
 		maxRetries: maxRetries,
 		retry:      newRetryPolicy(config.RetryConfig{MaxAttempts: 1}),
 		sleep:      time.Sleep,

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"time"
 
@@ -75,7 +77,7 @@ func NewGeminiProvider(name, apiKeyEnv string, models []string, timeout time.Dur
 		baseURL: "https://generativelanguage.googleapis.com/v1beta",
 		apiKey:  apiKey,
 		models:  models,
-		client:  &http.Client{Timeout: timeout},
+		client:  httpx.Client(timeout),
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"io"
 	"math"
 	"net/http"
+
+	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"time"
 )
 
@@ -65,7 +67,7 @@ func NewOpenAIEmbedder(baseURL, apiKey, model string) *OpenAIEmbedder {
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		model:   model,
-		client:  &http.Client{Timeout: 5 * time.Second},
+		client:  httpx.Client(5 * time.Second),
 	}
 }
 
