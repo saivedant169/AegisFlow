@@ -2,10 +2,10 @@ package config
 
 import (
 	"crypto/sha256"
-	"crypto/subtle"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -49,6 +49,9 @@ type Config struct {
 	Behavioral           BehavioralConfig          `yaml:"behavioral"`
 	SupplyChain          SupplyChainConfig         `yaml:"supply_chain"`
 	Resilience           ResilienceConfig          `yaml:"resilience"`
+
+	keyIndexOnce sync.Once                // builds keyIndex on first auth
+	keyIndex     map[[32]byte]TenantMatch // sha256(api key) -> tenant/role
 }
 
 // SupplyChainConfig controls signed extension verification.
@@ -954,27 +957,33 @@ func setDefaults(cfg *Config) {
 	}
 }
 
-func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
-	// Use constant-time comparison to prevent timing attacks.
-	// Hash both sides so length differences don't leak info.
-	inputHash := sha256.Sum256([]byte(apiKey))
-	var match *TenantMatch
+// buildKeyIndex precomputes a sha256(api key) -> match table so authentication
+// is a single map lookup instead of hashing and scanning every tenant key on
+// every request. Indexing by the key's sha256 keeps the lookup from leaking the
+// secret: an attacker would need a sha256 preimage of a valid key to hit the
+// table, so there's nothing useful to recover from the comparison.
+func (c *Config) buildKeyIndex() {
+	idx := make(map[[32]byte]TenantMatch)
 	for i := range c.Tenants {
 		for _, entry := range c.Tenants[i].APIKeys {
 			key := entry.resolvedKey()
 			if key == "" {
 				continue
 			}
-			keyHash := sha256.Sum256([]byte(key))
-			if subtle.ConstantTimeCompare(inputHash[:], keyHash[:]) == 1 {
-				match = &TenantMatch{
-					Tenant: &c.Tenants[i],
-					Role:   entry.Role,
-				}
-			}
+			idx[sha256.Sum256([]byte(key))] = TenantMatch{Tenant: &c.Tenants[i], Role: entry.Role}
 		}
 	}
-	return match
+	c.keyIndex = idx
+}
+
+func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
+	c.keyIndexOnce.Do(c.buildKeyIndex)
+	m, ok := c.keyIndex[sha256.Sum256([]byte(apiKey))]
+	if !ok {
+		return nil
+	}
+	match := m
+	return &match
 }
 
 func validateConfig(cfg *Config) error {

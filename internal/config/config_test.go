@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1066,4 +1067,43 @@ mcp_gateway:
 	if !cfg.MCPGateway.RequireAuth {
 		t.Fatal("expected require_auth true")
 	}
+}
+
+func TestFindTenantByAPIKey_IndexedLookup(t *testing.T) {
+	cfg := &Config{
+		Tenants: []TenantConfig{
+			{ID: "a", APIKeys: []APIKeyEntry{{Key: "key-a", Role: "operator"}}},
+			{ID: "b", APIKeys: []APIKeyEntry{{Key: "key-b", Role: "admin"}}},
+		},
+	}
+	m := cfg.FindTenantByAPIKey("key-b")
+	if m == nil || m.Tenant.ID != "b" || m.Role != "admin" {
+		t.Fatalf("expected tenant b/admin, got %+v", m)
+	}
+	if got := cfg.FindTenantByAPIKey("key-a"); got == nil || got.Tenant.ID != "a" {
+		t.Fatalf("expected tenant a, got %+v", got)
+	}
+	if cfg.FindTenantByAPIKey("nope") != nil {
+		t.Fatal("unknown key must not match")
+	}
+}
+
+func TestFindTenantByAPIKey_ConcurrentSafe(t *testing.T) {
+	cfg := &Config{
+		Tenants: []TenantConfig{{ID: "a", APIKeys: []APIKeyEntry{{Key: "key-a", Role: "operator"}}}},
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 500; j++ {
+				if m := cfg.FindTenantByAPIKey("key-a"); m == nil {
+					t.Error("expected match under concurrency")
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
