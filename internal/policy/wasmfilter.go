@@ -155,10 +155,16 @@ func (f *WasmFilter) SetMetadata(meta *WasmMetadata) {
 }
 
 func (f *WasmFilter) Check(content string) *Violation {
+	// The WASM module is a single stateful instance: a call allocates guest
+	// memory, writes the content, runs check, then reads back a result pointer.
+	// Two goroutines interleaving those steps would read each other's results
+	// and corrupt linear memory, so the whole call has to be serialized. A
+	// per-goroutine module pool would let these run in parallel later, but
+	// correctness comes first.
 	f.mu.Lock()
-	meta := f.metadata
-	f.mu.Unlock()
+	defer f.mu.Unlock()
 
+	meta := f.metadata
 	if meta == nil {
 		meta = &WasmMetadata{}
 	}

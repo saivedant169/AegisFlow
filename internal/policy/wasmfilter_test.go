@@ -2,6 +2,7 @@ package policy
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -223,5 +224,49 @@ func TestWasmFilterInEngine(t *testing.T) {
 	v, _ = engine.CheckInput("this is perfectly clean")
 	if v != nil {
 		t.Error("expected no violation for clean input")
+	}
+}
+
+// TestWasmFilterConcurrentCheck hammers a single filter from many goroutines
+// with a mix of forbidden and clean content. Before the call was serialized,
+// the goroutines interleaved on the shared module and handed back each other's
+// verdicts (and tripped the race detector / corrupted guest memory). Every
+// input must get its own correct answer.
+func TestWasmFilterConcurrentCheck(t *testing.T) {
+	wasm := loadTestWasm(t, "block.wasm")
+	f, err := NewWasmFilterFromBytes("test-conc", ActionBlock, wasm, time.Second, "block")
+	if err != nil {
+		t.Fatalf("failed to create wasm filter: %v", err)
+	}
+	defer f.Close()
+	f.SetMetadata(&WasmMetadata{TenantID: "t1", Model: "gpt-4o", Provider: "openai", Phase: "input"})
+
+	const workers = 8
+	const iterations = 50
+	var wg sync.WaitGroup
+	errs := make(chan string, workers*iterations)
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				if (id+i)%2 == 0 {
+					if v := f.Check("this contains the forbidden word"); v == nil {
+						errs <- "forbidden content was not blocked"
+					}
+				} else {
+					if v := f.Check("this is perfectly normal text"); v != nil {
+						errs <- "clean content was wrongly blocked"
+					}
+				}
+			}
+		}(w)
+	}
+	wg.Wait()
+	close(errs)
+
+	for e := range errs {
+		t.Fatal(e)
 	}
 }
