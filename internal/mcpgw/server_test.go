@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
 
@@ -357,5 +358,28 @@ func TestToolsListNoUpstreams(t *testing.T) {
 	json.NewDecoder(rec.Body).Decode(&resp)
 	if resp.Error != nil {
 		t.Fatalf("expected no error, got: %v", resp.Error)
+	}
+}
+
+func TestToolCallRecordedInEvidenceChain(t *testing.T) {
+	engine := toolpolicy.NewEngine([]toolpolicy.ToolRule{
+		{Protocol: "mcp", Tool: "github.delete_repo", Decision: "block"},
+	}, "block")
+	chain := evidence.NewSessionChain("test-mcp")
+	gw := NewGateway(engine, chain, nil, nil)
+
+	reqBody := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`1`),
+		Method:  "tools/call",
+		Params:  json.RawMessage(`{"name": "github.delete_repo", "arguments": {"repo": "important"}}`),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	gw.ServeHTTP(httptest.NewRecorder(), req)
+
+	if got := len(chain.Records()); got != 1 {
+		t.Fatalf("expected the blocked tool call to be recorded once, got %d records", got)
 	}
 }

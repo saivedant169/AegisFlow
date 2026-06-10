@@ -789,7 +789,9 @@ func main() {
 			}
 			toolPolicyEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
 		}
-		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, nil, approvalQueue, upstreams)
+		// Record MCP tool decisions in the evidence chain — without this the
+		// flagship tamper-evident log captured nothing for real tool calls.
+		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, evidenceChain, approvalQueue, upstreams)
 		mcpAddr := fmt.Sprintf("%s:%d", cfg.MCPGateway.Host, cfg.MCPGateway.Port)
 
 		var mcpHandler http.Handler = mcpGateway
