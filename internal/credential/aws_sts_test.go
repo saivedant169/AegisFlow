@@ -19,13 +19,15 @@ type mockSTSClient struct {
 	CalledSessionName string
 	CalledDuration    time.Duration
 	CalledExternalID  string
+	CalledPolicy      string
 }
 
-func (m *mockSTSClient) AssumeRole(_ context.Context, roleARN, sessionName string, duration time.Duration, externalID string) (*STSCredentials, error) {
+func (m *mockSTSClient) AssumeRole(_ context.Context, roleARN, sessionName string, duration time.Duration, externalID, policy string) (*STSCredentials, error) {
 	m.CalledRoleARN = roleARN
 	m.CalledSessionName = sessionName
 	m.CalledDuration = duration
 	m.CalledExternalID = externalID
+	m.CalledPolicy = policy
 	return m.Creds, m.Err
 }
 
@@ -293,5 +295,42 @@ func TestParseAssumeRoleResponse(t *testing.T) {
 	}
 	if creds.Expiration.Year() != 2025 {
 		t.Errorf("Expiration year = %d, want 2025", creds.Expiration.Year())
+	}
+}
+
+func TestAWSSTSBrokerPassesSessionPolicy(t *testing.T) {
+	mock := &mockSTSClient{
+		Creds: &STSCredentials{
+			AccessKeyID:     "AKIA",
+			SecretAccessKey: "secret",
+			SessionToken:    "token",
+			Expiration:      time.Now().Add(time.Hour).UTC(),
+		},
+	}
+	policy := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"*"}]}`
+	b := NewAWSSTSBroker("aws", AWSSTSBrokerConfig{
+		RoleARN:       "arn:aws:iam::123:role/r",
+		SessionPolicy: policy,
+		DefaultTTL:    time.Hour,
+	}, mock)
+
+	if _, err := b.Issue(context.Background(), CredentialRequest{TaskID: "t", Capability: "read"}); err != nil {
+		t.Fatalf("Issue failed: %v", err)
+	}
+	if mock.CalledPolicy != policy {
+		t.Fatalf("session policy was not forwarded to AssumeRole: got %q", mock.CalledPolicy)
+	}
+}
+
+func TestAWSSTSBrokerNoPolicyStillIssues(t *testing.T) {
+	mock := &mockSTSClient{
+		Creds: &STSCredentials{AccessKeyID: "A", SecretAccessKey: "s", SessionToken: "t", Expiration: time.Now().Add(time.Hour).UTC()},
+	}
+	b := NewAWSSTSBroker("aws", AWSSTSBrokerConfig{RoleARN: "arn:aws:iam::123:role/r", DefaultTTL: time.Hour}, mock)
+	if _, err := b.Issue(context.Background(), CredentialRequest{TaskID: "t"}); err != nil {
+		t.Fatalf("Issue failed without a policy: %v", err)
+	}
+	if mock.CalledPolicy != "" {
+		t.Fatalf("expected empty policy, got %q", mock.CalledPolicy)
 	}
 }

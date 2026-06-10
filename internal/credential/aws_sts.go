@@ -29,12 +29,13 @@ type STSCredentials struct {
 
 // STSClient abstracts the STS AssumeRole call for testability.
 type STSClient interface {
-	AssumeRole(ctx context.Context, roleARN, sessionName string, duration time.Duration, externalID string) (*STSCredentials, error)
+	AssumeRole(ctx context.Context, roleARN, sessionName string, duration time.Duration, externalID, policy string) (*STSCredentials, error)
 }
 
 // AWSSTSBrokerConfig holds configuration for the AWS STS broker.
 type AWSSTSBrokerConfig struct {
 	RoleARN           string
+	SessionPolicy     string
 	Region            string
 	SessionNamePrefix string
 	ExternalID        string
@@ -92,7 +93,15 @@ func (b *AWSSTSBroker) Issue(ctx context.Context, req CredentialRequest) (*Crede
 
 	sessionName := sanitizeSessionName(fmt.Sprintf("%s-%s", b.config.SessionNamePrefix, req.TaskID))
 
-	stsCreds, err := b.client.AssumeRole(ctx, b.config.RoleARN, sessionName, ttl, b.config.ExternalID)
+	// An inline session policy can only narrow the role's permissions, so it's
+	// the lever for least privilege here. We don't auto-generate IAM (a wrong
+	// policy would just fail AssumeRole) — the operator supplies one. Warn when
+	// it's missing so an over-broad credential is at least visible.
+	if b.config.SessionPolicy == "" {
+		log.Printf("[credential] WARNING: minting an UNSCOPED AWS STS credential for task %s — no session policy configured, so it carries the full role's permissions", req.TaskID)
+	}
+
+	stsCreds, err := b.client.AssumeRole(ctx, b.config.RoleARN, sessionName, ttl, b.config.ExternalID, b.config.SessionPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("sts assume-role: %w", err)
 	}
@@ -171,7 +180,7 @@ func NewHTTPSTSClient(accessKey, secretKey, region string) *HTTPSTSClient {
 }
 
 // AssumeRole makes a signed POST to the STS AssumeRole API and parses the XML response.
-func (c *HTTPSTSClient) AssumeRole(ctx context.Context, roleARN, sessionName string, duration time.Duration, externalID string) (*STSCredentials, error) {
+func (c *HTTPSTSClient) AssumeRole(ctx context.Context, roleARN, sessionName string, duration time.Duration, externalID, policy string) (*STSCredentials, error) {
 	endpoint := fmt.Sprintf("https://sts.%s.amazonaws.com/", c.Region)
 
 	params := url.Values{}
@@ -182,6 +191,9 @@ func (c *HTTPSTSClient) AssumeRole(ctx context.Context, roleARN, sessionName str
 	params.Set("DurationSeconds", fmt.Sprintf("%d", int(duration.Seconds())))
 	if externalID != "" {
 		params.Set("ExternalId", externalID)
+	}
+	if policy != "" {
+		params.Set("Policy", policy)
 	}
 
 	body := params.Encode()

@@ -631,6 +631,7 @@ func main() {
 					Region:            region,
 					SessionNamePrefix: "aegisflow",
 					ExternalID:        pc.AWSExternalID,
+					SessionPolicy:     pc.AWSSessionPolicy,
 					DefaultTTL:        ttl,
 				}, stsClient)
 				credRegistry.Register(pc.Name, broker)
