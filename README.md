@@ -70,6 +70,24 @@ Then connect your agent:
 
 Other policy packs: `readonly`, `infra-review`. See [starter-kit/README.md](starter-kit/README.md) for all options.
 
+### Install without building from source
+
+Grab a prebuilt binary (no Go toolchain needed):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/saivedant169/AegisFlow/main/scripts/install.sh | sh
+```
+
+Or run the published container:
+
+```bash
+docker run --rm -p 8080:8080 -p 8081:8081 \
+  -v "$PWD/configs/aegisflow.yaml:/app/configs/aegisflow.yaml" \
+  saivedant169/aegisflow:v0.8.0
+```
+
+Building from source still works (`make build`, Go 1.26.4+) if you prefer.
+
 ---
 
 ## Why AegisFlow?
