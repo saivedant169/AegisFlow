@@ -213,21 +213,27 @@ func (r SuspiciousFanOut) Detect(history []envelope.ActionEnvelope) *BehaviorAle
 		return nil
 	}
 
-	// Sliding window: for each starting point, count unique targets within window.
-	for start := 0; start < len(history); start++ {
-		windowStart := history[start].Timestamp
-		targets := make(map[string]struct{})
-		var ids []string
-
-		for j := start; j < len(history); j++ {
-			if history[j].Timestamp.Sub(windowStart) > window {
-				break
+	// Two-pointer sliding window over the time-ordered history: advance right,
+	// shrink left while the span exceeds the window, and track the count of
+	// distinct targets currently inside [left, right]. Each action enters and
+	// leaves the window once, so this is O(len(history)) instead of the
+	// O(len(history)^2) restart-from-every-start scan.
+	counts := make(map[string]int)
+	left := 0
+	for right := 0; right < len(history); right++ {
+		counts[history[right].Target]++
+		for history[right].Timestamp.Sub(history[left].Timestamp) > window {
+			t := history[left].Target
+			if counts[t]--; counts[t] == 0 {
+				delete(counts, t)
 			}
-			targets[history[j].Target] = struct{}{}
-			ids = append(ids, history[j].ID)
+			left++
 		}
-
-		if len(targets) >= maxTargets {
+		if len(counts) >= maxTargets {
+			ids := make([]string, 0, right-left+1)
+			for k := left; k <= right; k++ {
+				ids = append(ids, history[k].ID)
+			}
 			return &BehaviorAlert{
 				Rule:      r.Name(),
 				Severity:  "warning",
@@ -276,19 +282,19 @@ func (r RepeatedEscalation) Detect(history []envelope.ActionEnvelope) *BehaviorA
 		return nil
 	}
 
-	// Sliding window over escalation events.
-	for start := 0; start <= len(escalations)-maxReqs; start++ {
-		windowStart := escalations[start].Timestamp
-		count := 0
-		var ids []string
-		for j := start; j < len(escalations); j++ {
-			if escalations[j].Timestamp.Sub(windowStart) > window {
-				break
-			}
-			count++
-			ids = append(ids, escalations[j].ID)
+	// Two-pointer sliding window over escalation events: keep [left, right]
+	// within the time window and alert once it holds maxReqs events. O(k)
+	// instead of restarting the inner count from every start.
+	left := 0
+	for right := 0; right < len(escalations); right++ {
+		for escalations[right].Timestamp.Sub(escalations[left].Timestamp) > window {
+			left++
 		}
-		if count >= maxReqs {
+		if right-left+1 >= maxReqs {
+			ids := make([]string, 0, right-left+1)
+			for k := left; k <= right; k++ {
+				ids = append(ids, escalations[k].ID)
+			}
 			return &BehaviorAlert{
 				Rule:      r.Name(),
 				Severity:  "warning",

@@ -35,11 +35,42 @@ func NewSessionAnalyzer(sessionID string, rules []Rule, killSwitchScore, windowM
 	}
 }
 
+// maxSessionHistory caps how many actions a single session retains. With a
+// finite analysis window the history is already bounded by the window; this is
+// the backstop for windowMinutes <= 0 (unlimited) so a long-lived session can't
+// grow history without bound.
+const maxSessionHistory = 4096
+
 // RecordAction adds an action envelope to the session history.
 func (sa *SessionAnalyzer) RecordAction(env *envelope.ActionEnvelope) {
 	sa.mu.Lock()
 	defer sa.mu.Unlock()
 	sa.history = append(sa.history, *env)
+	sa.pruneLocked()
+}
+
+// pruneLocked drops actions outside the analysis window and enforces the hard
+// cap, so RecordAction keeps history bounded (O(window) memory) instead of
+// growing for the life of the session. Must be called under lock.
+//
+// History is appended in arrival order, so expired actions form a prefix; the
+// drop shifts the live tail to the front of the backing array (no realloc, no
+// retained garbage prefix), which is what keeps memory bounded.
+func (sa *SessionAnalyzer) pruneLocked() {
+	drop := 0
+	if sa.windowMinutes > 0 {
+		cutoff := time.Now().UTC().Add(-time.Duration(sa.windowMinutes) * time.Minute)
+		for drop < len(sa.history) && sa.history[drop].Timestamp.Before(cutoff) {
+			drop++
+		}
+	}
+	if over := len(sa.history) - drop - maxSessionHistory; over > 0 {
+		drop += over
+	}
+	if drop > 0 {
+		n := copy(sa.history, sa.history[drop:])
+		sa.history = sa.history[:n]
+	}
 }
 
 // Analyze runs all detection rules over the session history within the
