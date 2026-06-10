@@ -1027,3 +1027,43 @@ func TestValidateToolPolicies_NilConfig(t *testing.T) {
 		t.Fatalf("expected nil for nil config, got %v", warnings)
 	}
 }
+
+func TestMCPGatewayDefaultsToLoopback(t *testing.T) {
+	cfg := &Config{}
+	setDefaults(cfg)
+	if cfg.MCPGateway.Host != "127.0.0.1" {
+		t.Fatalf("expected MCP gateway to default to loopback, got %q", cfg.MCPGateway.Host)
+	}
+	if cfg.MCPGateway.RequireAuth {
+		t.Fatal("require_auth should default to false")
+	}
+}
+
+func TestMCPGatewayHostAndAuthParse(t *testing.T) {
+	yamlData := `
+mcp_gateway:
+  enabled: true
+  host: "0.0.0.0"
+  require_auth: true
+`
+	f, err := os.CreateTemp("", "aegisflow-mcp-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(yamlData); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	cfg, err := Load(f.Name())
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.MCPGateway.Host != "0.0.0.0" {
+		t.Fatalf("expected host 0.0.0.0, got %q", cfg.MCPGateway.Host)
+	}
+	if !cfg.MCPGateway.RequireAuth {
+		t.Fatal("expected require_auth true")
+	}
+}

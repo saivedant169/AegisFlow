@@ -304,9 +304,15 @@ type GitHubGateConfig struct {
 	DefaultDecision string `yaml:"default_decision"` // "allow", "review", "block"
 }
 type MCPGatewayConfig struct {
-	Enabled   bool                `yaml:"enabled"`
-	Port      int                 `yaml:"port"`
-	Upstreams []MCPUpstreamConfig `yaml:"upstreams"`
+	Enabled bool   `yaml:"enabled"`
+	Host    string `yaml:"host"`
+	Port    int    `yaml:"port"`
+	// RequireAuth gates every tool call behind the same API-key auth the main
+	// gateway uses. Off by default because the gateway binds to loopback, where
+	// the local MCP bridge reaches it without a key; turn it on whenever the
+	// port is exposed beyond the host.
+	RequireAuth bool                `yaml:"require_auth"`
+	Upstreams   []MCPUpstreamConfig `yaml:"upstreams"`
 }
 
 type MCPUpstreamConfig struct {
@@ -859,6 +865,11 @@ func setDefaults(cfg *Config) {
 
 	if cfg.MCPGateway.Port == 0 {
 		cfg.MCPGateway.Port = 8082
+	}
+	if cfg.MCPGateway.Host == "" {
+		// Default to loopback: the MCP gateway executes tools, so it should not
+		// be reachable off-host unless someone opts in explicitly.
+		cfg.MCPGateway.Host = "127.0.0.1"
 	}
 
 	// Capability defaults

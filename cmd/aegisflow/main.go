@@ -790,10 +790,19 @@ func main() {
 			toolPolicyEngine = toolpolicy.NewEngine(rules, cfg.ToolPolicies.DefaultDecision)
 		}
 		mcpGateway := mcpgw.NewGateway(toolPolicyEngine, nil, approvalQueue, upstreams)
-		mcpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.MCPGateway.Port)
+		mcpAddr := fmt.Sprintf("%s:%d", cfg.MCPGateway.Host, cfg.MCPGateway.Port)
+
+		var mcpHandler http.Handler = mcpGateway
+		if cfg.MCPGateway.RequireAuth {
+			mcpHandler = middleware.Auth(cfg)(mcpGateway)
+			log.Printf("[init] MCP gateway requires API-key auth")
+		} else if cfg.MCPGateway.Host != "127.0.0.1" && cfg.MCPGateway.Host != "localhost" {
+			log.Printf("WARNING: MCP gateway is bound to %s with no auth — anyone who can reach %s can execute tools. Set mcp_gateway.require_auth: true or bind to 127.0.0.1.", cfg.MCPGateway.Host, mcpAddr)
+		}
+
 		mcpSrv := &http.Server{
 			Addr:         mcpAddr,
-			Handler:      mcpGateway,
+			Handler:      mcpHandler,
 			ReadTimeout:  cfg.Server.ReadTimeout,
 			WriteTimeout: cfg.Server.WriteTimeout,
 		}
