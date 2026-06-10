@@ -2,7 +2,6 @@ package analytics
 
 import (
 	"math"
-	"sort"
 	"sync"
 	"time"
 )
@@ -25,7 +24,7 @@ type MetricBucket struct {
 	Timestamp     time.Time
 	Requests      int64
 	Errors        int64
-	Latencies     []int64
+	Latency       latencyHistogram
 	Tokens        int64
 	EstimatedCost float64
 }
@@ -73,22 +72,24 @@ func (ts *TimeSeries) Record(dp DataPoint) {
 			if dp.StatusCode >= 500 {
 				b.Errors++
 			}
-			b.Latencies = append(b.Latencies, dp.LatencyMs)
+			b.Latency.observe(dp.LatencyMs)
 			b.Tokens += dp.Tokens
 			b.EstimatedCost += dp.EstimatedCost
 			return
 		}
 	}
 
-	// New bucket
-	ts.buckets[ts.pos] = MetricBucket{
+	// New bucket. Reset the slot's histogram (the ring buffer reuses slots, so
+	// a fresh window must not inherit the evicted bucket's counts).
+	b := &ts.buckets[ts.pos]
+	*b = MetricBucket{
 		Timestamp:     bucketTime,
 		Requests:      1,
 		Errors:        boolToInt64(dp.StatusCode >= 500),
-		Latencies:     []int64{dp.LatencyMs},
 		Tokens:        dp.Tokens,
 		EstimatedCost: dp.EstimatedCost,
 	}
+	b.Latency.observe(dp.LatencyMs)
 	ts.pos = (ts.pos + 1) % ts.size
 	if ts.count < ts.size {
 		ts.count++
@@ -126,13 +127,10 @@ func summarize(b MetricBucket) BucketSummary {
 	if b.Requests > 0 {
 		s.ErrorRate = float64(b.Errors) / float64(b.Requests) * 100
 	}
-	if len(b.Latencies) > 0 {
-		sorted := make([]int64, len(b.Latencies))
-		copy(sorted, b.Latencies)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-		s.P50Latency = percentile(sorted, 50)
-		s.P95Latency = percentile(sorted, 95)
-		s.P99Latency = percentile(sorted, 99)
+	if b.Latency.total > 0 {
+		s.P50Latency = b.Latency.percentile(50)
+		s.P95Latency = b.Latency.percentile(95)
+		s.P99Latency = b.Latency.percentile(99)
 	}
 	return s
 }
