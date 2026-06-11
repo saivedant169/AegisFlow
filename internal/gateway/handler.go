@@ -17,9 +17,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/analytics"
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/cache"
-	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/eval"
-	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/provider"
 	"github.com/saivedant169/AegisFlow/internal/router"
@@ -199,13 +197,11 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := ""
-	if t := middleware.TenantFromContext(r.Context()); t != nil {
-		tenantID = t.ID
-	}
+	rc := h.buildRequestContext(r, surfaceOpenAI, startTime)
+	tenantID := rc.tenantID
+	sessionID := rc.sessionID
 
 	// Behavioral kill-switch check
-	sessionID := tenantID
 	if h.behavioralRegistry != nil && sessionID != "" {
 		sa := h.behavioralRegistry.GetOrCreate(sessionID)
 		if sa.Blocked() {
@@ -334,85 +330,10 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Apply response transformations
-	if h.responseTransformCfg != nil {
-		TransformResponse(resp, h.responseTransformCfg)
-	}
-
-	// Cache the response
-	if h.cache != nil {
-		cacheKey := cache.BuildKey(tenantID, req.Model, req.Messages)
-		h.cache.Set(cacheKey, resp)
-	}
-	if h.semanticCache != nil {
-		// Reuse the lookup embedding and insert off the request path.
-		h.semanticCache.StoreAsync(tenantID, &req, resp, semanticEmbedding)
-	}
-
-	// Track usage
-	if h.usage != nil {
-		h.usage.Record(tenantID, providerName, req.Model, resp.Usage)
-	}
-
-	// Persist to database via buffered worker queue (non-blocking)
-	if h.dbQueue != nil {
-		select {
-		case h.dbQueue <- storage.UsageEvent{
-			TenantID: tenantID, Model: req.Model,
-			PromptTokens: resp.Usage.PromptTokens, CompletionTokens: resp.Usage.CompletionTokens,
-			TotalTokens: resp.Usage.TotalTokens, StatusCode: 200,
-			LatencyMs: time.Since(startTime).Milliseconds(), CreatedAt: time.Now(),
-		}:
-		default:
-			log.Printf("db queue full — dropping usage event for tenant %s", tenantID)
-		}
-	}
-
-	// Record spend for budget tracking
-	if h.recordSpend != nil {
-		h.recordSpend(tenantID, req.Model, float64(resp.Usage.TotalTokens)*0.00001)
-	}
-
-	// Quality evaluation
-	var qualityScore int
-	if h.evalBuiltin {
-		evalResult := eval.ScoreResponse(resp, time.Since(startTime).Milliseconds(), 0, h.evalMinTokens, h.evalLatencyMul)
-		qualityScore = evalResult.Score
-	}
-
-	if h.evalWebhook != nil && h.evalWebhook.ShouldEvaluate() {
-		prompt := ""
-		if len(req.Messages) > 0 {
-			prompt = req.Messages[len(req.Messages)-1].Content
-		}
-		response := ""
-		if len(resp.Choices) > 0 {
-			response = resp.Choices[0].Message.Content
-		}
-		h.evalWebhook.Evaluate(eval.WebhookRequest{
-			Model: req.Model, Provider: providerName,
-			Prompt: prompt, Response: response,
-			LatencyMs:    time.Since(startTime).Milliseconds(),
-			BuiltinScore: qualityScore,
-		})
-	}
-
-	// Behavioral analysis: record action and analyze for anomalies
-	if h.behavioralRegistry != nil && sessionID != "" {
-		sa := h.behavioralRegistry.GetOrCreate(sessionID)
-		sa.RecordAction(&envelope.ActionEnvelope{
-			Timestamp: time.Now().UTC(),
-			Tool:      req.Model,
-			Target:    "chat-completion",
-			Protocol:  envelope.ProtocolHTTP,
-			Actor:     envelope.ActorInfo{TenantID: tenantID, SessionID: sessionID},
-		})
-		sa.Analyze()
-	}
-
-	// Record analytics data point
-	h.recordAnalytics(tenantID, req.Model, providerName, 200, startTime, int64(resp.Usage.TotalTokens), qualityScore)
-	h.logRequest(startTime, r, tenantID, req.Model, providerName, http.StatusOK, resp.Usage.TotalTokens, false, routed.Region)
+	// Post-response governance: transform, cache, usage/spend/db, eval,
+	// behavioral, analytics, audit. Shared with the Anthropic path so the tail
+	// can't diverge between wires.
+	h.postResponseGovernance(rc, &req, resp, providerName, routed.Region, semanticEmbedding)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-AegisFlow-Cache", "MISS")
