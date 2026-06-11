@@ -183,6 +183,22 @@ func writeInputBlockOpenAI(w http.ResponseWriter, gov govResult) {
 	}
 }
 
+// writeInputBlockAnthropic renders a govResult block as an Anthropic-wire error.
+// Input-policy and policy-engine-error map to the same types the original
+// Messages handler used; kill-switch and budget are new on this wire.
+func writeInputBlockAnthropic(w http.ResponseWriter, gov govResult) {
+	switch gov.Kind {
+	case blockKillSwitch:
+		writeAnthropicError(w, gov.Status, "permission_error", gov.Message)
+	case blockBudget:
+		writeAnthropicError(w, gov.Status, "rate_limit_error", gov.Message)
+	case blockInputPolicy:
+		writeAnthropicError(w, gov.Status, "permission_error", gov.Message)
+	default: // blockPolicyError
+		writeAnthropicError(w, gov.Status, "api_error", gov.Message)
+	}
+}
+
 // postResponseGovernance runs every side effect that must follow a successful,
 // policy-passed response: response transform, cache population, usage/spend/db
 // accounting, quality eval, behavioral recording, and analytics/audit logging.

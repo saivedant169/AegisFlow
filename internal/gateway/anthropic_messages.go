@@ -12,7 +12,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
@@ -252,47 +251,19 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 
 	req := translateMessagesRequest(&in)
 
-	tenantID := ""
-	if t := middleware.TenantFromContext(r.Context()); t != nil {
-		tenantID = t.ID
-	}
+	rc := h.buildRequestContext(r, surfaceAnthropic, startTime)
+	tenantID := rc.tenantID
 
-	// Apply the same model aliasing + request transforms the OpenAI path uses,
-	// so configured governance (system-prompt injection, aliases, per-tenant
-	// overrides) applies consistently regardless of wire format.
-	if h.modelAliases != nil {
-		ApplyModelAlias(req, h.modelAliases)
+	// Input governance: kill-switch, aliasing, transforms, budget, input policy —
+	// the same shared sequence the OpenAI path runs, so /v1/messages no longer
+	// skips the kill-switch and budget checks.
+	gov := h.runInputGovernance(rc, req)
+	if gov.Blocked {
+		writeInputBlockAnthropic(w, gov)
+		return
 	}
-	var tenantTransform *TransformConfig
-	if tenantID != "" && h.tenantTransforms != nil {
-		tenantTransform = h.tenantTransforms[tenantID]
-	}
-	TransformRequestWithTenant(req, h.transformCfg, tenantTransform)
-
-	// Input policy + audit, before anything leaves for the provider.
-	if h.policy != nil {
-		inputContent := extractContent(req.Messages)
-		v, err := h.policy.CheckInput(inputContent)
-		if err != nil {
-			log.Printf("policy engine input check error: %v", err)
-			h.recordAnalytics(tenantID, req.Model, "", http.StatusInternalServerError, startTime, 0)
-			writeAnthropicError(w, http.StatusInternalServerError, "api_error", "policy engine error")
-			return
-		}
-		if v != nil {
-			if v.Action == policy.ActionBlock {
-				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-				h.recordAnalytics(tenantID, req.Model, "", http.StatusForbidden, startTime, 0)
-				if h.auditLog != nil {
-					prompt := runeTruncate(inputContent, 200)
-					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(map[string]string{"message": v.Message, "prompt": prompt, "api": "messages"}), tenantID, req.Model)
-				}
-				writeAnthropicError(w, http.StatusForbidden, "permission_error", policy.FormatViolation(v))
-				return
-			}
-			h.fireWebhook("policy_warning", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-			log.Printf("policy warning: %s", policy.FormatViolation(v))
-		}
+	for _, warning := range gov.Warnings {
+		w.Header().Add("X-AegisFlow-Budget-Warning", warning)
 	}
 
 	if req.Stream {
@@ -333,7 +304,6 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	// transform, cache, usage/spend/db, eval, behavioral, analytics, audit.
 	// Closes the /v1/messages bypass that previously skipped everything but
 	// usage + analytics + logRequest.
-	rc := h.buildRequestContext(r, surfaceAnthropic, startTime)
 	h.postResponseGovernance(rc, req, resp, providerName, routed.Region, nil)
 
 	content := ""

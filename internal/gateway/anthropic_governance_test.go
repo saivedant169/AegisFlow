@@ -6,9 +6,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/provider"
@@ -82,6 +84,55 @@ func TestMessages_RecordsBehavioral(t *testing.T) {
 	}
 	if got := len(sa.History()); got != 1 {
 		t.Fatalf("expected 1 recorded action, got %d", got)
+	}
+}
+
+// A tenant over its per-model budget must be rejected on /v1/messages, not
+// silently served and billed. Before unification this never fired.
+func TestMessages_BudgetExceeded(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	budgetCheck := func(tenantID, model string) (bool, []string, string) {
+		return false, nil, "budget exhausted"
+	}
+	h := NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, nil, budgetCheck)
+
+	w := postMessagesAsTenant(h, "t1", msgBody)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 on over-budget /v1/messages, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// A behavioral-kill-switched session must be blocked on /v1/messages too.
+func TestMessages_KillSwitchBlocks(t *testing.T) {
+	h, _ := newMessagesHandler(nil)
+	reg := behavioral.NewRegistry(behavioral.DefaultRules(), 20, 0) // kill-switch at risk 20
+	// Pre-block the tenant's session: three consecutive deletes => destructive
+	// sequence (risk 25) >= threshold.
+	sa := reg.GetOrCreate("t1")
+	for i := 0; i < 3; i++ {
+		sa.RecordAction(&envelope.ActionEnvelope{
+			Timestamp:           time.Now().UTC(),
+			RequestedCapability: envelope.CapDelete,
+			Tool:                "shell.rm",
+			Target:              "/data",
+			Protocol:            envelope.ProtocolMCP,
+			Actor:               envelope.ActorInfo{SessionID: "t1"},
+		})
+	}
+	sa.Analyze()
+	if !sa.Blocked() {
+		t.Fatal("precondition: session should be kill-switch blocked")
+	}
+	h.SetBehavioralRegistry(reg)
+
+	w := postMessagesAsTenant(h, "t1", msgBody)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a kill-switched session on /v1/messages, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
