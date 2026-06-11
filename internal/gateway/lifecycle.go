@@ -9,6 +9,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
+	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
@@ -30,6 +31,112 @@ func (s apiSurface) behavioralTarget() string {
 		return "messages"
 	}
 	return "chat-completion"
+}
+
+// auditAPI tags the audit-log entry with the wire the request arrived on. Empty
+// for OpenAI (the original ChatCompletion path logged no api tag).
+func (s apiSurface) auditAPI() string {
+	if s == surfaceAnthropic {
+		return "messages"
+	}
+	return ""
+}
+
+// govBlockKind is the semantic reason input governance rejected a request. Each
+// wire adapter maps it to its own error envelope, so the decision is made once
+// and rendered per-wire.
+type govBlockKind int
+
+const (
+	blockNone govBlockKind = iota
+	blockKillSwitch
+	blockBudget
+	blockInputPolicy
+	blockPolicyError
+)
+
+// govResult is the outcome of input governance. Blocked means the adapter must
+// stop and render an error built from Kind/Status/Message; otherwise Warnings
+// (budget warnings) should be surfaced as response headers. The wire-agnostic
+// side effects (webhook, audit, analytics-on-block) already fired inside
+// runInputGovernance.
+type govResult struct {
+	Blocked  bool
+	Status   int
+	Kind     govBlockKind
+	Message  string
+	Warnings []string
+}
+
+// runInputGovernance runs the pre-route preparation and gates that must apply to
+// every request regardless of wire: behavioral kill-switch, model aliasing,
+// request transforms, per-model budget, and input policy. It mutates req in
+// place (aliasing/transforms) and returns the decision. Order matches the
+// original ChatCompletion sequence exactly. Shared so /v1/messages can't drift
+// from /v1/chat/completions (it previously skipped kill-switch and budget).
+func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletionRequest) govResult {
+	// Behavioral kill-switch.
+	if h.behavioralRegistry != nil && rc.sessionID != "" {
+		sa := h.behavioralRegistry.GetOrCreate(rc.sessionID)
+		if sa.Blocked() {
+			return govResult{
+				Blocked: true, Status: http.StatusForbidden, Kind: blockKillSwitch,
+				Message: "session blocked by behavioral kill switch — cumulative risk score exceeded threshold",
+			}
+		}
+	}
+
+	// Model aliasing.
+	if h.modelAliases != nil {
+		ApplyModelAlias(req, h.modelAliases)
+	}
+
+	// Request transformations (per-tenant overrides global).
+	var tenantTransform *TransformConfig
+	if rc.tenantID != "" && h.tenantTransforms != nil {
+		tenantTransform = h.tenantTransforms[rc.tenantID]
+	}
+	TransformRequestWithTenant(req, h.transformCfg, tenantTransform)
+
+	// Per-model budget check.
+	var warnings []string
+	if h.budgetCheck != nil && rc.tenantID != "" {
+		allowed, w, blockMsg := h.budgetCheck(rc.tenantID, req.Model)
+		if !allowed {
+			h.recordAnalytics(rc.tenantID, req.Model, "", http.StatusTooManyRequests, rc.startTime, 0)
+			return govResult{Blocked: true, Status: http.StatusTooManyRequests, Kind: blockBudget, Message: blockMsg}
+		}
+		warnings = w
+	}
+
+	// Input policy.
+	if h.policy != nil {
+		inputContent := extractContent(req.Messages)
+		v, err := h.policy.CheckInput(inputContent)
+		if err != nil {
+			log.Printf("policy engine input check error: %v", err)
+			h.recordAnalytics(rc.tenantID, req.Model, "", http.StatusInternalServerError, rc.startTime, 0)
+			return govResult{Blocked: true, Status: http.StatusInternalServerError, Kind: blockPolicyError, Message: "policy engine error"}
+		}
+		if v != nil {
+			if v.Action == policy.ActionBlock {
+				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), rc.tenantID, req.Model, v.Message)
+				h.recordAnalytics(rc.tenantID, req.Model, "", http.StatusForbidden, rc.startTime, 0)
+				if h.auditLog != nil {
+					detail := map[string]string{"message": v.Message, "prompt": runeTruncate(inputContent, 200)}
+					if api := rc.surface.auditAPI(); api != "" {
+						detail["api"] = api
+					}
+					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(detail), rc.tenantID, req.Model)
+				}
+				return govResult{Blocked: true, Status: http.StatusForbidden, Kind: blockInputPolicy, Message: policy.FormatViolation(v)}
+			}
+			h.fireWebhook("policy_warning", v.PolicyName, string(v.Action), rc.tenantID, req.Model, v.Message)
+			log.Printf("policy warning: %s", policy.FormatViolation(v))
+		}
+	}
+
+	return govResult{Warnings: warnings}
 }
 
 // requestContext bundles the cross-cutting inputs every governance stage needs,
@@ -58,6 +165,21 @@ func (h *Handler) buildRequestContext(r *http.Request, surface apiSurface, start
 		startTime: startTime,
 		httpReq:   r,
 		surface:   surface,
+	}
+}
+
+// writeInputBlockOpenAI renders a govResult block as an OpenAI-wire error,
+// preserving the original ChatCompletion error-type strings per block kind.
+func writeInputBlockOpenAI(w http.ResponseWriter, gov govResult) {
+	switch gov.Kind {
+	case blockKillSwitch:
+		writeError(w, gov.Status, "session_blocked", gov.Message)
+	case blockBudget:
+		writeError(w, gov.Status, "budget_exceeded", gov.Message)
+	case blockInputPolicy:
+		writeError(w, gov.Status, "policy_violation", gov.Message)
+	default: // blockPolicyError
+		writeError(w, gov.Status, "policy_error", gov.Message)
 	}
 }
 

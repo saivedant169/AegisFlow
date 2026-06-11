@@ -199,66 +199,16 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 
 	rc := h.buildRequestContext(r, surfaceOpenAI, startTime)
 	tenantID := rc.tenantID
-	sessionID := rc.sessionID
 
-	// Behavioral kill-switch check
-	if h.behavioralRegistry != nil && sessionID != "" {
-		sa := h.behavioralRegistry.GetOrCreate(sessionID)
-		if sa.Blocked() {
-			writeError(w, http.StatusForbidden, "session_blocked", "session blocked by behavioral kill switch — cumulative risk score exceeded threshold")
-			return
-		}
+	// Input governance: kill-switch, aliasing, transforms, budget, input policy.
+	// Shared with the Anthropic path so both wires run the identical sequence.
+	gov := h.runInputGovernance(rc, &req)
+	if gov.Blocked {
+		writeInputBlockOpenAI(w, gov)
+		return
 	}
-
-	// Apply model aliasing
-	if h.modelAliases != nil {
-		ApplyModelAlias(&req, h.modelAliases)
-	}
-
-	// Apply request transformations (per-tenant overrides global)
-	var tenantTransform *TransformConfig
-	if tenantID != "" && h.tenantTransforms != nil {
-		tenantTransform = h.tenantTransforms[tenantID]
-	}
-	TransformRequestWithTenant(&req, h.transformCfg, tenantTransform)
-
-	// Per-model budget check (global/tenant checks run in middleware, model-level here)
-	if h.budgetCheck != nil && tenantID != "" {
-		allowed, warnings, blockMsg := h.budgetCheck(tenantID, req.Model)
-		if !allowed {
-			h.recordAnalytics(tenantID, req.Model, "", http.StatusTooManyRequests, startTime, 0)
-			writeError(w, http.StatusTooManyRequests, "budget_exceeded", blockMsg)
-			return
-		}
-		for _, warning := range warnings {
-			w.Header().Add("X-AegisFlow-Budget-Warning", warning)
-		}
-	}
-
-	// Policy check: input
-	if h.policy != nil {
-		inputContent := extractContent(req.Messages)
-		v, err := h.policy.CheckInput(inputContent)
-		if err != nil {
-			log.Printf("policy engine input check error: %v", err)
-			h.recordAnalytics(tenantID, req.Model, "", http.StatusInternalServerError, startTime, 0)
-			writeError(w, http.StatusInternalServerError, "policy_error", "policy engine error")
-			return
-		}
-		if v != nil {
-			if v.Action == policy.ActionBlock {
-				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-				h.recordAnalytics(tenantID, req.Model, "", http.StatusForbidden, startTime, 0)
-				if h.auditLog != nil {
-					prompt := runeTruncate(inputContent, 200)
-					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(map[string]string{"message": v.Message, "prompt": prompt}), tenantID, req.Model)
-				}
-				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
-				return
-			}
-			h.fireWebhook("policy_warning", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-			log.Printf("policy warning: %s", policy.FormatViolation(v))
-		}
+	for _, warning := range gov.Warnings {
+		w.Header().Add("X-AegisFlow-Budget-Warning", warning)
 	}
 
 	if req.Stream {
