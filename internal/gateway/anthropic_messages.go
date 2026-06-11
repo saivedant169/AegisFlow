@@ -563,7 +563,11 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	})
 	writeSSE(w, flusher, "message_stop", map[string]any{"type": "message_stop"})
 
-	h.recordAnalytics(tenantID, model, "", http.StatusOK, startTime, int64(outTokens))
+	// Post-stream governance: usage/db/spend/behavioral/analytics/log — the tail
+	// both stream paths previously skipped. Provider/region are unset on the
+	// stream path (RouteStream doesn't surface them).
+	rc := h.buildRequestContext(r, surfaceAnthropic, startTime)
+	h.postStreamGovernance(rc, req, "", "", outTokens)
 }
 
 // estimateTokens is a rough byte-to-token approximation used only for the

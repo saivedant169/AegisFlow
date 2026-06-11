@@ -212,7 +212,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Stream {
-		h.handleStream(w, r, &req, tenantID)
+		h.handleStream(w, rc, &req)
 		return
 	}
 
@@ -272,7 +272,9 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *types.ChatCompletionRequest, tenantID string) {
+func (h *Handler) handleStream(w http.ResponseWriter, rc requestContext, req *types.ChatCompletionRequest) {
+	r := rc.httpReq
+	tenantID := rc.tenantID
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "server_error", "streaming not supported")
@@ -293,6 +295,15 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
+	// released counts bytes actually delivered to the client; on a clean finish
+	// finalize runs the post-stream governance tail with an estimated token
+	// count. A blocked or errored stream returns before finalize, so the tail
+	// only runs for a successful response (matching the non-streaming path).
+	released := 0
+	finalize := func() {
+		h.postStreamGovernance(rc, req, "", "", estimateTokensFromBytes(released))
+	}
+
 	// Output policy is enforced check-before-release: bytes are buffered and
 	// scanned before they go to the client, so blocked content never leaves the
 	// gateway. (The old code wrote each chunk first and scanned afterwards,
@@ -307,11 +318,13 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 			if n > 0 {
 				w.Write(buf[:n])
 				flusher.Flush()
+				released += n
 			}
 			if err != nil {
 				break
 			}
 		}
+		finalize()
 		return
 	}
 
@@ -333,6 +346,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 
 	flushPending := func() {
 		if len(pending) > 0 {
+			released += len(pending)
 			w.Write(pending)
 			flusher.Flush()
 			pending = pending[:0]
@@ -365,6 +379,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 			return
 		}
 		flushPending()
+		finalize()
 		return
 	}
 
@@ -414,6 +429,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, req *type
 	}
 	// Scan and release whatever's left below the interval.
 	release()
+	finalize()
 }
 
 func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {

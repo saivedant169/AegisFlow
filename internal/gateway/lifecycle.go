@@ -318,3 +318,45 @@ func (h *Handler) postResponseGovernance(rc requestContext, req *types.ChatCompl
 	h.recordAnalytics(rc.tenantID, req.Model, providerName, 200, rc.startTime, int64(resp.Usage.TotalTokens), qualityScore)
 	h.logRequest(rc.startTime, rc.httpReq, rc.tenantID, req.Model, providerName, http.StatusOK, resp.Usage.TotalTokens, false, region)
 }
+
+// postStreamGovernance runs the governance tail for a cleanly completed stream:
+// usage, db persistence, spend, behavioral record/analyze, analytics, and the
+// request log. It omits the stages that don't apply to streamed output — cache
+// population (streams aren't cached), response transform, and quality eval
+// (there is no buffered body to score). outTokens is the estimated output token
+// count. Shared by both streaming wires, which previously ran none of this, so
+// streamed traffic was invisible to spend, db, and behavioral defense.
+func (h *Handler) postStreamGovernance(rc requestContext, req *types.ChatCompletionRequest, providerName, region string, outTokens int) {
+	usageData := types.Usage{CompletionTokens: outTokens, TotalTokens: outTokens}
+
+	if h.usage != nil {
+		h.usage.Record(rc.tenantID, providerName, req.Model, usageData)
+	}
+	if h.dbQueue != nil {
+		select {
+		case h.dbQueue <- storage.UsageEvent{
+			TenantID: rc.tenantID, Model: req.Model,
+			CompletionTokens: outTokens, TotalTokens: outTokens, StatusCode: 200,
+			LatencyMs: time.Since(rc.startTime).Milliseconds(), CreatedAt: time.Now(),
+		}:
+		default:
+			log.Printf("db queue full — dropping usage event for tenant %s", rc.tenantID)
+		}
+	}
+	if h.recordSpend != nil {
+		h.recordSpend(rc.tenantID, req.Model, float64(outTokens)*0.00001)
+	}
+	if h.behavioralRegistry != nil && rc.sessionID != "" {
+		sa := h.behavioralRegistry.GetOrCreate(rc.sessionID)
+		sa.RecordAction(&envelope.ActionEnvelope{
+			Timestamp: time.Now().UTC(),
+			Tool:      req.Model,
+			Target:    rc.surface.behavioralTarget(),
+			Protocol:  envelope.ProtocolHTTP,
+			Actor:     envelope.ActorInfo{TenantID: rc.tenantID, SessionID: rc.sessionID},
+		})
+		sa.Analyze()
+	}
+	h.recordAnalytics(rc.tenantID, req.Model, providerName, 200, rc.startTime, int64(outTokens))
+	h.logRequest(rc.startTime, rc.httpReq, rc.tenantID, req.Model, providerName, http.StatusOK, outTokens, false, region)
+}

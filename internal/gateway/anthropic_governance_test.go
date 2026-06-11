@@ -139,6 +139,29 @@ func TestMessages_KillSwitchBlocks(t *testing.T) {
 	}
 }
 
+const msgStreamBody = `{"model":"mock","max_tokens":64,"stream":true,"messages":[{"role":"user","content":"Hello"}]}`
+
+// A streaming /v1/messages request must run the post-stream governance tail —
+// spend and behavioral previously fired on neither stream path.
+func TestMessages_StreamRecordsSpendAndBehavioral(t *testing.T) {
+	var spendCalls int
+	h, _ := newMessagesHandler(func(tenantID, model string, cost float64) { spendCalls++ })
+	reg := behavioral.NewRegistry(behavioral.DefaultRules(), 0, 0)
+	h.SetBehavioralRegistry(reg)
+
+	w := postMessagesAsTenant(h, "t1", msgStreamBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if spendCalls != 1 {
+		t.Fatalf("expected recordSpend once after a streaming /v1/messages, got %d", spendCalls)
+	}
+	sa := reg.Get("t1")
+	if sa == nil || len(sa.History()) != 1 {
+		t.Fatalf("expected one behavioral action recorded after streaming, got %v", sa)
+	}
+}
+
 // A cached response must be served on /v1/messages, framed as an Anthropic
 // envelope, without hitting the provider. Before unification the path never
 // consulted the cache.
