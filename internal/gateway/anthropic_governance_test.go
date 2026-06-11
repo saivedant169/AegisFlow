@@ -1,0 +1,98 @@
+package gateway
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/saivedant169/AegisFlow/internal/behavioral"
+	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/middleware"
+	"github.com/saivedant169/AegisFlow/internal/policy"
+	"github.com/saivedant169/AegisFlow/internal/provider"
+	"github.com/saivedant169/AegisFlow/internal/router"
+	"github.com/saivedant169/AegisFlow/internal/usage"
+)
+
+// postMessagesAsTenant drives /v1/messages with a tenant in context so the
+// governance stages keyed on tenant/session fire.
+func postMessagesAsTenant(h *Handler, tenantID, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.TenantContextKey, &config.TenantConfig{ID: tenantID})
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Messages(w, req)
+	return w
+}
+
+func newMessagesHandler(recordSpend func(string, string, float64)) (*Handler, *usage.Tracker) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	return NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, recordSpend, nil), ut
+}
+
+const msgBody = `{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"Hello"}]}`
+
+// The /v1/messages path must record spend to the same ledger budgetCheck reads.
+// Before the lifecycle unification this never fired (the governance bypass).
+func TestMessages_RecordsSpend(t *testing.T) {
+	var calls int
+	var gotModel string
+	var gotCost float64
+	h, _ := newMessagesHandler(func(tenantID, model string, cost float64) {
+		calls++
+		gotModel = model
+		gotCost = cost
+	})
+
+	if w := postMessagesAsTenant(h, "t1", msgBody); w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if calls != 1 {
+		t.Fatalf("expected recordSpend called once on /v1/messages, got %d", calls)
+	}
+	if gotModel != "mock" {
+		t.Errorf("spend model = %q, want mock", gotModel)
+	}
+	if gotCost <= 0 {
+		t.Errorf("spend cost = %v, want > 0", gotCost)
+	}
+}
+
+// The /v1/messages path must feed behavioral analysis so anomaly detection and
+// the kill-switch can see Anthropic traffic.
+func TestMessages_RecordsBehavioral(t *testing.T) {
+	h, _ := newMessagesHandler(nil)
+	reg := behavioral.NewRegistry(behavioral.DefaultRules(), 0, 0)
+	h.SetBehavioralRegistry(reg)
+
+	if w := postMessagesAsTenant(h, "t1", msgBody); w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	sa := reg.Get("t1")
+	if sa == nil {
+		t.Fatal("expected a behavioral analyzer for the tenant session after /v1/messages")
+	}
+	if got := len(sa.History()); got != 1 {
+		t.Fatalf("expected 1 recorded action, got %d", got)
+	}
+}
+
+// Usage accounting already fired on /v1/messages; keep it as a parity guard so a
+// future refactor can't silently drop it.
+func TestMessages_RecordsUsage(t *testing.T) {
+	h, ut := newMessagesHandler(nil)
+	if w := postMessagesAsTenant(h, "t1", msgBody); w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if u := ut.GetUsage("t1"); u == nil || u.TotalTokens == 0 {
+		t.Fatalf("expected usage recorded for tenant t1, got %+v", u)
+	}
+}

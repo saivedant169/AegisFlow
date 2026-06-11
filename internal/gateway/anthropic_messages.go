@@ -329,11 +329,12 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.usage != nil {
-		h.usage.Record(tenantID, providerName, req.Model, resp.Usage)
-	}
-	h.recordAnalytics(tenantID, req.Model, providerName, http.StatusOK, startTime, int64(resp.Usage.TotalTokens))
-	h.logRequest(startTime, r, tenantID, req.Model, providerName, http.StatusOK, resp.Usage.TotalTokens, false, routed.Region)
+	// Post-response governance: same tail the OpenAI path runs — response
+	// transform, cache, usage/spend/db, eval, behavioral, analytics, audit.
+	// Closes the /v1/messages bypass that previously skipped everything but
+	// usage + analytics + logRequest.
+	rc := h.buildRequestContext(r, surfaceAnthropic, startTime)
+	h.postResponseGovernance(rc, req, resp, providerName, routed.Region, nil)
 
 	content := ""
 	finishReason := ""
