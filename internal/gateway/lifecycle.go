@@ -168,6 +168,37 @@ func (h *Handler) buildRequestContext(r *http.Request, surface apiSurface, start
 	}
 }
 
+// lookupCache checks the semantic cache then the exact cache. On a hit it
+// returns the cached response and a wire-agnostic status ("SEMANTIC-HIT" /
+// "HIT"); on a miss it returns the embedding computed during the semantic
+// lookup so the store can reuse it instead of embedding the same text again.
+// Shared so /v1/messages reads the same cache /v1/chat/completions warms.
+func (h *Handler) lookupCache(rc requestContext, req *types.ChatCompletionRequest) (resp *types.ChatCompletionResponse, status string, embedding []float64, hit bool) {
+	if h.semanticCache != nil {
+		cached, emb, ok := h.semanticCache.GetSemanticWithEmbedding(rc.tenantID, req)
+		if ok {
+			return cached, "SEMANTIC-HIT", nil, true
+		}
+		embedding = emb
+	}
+	if h.cache != nil {
+		key := cache.BuildKey(rc.tenantID, req.Model, req.Messages)
+		if cached, ok := h.cache.Get(key); ok {
+			return cached, "HIT", nil, true
+		}
+	}
+	return nil, "", embedding, false
+}
+
+// cacheSourceName maps a cache status to the provider label used in the request
+// log, preserving the original ChatCompletion labels.
+func cacheSourceName(status string) string {
+	if status == "SEMANTIC-HIT" {
+		return "semantic-cache"
+	}
+	return "cache"
+}
+
 // writeInputBlockOpenAI renders a govResult block as an OpenAI-wire error,
 // preserving the original ChatCompletion error-type strings per block kind.
 func writeInputBlockOpenAI(w http.ResponseWriter, gov govResult) {

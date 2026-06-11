@@ -271,6 +271,15 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cache lookup (non-streaming only) — reads the same cache the OpenAI path
+	// warms. On a hit, serve the cached response framed as an Anthropic message.
+	cachedResp, cacheStatus, semanticEmbedding, hit := h.lookupCache(rc, req)
+	if hit {
+		h.logRequest(startTime, r, tenantID, req.Model, cacheSourceName(cacheStatus), http.StatusOK, cachedResp.Usage.TotalTokens, true, "")
+		writeAnthropicMessage(w, in.Model, cachedResp)
+		return
+	}
+
 	routed, err := h.router.RouteWithProvider(r.Context(), req)
 	if err != nil {
 		log.Printf("messages: provider routing error: %v", err)
@@ -303,9 +312,15 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	// Post-response governance: same tail the OpenAI path runs — response
 	// transform, cache, usage/spend/db, eval, behavioral, analytics, audit.
 	// Closes the /v1/messages bypass that previously skipped everything but
-	// usage + analytics + logRequest.
-	h.postResponseGovernance(rc, req, resp, providerName, routed.Region, nil)
+	// usage + analytics + logRequest. Reuses the lookup embedding for the store.
+	h.postResponseGovernance(rc, req, resp, providerName, routed.Region, semanticEmbedding)
 
+	writeAnthropicMessage(w, in.Model, resp)
+}
+
+// writeAnthropicMessage serializes an internal ChatCompletionResponse as an
+// Anthropic Messages envelope. Shared by the live and cache-hit response paths.
+func writeAnthropicMessage(w http.ResponseWriter, model string, resp *types.ChatCompletionResponse) {
 	content := ""
 	finishReason := ""
 	if len(resp.Choices) > 0 {
@@ -316,7 +331,7 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		ID:         newAnthropicMsgID(),
 		Type:       "message",
 		Role:       "assistant",
-		Model:      in.Model,
+		Model:      model,
 		Content:    []anthropicTextBlock{{Type: "text", Text: content}},
 		StopReason: mapStopReason(finishReason),
 		Usage: anthropicMsgUsage{

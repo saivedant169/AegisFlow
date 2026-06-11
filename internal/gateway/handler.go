@@ -216,33 +216,15 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Semantic cache lookup (non-streaming only). Keep the embedding it computes
-	// so a miss can reuse it for the store instead of embedding the same text
-	// again.
-	var semanticEmbedding []float64
-	if h.semanticCache != nil {
-		cached, embedding, ok := h.semanticCache.GetSemanticWithEmbedding(tenantID, &req)
-		if ok {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-AegisFlow-Cache", "SEMANTIC-HIT")
-			h.logRequest(startTime, r, tenantID, req.Model, "semantic-cache", http.StatusOK, cached.Usage.TotalTokens, true, "")
-			json.NewEncoder(w).Encode(cached)
-			return
-		}
-		semanticEmbedding = embedding
-	}
-
-	// Check cache (non-streaming only)
-	if h.cache != nil {
-		cacheKey := cache.BuildKey(tenantID, req.Model, req.Messages)
-		if cached, ok := h.cache.Get(cacheKey); ok {
-			log.Printf("cache hit: %s", cacheKey[:20])
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-AegisFlow-Cache", "HIT")
-			h.logRequest(startTime, r, tenantID, req.Model, "cache", http.StatusOK, cached.Usage.TotalTokens, true, "")
-			json.NewEncoder(w).Encode(cached)
-			return
-		}
+	// Cache lookup (non-streaming only). On a miss, keep the embedding it
+	// computed so the store can reuse it. Shared with the Anthropic path.
+	cachedResp, cacheStatus, semanticEmbedding, hit := h.lookupCache(rc, &req)
+	if hit {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-AegisFlow-Cache", cacheStatus)
+		h.logRequest(startTime, r, tenantID, req.Model, cacheSourceName(cacheStatus), http.StatusOK, cachedResp.Usage.TotalTokens, true, "")
+		json.NewEncoder(w).Encode(cachedResp)
+		return
 	}
 
 	routed, err := h.router.RouteWithProvider(r.Context(), &req)

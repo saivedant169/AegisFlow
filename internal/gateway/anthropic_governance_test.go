@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
+	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
@@ -16,6 +18,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/provider"
 	"github.com/saivedant169/AegisFlow/internal/router"
 	"github.com/saivedant169/AegisFlow/internal/usage"
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
 // postMessagesAsTenant drives /v1/messages with a tenant in context so the
@@ -133,6 +136,45 @@ func TestMessages_KillSwitchBlocks(t *testing.T) {
 	w := postMessagesAsTenant(h, "t1", msgBody)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 for a kill-switched session on /v1/messages, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// A cached response must be served on /v1/messages, framed as an Anthropic
+// envelope, without hitting the provider. Before unification the path never
+// consulted the cache.
+func TestMessages_CacheHit(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	c := cache.NewMemoryCache(5*time.Minute, 100)
+	h := NewHandler(registry, rt, pe, ut, c, nil, nil, nil, 0, nil, nil)
+
+	// Seed the cache under the exact key the Messages handler will compute.
+	var in anthropicMessagesRequest
+	if err := json.Unmarshal([]byte(msgBody), &in); err != nil {
+		t.Fatalf("seed unmarshal: %v", err)
+	}
+	tr := translateMessagesRequest(&in)
+	key := cache.BuildKey("t1", tr.Model, tr.Messages)
+	c.Set(key, &types.ChatCompletionResponse{
+		Model:   "mock",
+		Choices: []types.Choice{{Message: types.Message{Role: "assistant", Content: "CACHED-SENTINEL"}, FinishReason: "stop"}},
+		Usage:   types.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+	})
+
+	w := postMessagesAsTenant(h, "t1", msgBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp anthropicMessagesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Content) == 0 || resp.Content[0].Text != "CACHED-SENTINEL" {
+		t.Fatalf("expected the cached response served as an Anthropic message, got %+v", resp.Content)
 	}
 }
 
