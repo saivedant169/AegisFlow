@@ -168,6 +168,40 @@ func (h *Handler) buildRequestContext(r *http.Request, surface apiSurface, start
 	}
 }
 
+// runOutputPolicy runs the output policy on a completed response. It returns a
+// non-nil blocked govResult if the response must be rejected, having already
+// fired the wire-agnostic side effects (webhook, analytics, audit, request log).
+// nil means the response may be served. Shared so /v1/messages logs an
+// output-block to the admin feed exactly like /v1/chat/completions.
+func (h *Handler) runOutputPolicy(rc requestContext, req *types.ChatCompletionRequest, resp *types.ChatCompletionResponse, providerName, region string) *govResult {
+	if h.policy == nil || len(resp.Choices) == 0 {
+		return nil
+	}
+	v, err := h.policy.CheckOutput(resp.Choices[0].Message.Content)
+	if err != nil {
+		log.Printf("policy engine output check error: %v", err)
+		h.recordAnalytics(rc.tenantID, req.Model, providerName, http.StatusInternalServerError, rc.startTime, 0)
+		return &govResult{Blocked: true, Status: http.StatusInternalServerError, Kind: blockPolicyError, Message: "policy engine error"}
+	}
+	if v != nil && v.Action == policy.ActionBlock {
+		h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), rc.tenantID, req.Model, v.Message)
+		h.recordAnalytics(rc.tenantID, req.Model, providerName, http.StatusForbidden, rc.startTime, 0)
+		h.logRequest(rc.startTime, rc.httpReq, rc.tenantID, req.Model, providerName, http.StatusForbidden, resp.Usage.TotalTokens, false, region)
+		if h.auditLog != nil {
+			detail := map[string]string{"message": v.Message, "phase": "output"}
+			if api := rc.surface.auditAPI(); api != "" {
+				detail["api"] = api
+			}
+			h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(detail), rc.tenantID, req.Model)
+		}
+		return &govResult{Blocked: true, Status: http.StatusForbidden, Kind: blockInputPolicy, Message: policy.FormatViolation(v)}
+	}
+	if v != nil {
+		log.Printf("policy warning (output): %s", policy.FormatViolation(v))
+	}
+	return nil
+}
+
 // lookupCache checks the semantic cache then the exact cache. On a hit it
 // returns the cached response and a wire-agnostic status ("SEMANTIC-HIT" /
 // "HIT"); on a miss it returns the embedding computed during the semantic
@@ -199,9 +233,9 @@ func cacheSourceName(status string) string {
 	return "cache"
 }
 
-// writeInputBlockOpenAI renders a govResult block as an OpenAI-wire error,
+// writeBlockOpenAI renders a govResult block as an OpenAI-wire error,
 // preserving the original ChatCompletion error-type strings per block kind.
-func writeInputBlockOpenAI(w http.ResponseWriter, gov govResult) {
+func writeBlockOpenAI(w http.ResponseWriter, gov govResult) {
 	switch gov.Kind {
 	case blockKillSwitch:
 		writeError(w, gov.Status, "session_blocked", gov.Message)
@@ -214,10 +248,10 @@ func writeInputBlockOpenAI(w http.ResponseWriter, gov govResult) {
 	}
 }
 
-// writeInputBlockAnthropic renders a govResult block as an Anthropic-wire error.
+// writeBlockAnthropic renders a govResult block as an Anthropic-wire error.
 // Input-policy and policy-engine-error map to the same types the original
 // Messages handler used; kill-switch and budget are new on this wire.
-func writeInputBlockAnthropic(w http.ResponseWriter, gov govResult) {
+func writeBlockAnthropic(w http.ResponseWriter, gov govResult) {
 	switch gov.Kind {
 	case blockKillSwitch:
 		writeAnthropicError(w, gov.Status, "permission_error", gov.Message)

@@ -204,7 +204,7 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	// Shared with the Anthropic path so both wires run the identical sequence.
 	gov := h.runInputGovernance(rc, &req)
 	if gov.Blocked {
-		writeInputBlockOpenAI(w, gov)
+		writeBlockOpenAI(w, gov)
 		return
 	}
 	for _, warning := range gov.Warnings {
@@ -238,28 +238,10 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 	resp := routed.Response
 	providerName := routed.Provider
 
-	// Policy check: output
-	if h.policy != nil && len(resp.Choices) > 0 {
-		v, err := h.policy.CheckOutput(resp.Choices[0].Message.Content)
-		if err != nil {
-			log.Printf("policy engine output check error: %v", err)
-			h.recordAnalytics(tenantID, req.Model, providerName, http.StatusInternalServerError, startTime, 0)
-			writeError(w, http.StatusInternalServerError, "policy_error", "policy engine error")
-			return
-		}
-		if v != nil {
-			if v.Action == policy.ActionBlock {
-				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
-				h.logRequest(startTime, r, tenantID, req.Model, providerName, http.StatusForbidden, resp.Usage.TotalTokens, false, routed.Region)
-				if h.auditLog != nil {
-					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(map[string]string{"message": v.Message, "phase": "output"}), tenantID, req.Model)
-				}
-				writeError(w, http.StatusForbidden, "policy_violation", policy.FormatViolation(v))
-				return
-			}
-			log.Printf("policy warning (output): %s", policy.FormatViolation(v))
-		}
+	// Output policy (shared with the Anthropic path).
+	if blk := h.runOutputPolicy(rc, &req, resp, providerName, routed.Region); blk != nil {
+		writeBlockOpenAI(w, *blk)
+		return
 	}
 
 	// Post-response governance: transform, cache, usage/spend/db, eval,

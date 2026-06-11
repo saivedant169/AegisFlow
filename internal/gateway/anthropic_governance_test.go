@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
@@ -198,6 +199,30 @@ func TestMessages_CacheHit(t *testing.T) {
 	}
 	if len(resp.Content) == 0 || resp.Content[0].Text != "CACHED-SENTINEL" {
 		t.Fatalf("expected the cached response served as an Anthropic message, got %+v", resp.Content)
+	}
+}
+
+// An output-policy block on /v1/messages must be written to the admin request
+// feed, like the OpenAI path. Before unification the Anthropic path blocked but
+// logged nothing (the "partial" divergence).
+func TestMessages_OutputBlockLogsRequest(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine(nil, []policy.Filter{policy.NewKeywordFilter("out", policy.ActionBlock, []string{"mock response"})})
+	ut := usage.NewTracker(usage.NewStore())
+	h := NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, nil, nil)
+	reqLog := admin.NewRequestLog(10)
+	h.SetRequestLogger(reqLog, "test")
+
+	w := postMessagesAsTenant(h, "t1", msgBody)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 output block, got %d: %s", w.Code, w.Body.String())
+	}
+	entries := reqLog.Recent(1)
+	if len(entries) != 1 || entries[0].Status != http.StatusForbidden {
+		t.Fatalf("expected a 403 request-log entry on output block, got %+v", entries)
 	}
 }
 

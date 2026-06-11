@@ -259,7 +259,7 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	// skips the kill-switch and budget checks.
 	gov := h.runInputGovernance(rc, req)
 	if gov.Blocked {
-		writeInputBlockAnthropic(w, gov)
+		writeBlockAnthropic(w, gov)
 		return
 	}
 	for _, warning := range gov.Warnings {
@@ -290,23 +290,11 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	resp := routed.Response
 	providerName := routed.Provider
 
-	// Output policy.
-	if h.policy != nil && len(resp.Choices) > 0 {
-		v, err := h.policy.CheckOutput(resp.Choices[0].Message.Content)
-		if err != nil {
-			log.Printf("policy engine output check error: %v", err)
-			writeAnthropicError(w, http.StatusInternalServerError, "api_error", "policy engine error")
-			return
-		}
-		if v != nil && v.Action == policy.ActionBlock {
-			h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
-			h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
-			if h.auditLog != nil {
-				h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(map[string]string{"message": v.Message, "phase": "output", "api": "messages"}), tenantID, req.Model)
-			}
-			writeAnthropicError(w, http.StatusForbidden, "permission_error", policy.FormatViolation(v))
-			return
-		}
+	// Output policy (shared with the OpenAI path; also logs the block to the
+	// admin feed, which the bespoke version here used to skip).
+	if blk := h.runOutputPolicy(rc, req, resp, providerName, routed.Region); blk != nil {
+		writeBlockAnthropic(w, *blk)
+		return
 	}
 
 	// Post-response governance: same tail the OpenAI path runs — response
