@@ -406,25 +406,10 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		"content_block": map[string]any{"type": "text", "text": ""},
 	})
 
-	// scanWindow holds a bounded tail of output for policy scanning; totalOut
-	// tracks the full output length for the usage estimate. pending holds
-	// deltas scanned-but-not-yet-released so we never egress before checking.
-	var scanWindow strings.Builder
+	// totalOut tracks full output length for the usage estimate; finishReason is
+	// captured from the stream chunks.
 	totalOut := 0
-	var pending strings.Builder
-	pendingBytes := 0
-	const checkInterval = 500
 	finishReason := ""
-
-	// When every output filter supports incremental matching, scan each delta
-	// once as it arrives (O(total bytes)) instead of re-scanning the whole
-	// window every checkInterval (O(n^2)). Otherwise fall back to the windowed
-	// CheckOutput scan below.
-	var matcher policy.StreamMatcher
-	incremental := false
-	if h.policy != nil {
-		matcher, incremental = h.policy.NewOutputStreamMatcher()
-	}
 
 	emitStreamBlock := func(v *policy.Violation) {
 		h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, model, v.Message)
@@ -436,29 +421,17 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		log.Printf("stream terminated: %s", policy.FormatViolation(v))
 	}
 
-	// flushPending releases the buffered deltas to the client. In windowed mode
-	// it re-scans the bounded window first; in incremental mode the deltas were
-	// already scanned as they arrived. Returns false if the stream was blocked.
-	flushPending := func() (ok bool) {
-		if pending.Len() == 0 {
-			return true
-		}
-		if h.policy != nil && !incremental {
-			if v, checkErr := h.policy.CheckOutput(scanWindow.String()); checkErr != nil {
-				log.Printf("policy engine stream check error: %v", checkErr)
-			} else if v != nil && v.Action == policy.ActionBlock {
-				emitStreamBlock(v)
-				return false
-			}
-		}
-		writeSSE(w, flusher, "content_block_delta", map[string]any{
-			"type": "content_block_delta", "index": 0,
-			"delta": map[string]any{"type": "text_delta", "text": pending.String()},
-		})
-		pending.Reset()
-		pendingBytes = 0
-		return true
-	}
+	// Scan-before-release via the shared streamScanner; the sink re-frames each
+	// scanned-clean run of text as an Anthropic content_block_delta.
+	sc := newStreamScanner(h.policy, streamSink{
+		writeDelta: func(b []byte) {
+			writeSSE(w, flusher, "content_block_delta", map[string]any{
+				"type": "content_block_delta", "index": 0,
+				"delta": map[string]any{"type": "text_delta", "text": string(b)},
+			})
+		},
+		block: emitStreamBlock,
+	})
 
 	scanner := bufio.NewScanner(stream)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -488,29 +461,9 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 			continue
 		}
 
-		pending.WriteString(delta)
-		pendingBytes += len(delta)
 		totalOut += len(delta)
-
-		if incremental {
-			if v := matcher.Write([]byte(delta)); v != nil && v.Action == policy.ActionBlock {
-				emitStreamBlock(v)
-				return
-			}
-		} else {
-			// Maintain a bounded sliding window for the policy scan.
-			scanWindow.WriteString(delta)
-			if scanWindow.Len() > maxAccumulatedStreamBytes {
-				s := scanWindow.String()
-				scanWindow.Reset()
-				scanWindow.WriteString(s[len(s)-maxAccumulatedStreamBytes:])
-			}
-		}
-
-		if pendingBytes >= checkInterval {
-			if !flushPending() {
-				return
-			}
+		if !sc.Feed([]byte(delta)) {
+			return
 		}
 	}
 
@@ -526,17 +479,9 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		return
 	}
 
-	// Flush the matcher's carried trailing bytes; a keyword ending on the very
-	// last byte of the stream is only caught here.
-	if incremental {
-		if v := matcher.Close(); v != nil && v.Action == policy.ActionBlock {
-			emitStreamBlock(v)
-			return
-		}
-	}
-
-	// Final scan + release of the sub-threshold tail.
-	if !flushPending() {
+	// Flush the scanner's carried tail and release the sub-threshold remainder;
+	// a keyword ending on the very last byte is only caught here.
+	if !sc.Close() {
 		return
 	}
 
