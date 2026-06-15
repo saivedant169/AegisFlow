@@ -1,13 +1,82 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/saivedant169/AegisFlow/internal/config"
+	"github.com/saivedant169/AegisFlow/internal/policy"
+	"github.com/saivedant169/AegisFlow/internal/provider"
+	"github.com/saivedant169/AegisFlow/internal/router"
+	"github.com/saivedant169/AegisFlow/internal/usage"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
+
+// toolEchoProvider returns a tool call echoing the first tool when the request
+// carries tools, standing in for an OpenAI-compatible provider that preserves
+// tool semantics. Lets the full /v1/messages tool loop be exercised locally.
+type toolEchoProvider struct{}
+
+func (toolEchoProvider) Name() string { return "toolecho" }
+func (toolEchoProvider) ChatCompletion(_ context.Context, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, error) {
+	if len(req.Tools) > 0 {
+		return &types.ChatCompletionResponse{
+			Model: req.Model,
+			Choices: []types.Choice{{FinishReason: "tool_calls", Message: types.Message{
+				Role: "assistant",
+				ToolCalls: []types.ToolCall{{ID: "tu_echo", Type: "function",
+					Function: types.ToolCallFunction{Name: req.Tools[0].Function.Name, Arguments: `{"echo":true}`}}},
+			}}},
+			Usage: types.Usage{TotalTokens: 3},
+		}, nil
+	}
+	return &types.ChatCompletionResponse{Model: req.Model, Choices: []types.Choice{{FinishReason: "stop", Message: types.Message{Role: "assistant", Content: "no tools"}}}}, nil
+}
+func (toolEchoProvider) ChatCompletionStream(context.Context, *types.ChatCompletionRequest) (io.ReadCloser, error) {
+	return nil, fmt.Errorf("streaming not supported")
+}
+func (toolEchoProvider) Models(context.Context) ([]types.Model, error) {
+	return []types.Model{{ID: "mock"}}, nil
+}
+func (toolEchoProvider) EstimateTokens(s string) int  { return len(s) / 4 }
+func (toolEchoProvider) Healthy(context.Context) bool { return true }
+
+// Full /v1/messages tool loop: an Anthropic tool request is translated, the
+// provider returns a tool call, and the response is emitted as a tool_use block.
+func TestMessages_ToolRoundTrip(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(toolEchoProvider{})
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"toolecho"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	h := NewHandler(registry, rt, policy.NewEngine(nil, nil), usage.NewTracker(usage.NewStore()), nil, nil, nil, nil, 0, nil, nil)
+	h.SetMessagesToolPassthrough(true)
+
+	w := postMessagesAsTenant(h, "t1", toolReqBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var out anthropicMessagesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.StopReason != "tool_use" {
+		t.Errorf("stop_reason = %q, want tool_use", out.StopReason)
+	}
+	found := false
+	for _, b := range out.Content {
+		if b.Type == "tool_use" && b.Name == "get_weather" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected a tool_use block for get_weather, got %+v", out.Content)
+	}
+}
 
 // A response carrying tool calls must serialize as Anthropic tool_use blocks
 // with stop_reason "tool_use".
