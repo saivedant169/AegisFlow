@@ -49,9 +49,19 @@ type Config struct {
 	Behavioral           BehavioralConfig          `yaml:"behavioral"`
 	SupplyChain          SupplyChainConfig         `yaml:"supply_chain"`
 	Resilience           ResilienceConfig          `yaml:"resilience"`
+	MessagesAPI          MessagesAPIConfig         `yaml:"messages_api"`
 
 	keyIndexOnce sync.Once                // builds keyIndex on first auth
 	keyIndex     map[[32]byte]TenantMatch // sha256(api key) -> tenant/role
+}
+
+// MessagesAPIConfig configures the inbound Anthropic /v1/messages endpoint.
+type MessagesAPIConfig struct {
+	// ToolPassthrough enables translating tool_use/tool_result blocks across the
+	// wire instead of rejecting tool requests. Off by default: until a provider's
+	// tool loop is verified end to end, /v1/messages rejects tools loudly rather
+	// than silently degrading an agentic conversation.
+	ToolPassthrough bool `yaml:"tool_passthrough"`
 }
 
 // SupplyChainConfig controls signed extension verification.

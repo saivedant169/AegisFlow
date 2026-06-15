@@ -54,6 +54,13 @@ type Handler struct {
 	tenantTransforms     map[string]*TransformConfig // tenant ID -> transform config
 	semanticCache        *cache.SemanticCache
 	behavioralRegistry   *behavioral.Registry
+	messagesToolsEnabled bool
+}
+
+// SetMessagesToolPassthrough enables tool translation on the /v1/messages
+// endpoint. When false (default), tool requests are rejected up front.
+func (h *Handler) SetMessagesToolPassthrough(enabled bool) {
+	h.messagesToolsEnabled = enabled
 }
 
 // SetAuditLogger sets the audit logging function on the handler.

@@ -303,6 +303,7 @@ func main() {
 
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
 	handler.SetRequestLogger(reqLog, cfg.Federation.ControlPlane.Name)
+	handler.SetMessagesToolPassthrough(cfg.MessagesAPI.ToolPassthrough)
 	if semanticCache != nil {
 		handler.SetSemanticCache(semanticCache)
 	}
