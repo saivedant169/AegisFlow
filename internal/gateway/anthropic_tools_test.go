@@ -1,9 +1,70 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/saivedant169/AegisFlow/pkg/types"
 )
+
+// A response carrying tool calls must serialize as Anthropic tool_use blocks
+// with stop_reason "tool_use".
+func TestWriteAnthropicMessage_EmitsToolUse(t *testing.T) {
+	w := httptest.NewRecorder()
+	resp := &types.ChatCompletionResponse{
+		Choices: []types.Choice{{
+			FinishReason: "tool_calls",
+			Message: types.Message{
+				Role: "assistant",
+				ToolCalls: []types.ToolCall{{
+					ID: "tu_1", Type: "function",
+					Function: types.ToolCallFunction{Name: "get_weather", Arguments: `{"city":"SF"}`},
+				}},
+			},
+		}},
+		Usage: types.Usage{PromptTokens: 5, CompletionTokens: 3},
+	}
+	writeAnthropicMessage(w, "claude-x", resp)
+
+	var out anthropicMessagesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.StopReason != "tool_use" {
+		t.Errorf("stop_reason = %q, want tool_use", out.StopReason)
+	}
+	var tu *anthropicRespBlock
+	for i := range out.Content {
+		if out.Content[i].Type == "tool_use" {
+			tu = &out.Content[i]
+		}
+	}
+	if tu == nil {
+		t.Fatalf("no tool_use block in %+v", out.Content)
+	}
+	if tu.ID != "tu_1" || tu.Name != "get_weather" || string(tu.Input) != `{"city":"SF"}` {
+		t.Errorf("unexpected tool_use block: %+v", tu)
+	}
+}
+
+// A plain text response still serializes as a single text block.
+func TestWriteAnthropicMessage_TextOnly(t *testing.T) {
+	w := httptest.NewRecorder()
+	resp := &types.ChatCompletionResponse{
+		Choices: []types.Choice{{FinishReason: "stop", Message: types.Message{Role: "assistant", Content: "hi there"}}},
+	}
+	writeAnthropicMessage(w, "claude-x", resp)
+	var out anthropicMessagesResponse
+	json.Unmarshal(w.Body.Bytes(), &out)
+	if out.StopReason != "end_turn" {
+		t.Errorf("stop_reason = %q, want end_turn", out.StopReason)
+	}
+	if len(out.Content) != 1 || out.Content[0].Type != "text" || out.Content[0].Text != "hi there" {
+		t.Errorf("unexpected content: %+v", out.Content)
+	}
+}
 
 func TestTranslateAnthropicMessage_ToolUse(t *testing.T) {
 	m := anthropicInMessage{Role: "assistant", Content: []byte(`[

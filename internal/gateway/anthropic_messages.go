@@ -62,6 +62,8 @@ func mapStopReason(finishReason string) string {
 	switch finishReason {
 	case "length":
 		return "max_tokens"
+	case "tool_calls":
+		return "tool_use"
 	case "content_filter":
 		return "end_turn"
 	case "stop", "":
@@ -117,6 +119,17 @@ type anthropicTextBlock struct {
 	Text string `json:"text"`
 }
 
+// anthropicRespBlock is a response content block: a text block or a tool_use
+// block (the model asking the client to run a tool). One struct with omitempty
+// fields so a heterogeneous content array marshals correctly.
+type anthropicRespBlock struct {
+	Type  string          `json:"type"`
+	Text  string          `json:"text,omitempty"`  // text block
+	ID    string          `json:"id,omitempty"`    // tool_use block
+	Name  string          `json:"name,omitempty"`  // tool_use block
+	Input json.RawMessage `json:"input,omitempty"` // tool_use block
+}
+
 type anthropicMsgUsage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
@@ -127,7 +140,7 @@ type anthropicMessagesResponse struct {
 	Type         string               `json:"type"`
 	Role         string               `json:"role"`
 	Model        string               `json:"model"`
-	Content      []anthropicTextBlock `json:"content"`
+	Content      []anthropicRespBlock `json:"content"`
 	StopReason   string               `json:"stop_reason"`
 	StopSequence *string              `json:"stop_sequence"`
 	Usage        anthropicMsgUsage    `json:"usage"`
@@ -323,17 +336,39 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 func writeAnthropicMessage(w http.ResponseWriter, model string, resp *types.ChatCompletionResponse) {
 	content := ""
 	finishReason := ""
+	var toolCalls []types.ToolCall
 	if len(resp.Choices) > 0 {
 		content = resp.Choices[0].Message.Content
 		finishReason = resp.Choices[0].FinishReason
+		toolCalls = resp.Choices[0].Message.ToolCalls
 	}
+
+	// Emit a text block when there is text (or when there are no tool calls, to
+	// keep a well-formed empty response), then one tool_use block per tool call.
+	blocks := make([]anthropicRespBlock, 0, 1+len(toolCalls))
+	if content != "" || len(toolCalls) == 0 {
+		blocks = append(blocks, anthropicRespBlock{Type: "text", Text: content})
+	}
+	for _, tc := range toolCalls {
+		input := json.RawMessage(tc.Function.Arguments)
+		if len(input) == 0 {
+			input = json.RawMessage("{}")
+		}
+		blocks = append(blocks, anthropicRespBlock{Type: "tool_use", ID: tc.ID, Name: tc.Function.Name, Input: input})
+	}
+
+	stopReason := mapStopReason(finishReason)
+	if len(toolCalls) > 0 {
+		stopReason = "tool_use"
+	}
+
 	out := anthropicMessagesResponse{
 		ID:         newAnthropicMsgID(),
 		Type:       "message",
 		Role:       "assistant",
 		Model:      model,
-		Content:    []anthropicTextBlock{{Type: "text", Text: content}},
-		StopReason: mapStopReason(finishReason),
+		Content:    blocks,
+		StopReason: stopReason,
 		Usage: anthropicMsgUsage{
 			InputTokens:  resp.Usage.PromptTokens,
 			OutputTokens: resp.Usage.CompletionTokens,
