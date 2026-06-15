@@ -229,7 +229,7 @@ func (h *Handler) processWSRequest(ctx context.Context, tenantID string, req *ty
 
 	// Policy check: input
 	if h.policy != nil {
-		inputContent := extractContent(req.Messages)
+		inputContent := governableInput(req)
 		if v, _ := h.policy.CheckInput(inputContent); v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)

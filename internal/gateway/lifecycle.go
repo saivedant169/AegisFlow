@@ -3,6 +3,7 @@ package gateway
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/cache"
@@ -13,6 +14,51 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/storage"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
+
+// governableInput gathers every text surface in a request that input policy must
+// inspect: message contents, tool-call arguments carried on assistant messages,
+// and the tool definitions themselves. A blocked keyword or injection hidden in
+// a tool name/description/schema or in tool-call arguments would otherwise slip
+// past CheckInput, which historically saw only Message.Content.
+func governableInput(req *types.ChatCompletionRequest) string {
+	var b strings.Builder
+	for _, m := range req.Messages {
+		if m.Content != "" {
+			b.WriteString(m.Content)
+			b.WriteByte('\n')
+		}
+		for _, tc := range m.ToolCalls {
+			b.WriteString(tc.Function.Name)
+			b.WriteByte(' ')
+			b.WriteString(tc.Function.Arguments)
+			b.WriteByte('\n')
+		}
+	}
+	for _, t := range req.Tools {
+		b.WriteString(t.Function.Name)
+		b.WriteByte(' ')
+		b.WriteString(t.Function.Description)
+		b.WriteByte(' ')
+		b.Write(t.Function.Parameters)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// governableOutput gathers a response message's text plus any tool call the
+// model requested, so output policy scans tool-call arguments — an exfiltration
+// channel — not just the assistant's text content.
+func governableOutput(msg *types.Message) string {
+	var b strings.Builder
+	b.WriteString(msg.Content)
+	for _, tc := range msg.ToolCalls {
+		b.WriteByte('\n')
+		b.WriteString(tc.Function.Name)
+		b.WriteByte(' ')
+		b.WriteString(tc.Function.Arguments)
+	}
+	return b.String()
+}
 
 // apiSurface identifies the wire format a request arrived on. It is used only
 // for audit/analytics tagging and never to branch governance — both surfaces
@@ -111,7 +157,7 @@ func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletio
 
 	// Input policy.
 	if h.policy != nil {
-		inputContent := extractContent(req.Messages)
+		inputContent := governableInput(req)
 		v, err := h.policy.CheckInput(inputContent)
 		if err != nil {
 			log.Printf("policy engine input check error: %v", err)
@@ -177,7 +223,7 @@ func (h *Handler) runOutputPolicy(rc requestContext, req *types.ChatCompletionRe
 	if h.policy == nil || len(resp.Choices) == 0 {
 		return nil
 	}
-	v, err := h.policy.CheckOutput(resp.Choices[0].Message.Content)
+	v, err := h.policy.CheckOutput(governableOutput(&resp.Choices[0].Message))
 	if err != nil {
 		log.Printf("policy engine output check error: %v", err)
 		h.recordAnalytics(rc.tenantID, req.Model, providerName, http.StatusInternalServerError, rc.startTime, 0)
