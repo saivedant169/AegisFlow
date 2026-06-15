@@ -181,7 +181,7 @@ func TestMessages_CacheHit(t *testing.T) {
 	if err := json.Unmarshal([]byte(msgBody), &in); err != nil {
 		t.Fatalf("seed unmarshal: %v", err)
 	}
-	tr := translateMessagesRequest(&in)
+	tr := translateMessagesRequest(&in, false)
 	key := cache.BuildKey("t1", tr.Model, tr.Messages)
 	c.Set(key, &types.ChatCompletionResponse{
 		Model:   "mock",

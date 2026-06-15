@@ -170,14 +170,20 @@ func flattenAnthropicContent(raw json.RawMessage) string {
 }
 
 // translateMessagesRequest converts an Anthropic Messages request into the
-// internal ChatCompletionRequest the rest of the pipeline understands.
-func translateMessagesRequest(in *anthropicMessagesRequest) *types.ChatCompletionRequest {
+// internal ChatCompletionRequest the rest of the pipeline understands. When
+// tools is true, tool_use/tool_result blocks and the tools/tool_choice fields
+// are translated; otherwise content is flattened to text only.
+func translateMessagesRequest(in *anthropicMessagesRequest, tools bool) *types.ChatCompletionRequest {
 	msgs := make([]types.Message, 0, len(in.Messages)+1)
 	if sys := flattenAnthropicContent(in.System); sys != "" {
 		msgs = append(msgs, types.Message{Role: "system", Content: sys})
 	}
 	for _, m := range in.Messages {
-		msgs = append(msgs, types.Message{Role: m.Role, Content: flattenAnthropicContent(m.Content)})
+		if tools {
+			msgs = append(msgs, translateAnthropicMessage(m)...)
+		} else {
+			msgs = append(msgs, types.Message{Role: m.Role, Content: flattenAnthropicContent(m.Content)})
+		}
 	}
 	out := &types.ChatCompletionRequest{
 		Model:       in.Model,
@@ -186,6 +192,10 @@ func translateMessagesRequest(in *anthropicMessagesRequest) *types.ChatCompletio
 		Temperature: in.Temperature,
 		TopP:        in.TopP,
 		Stop:        in.StopSequences,
+	}
+	if tools {
+		out.Tools = translateAnthropicTools(in.Tools)
+		out.ToolChoice = translateAnthropicToolChoice(in.ToolChoice)
 	}
 	if in.MaxTokens > 0 {
 		mt := in.MaxTokens
@@ -240,16 +250,18 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "messages is required")
 		return
 	}
-	// Reject tool use loudly rather than silently dropping it. This gateway
-	// translates text turns only; silently flattening tool_use/tool_result
-	// blocks would corrupt an agentic conversation without the client noticing.
-	if used, what := requestUsesTools(&in); used {
-		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error",
-			"tool use ("+what+") is not yet supported by the AegisFlow /v1/messages endpoint; use a text-only request")
-		return
+	// Without tool passthrough, reject tool use loudly rather than silently
+	// dropping it: flattening tool_use/tool_result blocks to text would corrupt
+	// an agentic conversation without the client noticing.
+	if !h.messagesToolsEnabled {
+		if used, what := requestUsesTools(&in); used {
+			writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error",
+				"tool use ("+what+") is not yet supported by the AegisFlow /v1/messages endpoint; use a text-only request")
+			return
+		}
 	}
 
-	req := translateMessagesRequest(&in)
+	req := translateMessagesRequest(&in, h.messagesToolsEnabled)
 
 	rc := h.buildRequestContext(r, surfaceAnthropic, startTime)
 	tenantID := rc.tenantID
@@ -345,7 +357,7 @@ func (h *Handler) CountTokens(w http.ResponseWriter, r *http.Request) {
 		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "messages is required")
 		return
 	}
-	req := translateMessagesRequest(&in)
+	req := translateMessagesRequest(&in, false)
 	tokens := estimateTokens(extractContent(req.Messages))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"input_tokens": tokens})

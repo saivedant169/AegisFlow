@@ -293,7 +293,7 @@ func TestTranslateMessagesRequest_SystemAndMaxTokens(t *testing.T) {
 		System:    json.RawMessage(`"be terse"`),
 		Messages:  []anthropicInMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}},
 	}
-	out := translateMessagesRequest(in)
+	out := translateMessagesRequest(in, false)
 	if len(out.Messages) != 2 {
 		t.Fatalf("expected system + user = 2 messages, got %d", len(out.Messages))
 	}
