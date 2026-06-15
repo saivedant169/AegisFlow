@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -30,7 +31,7 @@ func governableInput(req *types.ChatCompletionRequest) string {
 		for _, tc := range m.ToolCalls {
 			b.WriteString(tc.Function.Name)
 			b.WriteByte(' ')
-			b.WriteString(tc.Function.Arguments)
+			writeScannable(&b, []byte(tc.Function.Arguments))
 			b.WriteByte('\n')
 		}
 	}
@@ -39,7 +40,11 @@ func governableInput(req *types.ChatCompletionRequest) string {
 		b.WriteByte(' ')
 		b.WriteString(t.Function.Description)
 		b.WriteByte(' ')
-		b.Write(t.Function.Parameters)
+		writeScannable(&b, t.Function.Parameters)
+		b.WriteByte('\n')
+	}
+	if len(req.ToolChoice) > 0 && string(req.ToolChoice) != "null" {
+		writeScannable(&b, req.ToolChoice)
 		b.WriteByte('\n')
 	}
 	return b.String()
@@ -55,9 +60,39 @@ func governableOutput(msg *types.Message) string {
 		b.WriteByte('\n')
 		b.WriteString(tc.Function.Name)
 		b.WriteByte(' ')
-		b.WriteString(tc.Function.Arguments)
+		writeScannable(&b, []byte(tc.Function.Arguments))
 	}
 	return b.String()
+}
+
+// writeScannable appends raw JSON bytes AND their decoded form to b. Scanning
+// the raw bytes preserves coverage of structural text; scanning the decoded form
+// resolves JSON unicode escapes to their literal characters, so a keyword hidden
+// behind \u escapes — which the provider's parser would decode — can't slip past
+// the policy filters.
+func writeScannable(b *strings.Builder, raw []byte) {
+	if len(raw) == 0 {
+		return
+	}
+	b.Write(raw)
+	if decoded := decodeJSONForScan(raw); decoded != "" {
+		b.WriteByte(' ')
+		b.WriteString(decoded)
+	}
+}
+
+// decodeJSONForScan returns the canonical re-encoding of valid JSON (escapes
+// resolved to literal characters), or "" if raw isn't valid JSON.
+func decodeJSONForScan(raw []byte) string {
+	var v interface{}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return ""
+	}
+	out, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
 
 // apiSurface identifies the wire format a request arrived on. It is used only

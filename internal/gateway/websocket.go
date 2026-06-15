@@ -251,9 +251,9 @@ func (h *Handler) processWSRequest(ctx context.Context, tenantID string, req *ty
 	resp := routed.Response
 	providerName := routed.Provider
 
-	// Policy check: output
+	// Policy check: output (scans tool-call arguments too, like the HTTP paths)
 	if h.policy != nil && len(resp.Choices) > 0 {
-		if v, _ := h.policy.CheckOutput(resp.Choices[0].Message.Content); v != nil {
+		if v, _ := h.policy.CheckOutput(governableOutput(&resp.Choices[0].Message)); v != nil {
 			if v.Action == policy.ActionBlock {
 				h.fireWebhook("policy_violation", v.PolicyName, string(v.Action), tenantID, req.Model, v.Message)
 				h.recordAnalytics(tenantID, req.Model, providerName, http.StatusForbidden, startTime, 0)
