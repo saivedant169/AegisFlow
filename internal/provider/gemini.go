@@ -30,6 +30,8 @@ type GeminiProvider struct {
 
 type geminiRequest struct {
 	Contents         []geminiContent         `json:"contents"`
+	Tools            []geminiTool            `json:"tools,omitempty"`
+	ToolConfig       *geminiToolConfig       `json:"toolConfig,omitempty"`
 	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
 }
 
@@ -39,7 +41,42 @@ type geminiContent struct {
 }
 
 type geminiPart struct {
-	Text string `json:"text"`
+	Text             string                  `json:"text,omitempty"`
+	FunctionCall     *geminiFunctionCall     `json:"functionCall,omitempty"`
+	FunctionResponse *geminiFunctionResponse `json:"functionResponse,omitempty"`
+}
+
+// geminiFunctionCall is a model's tool call (args is a JSON object).
+type geminiFunctionCall struct {
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args,omitempty"`
+}
+
+// geminiFunctionResponse returns a tool result, keyed by function name (Gemini
+// has no call ids) with an object response.
+type geminiFunctionResponse struct {
+	Name     string          `json:"name"`
+	Response json.RawMessage `json:"response,omitempty"`
+}
+
+// geminiTool wraps a batch of function declarations (Gemini's native shape).
+type geminiTool struct {
+	FunctionDeclarations []geminiFunctionDecl `json:"functionDeclarations"`
+}
+
+type geminiFunctionDecl struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Parameters  json.RawMessage `json:"parameters,omitempty"`
+}
+
+type geminiToolConfig struct {
+	FunctionCallingConfig *geminiFunctionCallingConfig `json:"functionCallingConfig,omitempty"`
+}
+
+type geminiFunctionCallingConfig struct {
+	Mode                 string   `json:"mode,omitempty"` // AUTO | ANY | NONE
+	AllowedFunctionNames []string `json:"allowedFunctionNames,omitempty"`
 }
 
 type geminiGenerationConfig struct {
@@ -223,23 +260,60 @@ func (g *GeminiProvider) Healthy(ctx context.Context) bool {
 }
 
 func (g *GeminiProvider) translateRequest(req *types.ChatCompletionRequest) geminiRequest {
+	// Gemini's functionResponse keys by function name, but a tool-result message
+	// references the call by id, so map ids to names from the assistant turns.
+	idToName := map[string]string{}
+	for _, m := range req.Messages {
+		for _, tc := range m.ToolCalls {
+			if tc.ID != "" {
+				idToName[tc.ID] = tc.Function.Name
+			}
+		}
+	}
+
 	var contents []geminiContent
 	for _, m := range req.Messages {
 		role := m.Role
-		if role == "assistant" {
+		switch role {
+		case "assistant":
 			role = "model"
+		case "system":
+			role = "user" // Gemini has no system role; fold into user context
 		}
-		if role == "system" {
-			// Gemini handles system as a user message with context
-			role = "user"
+
+		switch {
+		case m.Role == "tool":
+			contents = append(contents, geminiContent{Role: "user", Parts: []geminiPart{{
+				FunctionResponse: &geminiFunctionResponse{Name: idToName[m.ToolCallID], Response: wrapToolResponse(m.Content)},
+			}}})
+		case len(m.ToolCalls) > 0:
+			parts := make([]geminiPart, 0, 1+len(m.ToolCalls))
+			if m.Content != "" {
+				parts = append(parts, geminiPart{Text: m.Content})
+			}
+			for _, tc := range m.ToolCalls {
+				args := json.RawMessage(tc.Function.Arguments)
+				if len(args) == 0 {
+					args = json.RawMessage("{}")
+				}
+				parts = append(parts, geminiPart{FunctionCall: &geminiFunctionCall{Name: tc.Function.Name, Args: args}})
+			}
+			contents = append(contents, geminiContent{Role: role, Parts: parts})
+		default:
+			contents = append(contents, geminiContent{Role: role, Parts: []geminiPart{{Text: m.Content}}})
 		}
-		contents = append(contents, geminiContent{
-			Role:  role,
-			Parts: []geminiPart{{Text: m.Content}},
-		})
 	}
 
 	gemReq := geminiRequest{Contents: contents}
+
+	if len(req.Tools) > 0 {
+		decls := make([]geminiFunctionDecl, 0, len(req.Tools))
+		for _, t := range req.Tools {
+			decls = append(decls, geminiFunctionDecl{Name: t.Function.Name, Description: t.Function.Description, Parameters: t.Function.Parameters})
+		}
+		gemReq.Tools = []geminiTool{{FunctionDeclarations: decls}}
+		gemReq.ToolConfig = geminiToolConfigFrom(req.ToolChoice)
+	}
 
 	if req.Temperature != nil || req.MaxTokens != nil || req.TopP != nil {
 		gemReq.GenerationConfig = &geminiGenerationConfig{
@@ -252,15 +326,73 @@ func (g *GeminiProvider) translateRequest(req *types.ChatCompletionRequest) gemi
 	return gemReq
 }
 
+// wrapToolResponse returns the tool output as a JSON object, which Gemini's
+// functionResponse requires. A JSON-object string passes through; anything else
+// is wrapped as {"result": <content>}.
+func wrapToolResponse(content string) json.RawMessage {
+	var v map[string]interface{}
+	if json.Unmarshal([]byte(content), &v) == nil {
+		return json.RawMessage(content)
+	}
+	b, _ := json.Marshal(map[string]string{"result": content})
+	return b
+}
+
+// geminiToolConfigFrom maps the internal (OpenAI-form) tool_choice to Gemini's
+// functionCallingConfig: auto->AUTO, required->ANY, none->NONE, named->ANY with
+// an allowed-function restriction.
+func geminiToolConfigFrom(raw json.RawMessage) *geminiToolConfig {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		mode := ""
+		switch s {
+		case "auto":
+			mode = "AUTO"
+		case "required":
+			mode = "ANY"
+		case "none":
+			mode = "NONE"
+		}
+		if mode == "" {
+			return nil
+		}
+		return &geminiToolConfig{FunctionCallingConfig: &geminiFunctionCallingConfig{Mode: mode}}
+	}
+	var obj struct {
+		Function struct {
+			Name string `json:"name"`
+		} `json:"function"`
+	}
+	if json.Unmarshal(raw, &obj) == nil && obj.Function.Name != "" {
+		return &geminiToolConfig{FunctionCallingConfig: &geminiFunctionCallingConfig{Mode: "ANY", AllowedFunctionNames: []string{obj.Function.Name}}}
+	}
+	return nil
+}
+
 func (g *GeminiProvider) translateResponse(resp *geminiResponse, model string) *types.ChatCompletionResponse {
 	content := ""
 	finishReason := "stop"
+	var toolCalls []types.ToolCall
 	if len(resp.Candidates) > 0 {
 		for _, part := range resp.Candidates[0].Content.Parts {
+			if part.FunctionCall != nil {
+				args := string(part.FunctionCall.Args)
+				if args == "" {
+					args = "{}"
+				}
+				toolCalls = append(toolCalls, types.ToolCall{
+					Type:     "function",
+					Function: types.ToolCallFunction{Name: part.FunctionCall.Name, Arguments: args},
+				})
+				continue
+			}
 			content += part.Text
 		}
-		if resp.Candidates[0].FinishReason != "" {
-			finishReason = "stop" // normalize Gemini's STOP to OpenAI's stop
+		if len(toolCalls) > 0 {
+			finishReason = "tool_calls"
 		}
 	}
 
@@ -277,7 +409,7 @@ func (g *GeminiProvider) translateResponse(resp *geminiResponse, model string) *
 		Created: time.Now().Unix(),
 		Model:   model,
 		Choices: []types.Choice{
-			{Index: 0, Message: types.Message{Role: "assistant", Content: content}, FinishReason: finishReason},
+			{Index: 0, Message: types.Message{Role: "assistant", Content: content, ToolCalls: toolCalls}, FinishReason: finishReason},
 		},
 		Usage: usage,
 	}
