@@ -24,29 +24,53 @@ type AnthropicProvider struct {
 }
 
 type anthropicRequest struct {
-	Model     string             `json:"model"`
-	MaxTokens int                `json:"max_tokens"`
-	Messages  []anthropicMessage `json:"messages"`
-	Stream    bool               `json:"stream,omitempty"`
+	Model      string             `json:"model"`
+	MaxTokens  int                `json:"max_tokens"`
+	Messages   []anthropicMessage `json:"messages"`
+	Tools      []anthropicReqTool `json:"tools,omitempty"`
+	ToolChoice json.RawMessage    `json:"tool_choice,omitempty"`
+	Stream     bool               `json:"stream,omitempty"`
 }
 
 type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"` // string, or []anthropicReqBlock when tools are involved
+}
+
+// anthropicReqTool is a tool definition in Anthropic's native request shape.
+type anthropicReqTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	InputSchema json.RawMessage `json:"input_schema,omitempty"`
+}
+
+// anthropicReqBlock is a request content block (text, tool_use, or tool_result).
+type anthropicReqBlock struct {
+	Type      string          `json:"type"`
+	Text      string          `json:"text,omitempty"`        // text
+	ID        string          `json:"id,omitempty"`          // tool_use
+	Name      string          `json:"name,omitempty"`        // tool_use
+	Input     json.RawMessage `json:"input,omitempty"`       // tool_use
+	ToolUseID string          `json:"tool_use_id,omitempty"` // tool_result
+	Content   string          `json:"content,omitempty"`     // tool_result
 }
 
 type anthropicResponse struct {
-	ID      string                  `json:"id"`
-	Type    string                  `json:"type"`
-	Role    string                  `json:"role"`
-	Content []anthropicContentBlock `json:"content"`
-	Model   string                  `json:"model"`
-	Usage   anthropicUsage          `json:"usage"`
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Role       string                  `json:"role"`
+	Content    []anthropicContentBlock `json:"content"`
+	Model      string                  `json:"model"`
+	StopReason string                  `json:"stop_reason"`
+	Usage      anthropicUsage          `json:"usage"`
 }
 
 type anthropicContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type  string          `json:"type"`
+	Text  string          `json:"text,omitempty"`
+	ID    string          `json:"id,omitempty"`    // tool_use
+	Name  string          `json:"name,omitempty"`  // tool_use
+	Input json.RawMessage `json:"input,omitempty"` // tool_use
 }
 
 type anthropicUsage struct {
@@ -162,10 +186,31 @@ func (a *AnthropicProvider) Healthy(ctx context.Context) bool {
 func (a *AnthropicProvider) translateRequest(req *types.ChatCompletionRequest) anthropicRequest {
 	msgs := make([]anthropicMessage, 0, len(req.Messages))
 	for _, m := range req.Messages {
-		if m.Role == "system" {
+		switch {
+		case m.Role == "system":
 			continue
+		case m.Role == "tool":
+			// Tool result -> a user message carrying a tool_result block.
+			msgs = append(msgs, anthropicMessage{Role: "user", Content: []anthropicReqBlock{
+				{Type: "tool_result", ToolUseID: m.ToolCallID, Content: m.Content},
+			}})
+		case len(m.ToolCalls) > 0:
+			// Assistant tool call(s) -> content blocks (optional text + tool_use).
+			blocks := make([]anthropicReqBlock, 0, 1+len(m.ToolCalls))
+			if m.Content != "" {
+				blocks = append(blocks, anthropicReqBlock{Type: "text", Text: m.Content})
+			}
+			for _, tc := range m.ToolCalls {
+				input := json.RawMessage(tc.Function.Arguments)
+				if len(input) == 0 {
+					input = json.RawMessage("{}")
+				}
+				blocks = append(blocks, anthropicReqBlock{Type: "tool_use", ID: tc.ID, Name: tc.Function.Name, Input: input})
+			}
+			msgs = append(msgs, anthropicMessage{Role: m.Role, Content: blocks})
+		default:
+			msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
 		}
-		msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
 	}
 
 	maxTokens := 1024
@@ -174,18 +219,84 @@ func (a *AnthropicProvider) translateRequest(req *types.ChatCompletionRequest) a
 	}
 
 	return anthropicRequest{
-		Model:     req.Model,
-		MaxTokens: maxTokens,
-		Messages:  msgs,
+		Model:      req.Model,
+		MaxTokens:  maxTokens,
+		Messages:   msgs,
+		Tools:      toolsToAnthropic(req.Tools),
+		ToolChoice: toolChoiceToAnthropic(req.ToolChoice),
 	}
+}
+
+// toolsToAnthropic maps internal tool definitions to Anthropic's native shape.
+func toolsToAnthropic(tools []types.Tool) []anthropicReqTool {
+	if len(tools) == 0 {
+		return nil
+	}
+	out := make([]anthropicReqTool, 0, len(tools))
+	for _, t := range tools {
+		out = append(out, anthropicReqTool{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			InputSchema: t.Function.Parameters,
+		})
+	}
+	return out
+}
+
+// toolChoiceToAnthropic maps the internal (OpenAI-form) tool_choice to Anthropic.
+// "auto"->{auto}, "required"->{any}, {function:{name}}->{tool,name}; "none" and
+// unknowns omit the field (Anthropic has no explicit "none").
+func toolChoiceToAnthropic(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		switch s {
+		case "auto":
+			return json.RawMessage(`{"type":"auto"}`)
+		case "required":
+			return json.RawMessage(`{"type":"any"}`)
+		}
+		return nil
+	}
+	var obj struct {
+		Function struct {
+			Name string `json:"name"`
+		} `json:"function"`
+	}
+	if err := json.Unmarshal(raw, &obj); err == nil && obj.Function.Name != "" {
+		b, err := json.Marshal(map[string]string{"type": "tool", "name": obj.Function.Name})
+		if err == nil {
+			return b
+		}
+	}
+	return nil
 }
 
 func (a *AnthropicProvider) translateResponse(resp *anthropicResponse, model string) *types.ChatCompletionResponse {
 	content := ""
+	var toolCalls []types.ToolCall
 	for _, block := range resp.Content {
-		if block.Type == "text" {
+		switch block.Type {
+		case "text":
 			content += block.Text
+		case "tool_use":
+			input := string(block.Input)
+			if input == "" {
+				input = "{}"
+			}
+			toolCalls = append(toolCalls, types.ToolCall{
+				ID:       block.ID,
+				Type:     "function",
+				Function: types.ToolCallFunction{Name: block.Name, Arguments: input},
+			})
 		}
+	}
+
+	finishReason := "stop"
+	if len(toolCalls) > 0 {
+		finishReason = "tool_calls"
 	}
 
 	return &types.ChatCompletionResponse{
@@ -196,8 +307,8 @@ func (a *AnthropicProvider) translateResponse(resp *anthropicResponse, model str
 		Choices: []types.Choice{
 			{
 				Index:        0,
-				Message:      types.Message{Role: "assistant", Content: content},
-				FinishReason: "stop",
+				Message:      types.Message{Role: "assistant", Content: content, ToolCalls: toolCalls},
+				FinishReason: finishReason,
 			},
 		},
 		Usage: types.Usage{
