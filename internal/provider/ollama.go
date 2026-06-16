@@ -24,12 +24,43 @@ type OllamaProvider struct {
 type ollamaChatRequest struct {
 	Model    string          `json:"model"`
 	Messages []ollamaMessage `json:"messages"`
+	Tools    []types.Tool    `json:"tools,omitempty"` // Ollama tool definitions are OpenAI-shaped
 	Stream   bool            `json:"stream"`
 }
 
 type ollamaMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+}
+
+// ollamaToolCall mirrors Ollama's tool call shape. Unlike OpenAI, Ollama carries
+// arguments as a JSON object, not a JSON-encoded string, so Arguments is raw.
+type ollamaToolCall struct {
+	Function ollamaToolCallFunc `json:"function"`
+}
+
+type ollamaToolCallFunc struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+}
+
+// ollamaMessagesFrom translates internal messages to Ollama messages, carrying
+// assistant tool calls (arguments as an object) and tool results.
+func ollamaMessagesFrom(msgs []types.Message) []ollamaMessage {
+	out := make([]ollamaMessage, 0, len(msgs))
+	for _, m := range msgs {
+		om := ollamaMessage{Role: m.Role, Content: m.Content}
+		for _, tc := range m.ToolCalls {
+			args := json.RawMessage(tc.Function.Arguments)
+			if len(args) == 0 {
+				args = json.RawMessage("{}")
+			}
+			om.ToolCalls = append(om.ToolCalls, ollamaToolCall{Function: ollamaToolCallFunc{Name: tc.Function.Name, Arguments: args}})
+		}
+		out = append(out, om)
+	}
+	return out
 }
 
 type ollamaChatResponse struct {
@@ -55,11 +86,10 @@ func (o *OllamaProvider) Name() string {
 
 func (o *OllamaProvider) ChatCompletion(ctx context.Context, req *types.ChatCompletionRequest) (*types.ChatCompletionResponse, error) {
 	ollamaReq := ollamaChatRequest{
-		Model:  req.Model,
-		Stream: false,
-	}
-	for _, m := range req.Messages {
-		ollamaReq.Messages = append(ollamaReq.Messages, ollamaMessage{Role: m.Role, Content: m.Content})
+		Model:    req.Model,
+		Messages: ollamaMessagesFrom(req.Messages),
+		Tools:    req.Tools,
+		Stream:   false,
 	}
 
 	body, err := json.Marshal(ollamaReq)
@@ -99,6 +129,18 @@ func (o *OllamaProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 		completionTokens = o.EstimateTokens(content)
 	}
 
+	var toolCalls []types.ToolCall
+	for _, oc := range ollamaResp.Message.ToolCalls {
+		toolCalls = append(toolCalls, types.ToolCall{
+			Type:     "function",
+			Function: types.ToolCallFunction{Name: oc.Function.Name, Arguments: string(oc.Function.Arguments)},
+		})
+	}
+	finishReason := "stop"
+	if len(toolCalls) > 0 {
+		finishReason = "tool_calls"
+	}
+
 	return &types.ChatCompletionResponse{
 		ID:      fmt.Sprintf("aegis-ollama-%d", time.Now().UnixNano()),
 		Object:  "chat.completion",
@@ -107,8 +149,8 @@ func (o *OllamaProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 		Choices: []types.Choice{
 			{
 				Index:        0,
-				Message:      types.Message{Role: "assistant", Content: content},
-				FinishReason: "stop",
+				Message:      types.Message{Role: "assistant", Content: content, ToolCalls: toolCalls},
+				FinishReason: finishReason,
 			},
 		},
 		Usage: types.Usage{
@@ -121,11 +163,10 @@ func (o *OllamaProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 
 func (o *OllamaProvider) ChatCompletionStream(ctx context.Context, req *types.ChatCompletionRequest) (io.ReadCloser, error) {
 	ollamaReq := ollamaChatRequest{
-		Model:  req.Model,
-		Stream: true,
-	}
-	for _, m := range req.Messages {
-		ollamaReq.Messages = append(ollamaReq.Messages, ollamaMessage{Role: m.Role, Content: m.Content})
+		Model:    req.Model,
+		Messages: ollamaMessagesFrom(req.Messages),
+		Tools:    req.Tools,
+		Stream:   true,
 	}
 
 	body, err := json.Marshal(ollamaReq)
