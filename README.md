@@ -621,9 +621,9 @@ AegisFlow/
 │   ├── evidence/               # Hash-linked evidence chain + Markdown/HTML reports
 │   ├── federation/             # Multi-cluster federation
 │   ├── gateway/                # Request handler + transforms + WebSocket
-│   ├── githubgate/             # GitHub API interceptor with risk classification
-│   ├── httpgate/               # HTTP reverse proxy with policy enforcement
-│   ├── identity/               # Org/team/project hierarchy + separation of duties
+│   ├── githubgate/             # [experimental, not wired] GitHub API interceptor
+│   ├── httpgate/               # [experimental, not wired] HTTP reverse proxy gate
+│   ├── identity/               # [experimental, not wired] Org/team/project + SoD
 │   ├── loadshed/               # Load shedding + priority queues
 │   ├── manifest/               # Task manifests + drift detection + enforcement
 │   ├── mcpgw/                  # MCP JSON-RPC gateway (SSE + direct)
@@ -636,9 +636,9 @@ AegisFlow/
 │   ├── resource/               # Typed resource model (repo, table, host, etc.)
 │   ├── rollout/                # Canary rollout manager
 │   ├── router/                 # Model routing + strategies
-│   ├── sandbox/                # Runtime sandboxing (shell, SQL, HTTP, Git)
-│   ├── shellgate/              # Shell command interceptor
-│   ├── sqlgate/                # SQL query interceptor + operation classification
+│   ├── sandbox/                # [experimental, not wired] Runtime sandboxing
+│   ├── shellgate/              # [experimental, not wired] Shell command gate
+│   ├── sqlgate/                # [experimental, not wired] SQL query gate
 │   ├── storage/                # PostgreSQL persistence
 │   ├── supply/                 # Supply chain verification + signed policy packs
 │   ├── telemetry/              # OpenTelemetry init
@@ -674,9 +674,19 @@ Before exposing AegisFlow outside a local demo, review the [production checklist
 - [x] **Phase 8**: Evidence export + verification CLI (`aegisctl verify`, `aegisctl evidence`) + 3 coding-agent policy packs
 
 ### Enterprise-Grade (all 12 items)
-- [x] **Tier 1**: Typed resource model, TaskManifest + drift detection, capability tickets, policy simulation/why/diff, safe execution sandboxes, human-usable evidence
-- [x] **Tier 2**: Behavioral session policy, GitHub + Slack approval integrations, enterprise identity + separation of duties, signed policy supply chain
+- [x] **Tier 1**: Typed resource model, TaskManifest + drift detection, capability tickets, policy simulation/why/diff, human-usable evidence
+- [x] **Tier 2**: Behavioral session policy, GitHub + Slack approval integrations, signed policy supply chain
 - [x] **Tier 3**: HA/recovery/retention/backup, threat model + OWASP mapping + security docs
+
+### Experimental (libraries present + unit-tested, not yet wired into the runtime)
+These packages ship as tested libraries but are **not** mounted in any binary's
+request path today; they enforce nothing until wired. Tracked, not claimed:
+- Execution gates: `shellgate`, `sqlgate`, `githubgate`, `httpgate`, `sandbox`
+- Enterprise identity hierarchy + separation of duties: `identity`
+
+Runtime tool governance today flows through the wired path: the MCP gateway +
+`toolpolicy` engine (allow/review/block on tool calls), input/output policy, and
+the evidence chain.
 
 ### Runtime Integration
 - [x] **Approval notifications**: Slack + GitHub notifiers fire automatically on submit/approve/deny

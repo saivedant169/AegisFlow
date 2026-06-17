@@ -4,6 +4,14 @@
 **Date:** 2026-04-06
 **Reference:** [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)
 
+> **Enforcement status:** Controls **wired into the runtime today**: MCP gateway
+> + `toolpolicy` engine, input/output policy, behavioral analysis + kill-switch,
+> RBAC, approval queue, task-scoped credentials, signed evidence chain, WASM
+> plugin sandbox (wazero). The **execution-gate sandboxes** (shell, SQL, Git,
+> HTTP), **network policy**, and the **identity / separation-of-duties
+> hierarchy** are experimental libraries — unit-tested but **not yet wired**.
+> Mappings that name them describe planned, not shipped, mitigations.
+
 ---
 
 ## Overview
