@@ -8,7 +8,7 @@ ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -o aegisflow ./cmd/aegisflow
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -o aegisctl ./cmd/aegisctl
 
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates curl jq bash
 WORKDIR /app
 COPY --from=builder /app/aegisflow .
