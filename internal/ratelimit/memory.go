@@ -12,11 +12,12 @@ type window struct {
 }
 
 type MemoryLimiter struct {
-	mu      sync.RWMutex
-	windows map[string]*window
-	limit   int
-	period  time.Duration
-	stop    chan struct{}
+	mu       sync.RWMutex
+	windows  map[string]*window
+	limit    int
+	period   time.Duration
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func NewMemoryLimiter(limit int, period time.Duration) *MemoryLimiter {
@@ -59,13 +60,10 @@ func (m *MemoryLimiter) cleanup(now time.Time) {
 	m.mu.Unlock()
 }
 
-// Stop ends the background eviction loop.
+// Stop ends the background eviction loop. Safe to call multiple times and from
+// multiple goroutines (the select/default close was racy under concurrent Stop).
 func (m *MemoryLimiter) Stop() {
-	select {
-	case <-m.stop:
-	default:
-		close(m.stop)
-	}
+	m.stopOnce.Do(func() { close(m.stop) })
 }
 
 func (m *MemoryLimiter) Allow(key string, cost int) (bool, error) {

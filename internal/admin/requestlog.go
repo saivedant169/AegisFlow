@@ -77,7 +77,7 @@ func (rl *RequestLog) Recent(n int) []RequestEntry {
 
 // RecentViolations returns the most recent requests that triggered a policy.
 func (rl *RequestLog) RecentViolations(n int) []RequestEntry {
-	all := rl.Recent(rl.count)
+	all := rl.Recent(0) // 0 => all entries; rl.count is read under the lock inside Recent
 	var violations []RequestEntry
 	for _, e := range all {
 		if e.PolicyHit != "" {

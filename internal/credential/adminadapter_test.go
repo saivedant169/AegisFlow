@@ -50,13 +50,14 @@ func TestAdminAdapterActiveCredentials_Redacted(t *testing.T) {
 		t.Fatalf("expected 1 credential, got %d", len(creds))
 	}
 
-	// Token should be redacted (first 8 chars + "...")
+	// Token hint must be a non-reversible fingerprint that leaks no part of the
+	// secret (the old hint exposed token[:8]).
 	hint := creds[0]["token_hint"].(string)
-	if !strings.HasSuffix(hint, "...") {
-		t.Errorf("expected redacted token hint, got %q", hint)
+	if !strings.HasPrefix(hint, "sha256:") {
+		t.Errorf("expected a sha256 fingerprint, got %q", hint)
 	}
-	if strings.Contains(hint, "super-secret-token-12345") {
-		t.Error("token hint should not contain full token")
+	if strings.Contains(hint, "super-se") || strings.Contains(hint, "super-secret-token-12345") {
+		t.Errorf("token hint must not leak any of the token, got %q", hint)
 	}
 	if creds[0]["task_id"] != "task-1" {
 		t.Errorf("expected task-1, got %v", creds[0]["task_id"])

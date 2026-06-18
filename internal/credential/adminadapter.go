@@ -2,9 +2,22 @@ package credential
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 )
+
+// tokenFingerprint returns a non-reversible identifier for a secret so the admin
+// API can distinguish credentials without leaking the start of a live token or
+// username (the old hint exposed token[:8]).
+func tokenFingerprint(token string) string {
+	if token == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(token))
+	return "sha256:" + hex.EncodeToString(sum[:])[:12]
+}
 
 // AdminAdapter exposes credential registry operations for the admin API.
 type AdminAdapter struct {
@@ -37,14 +50,10 @@ func (a *AdminAdapter) ActiveCredentials() interface{} {
 
 	result := make([]redactedCred, len(creds))
 	for i, c := range creds {
-		hint := c.Token
-		if len(hint) > 8 {
-			hint = hint[:8] + "..."
-		}
 		result[i] = redactedCred{
 			ID:        c.ID,
 			Type:      c.Type,
-			TokenHint: hint,
+			TokenHint: tokenFingerprint(c.Token),
 			ExpiresAt: c.ExpiresAt.Format("2006-01-02T15:04:05Z"),
 			Scope:     c.Scope,
 			TaskID:    c.TaskID,
@@ -59,7 +68,7 @@ func (a *AdminAdapter) RevokeCredential(id string) error {
 	if id == "" {
 		return fmt.Errorf("credential ID is required")
 	}
-	return a.registry.Revoke(nil, id)
+	return a.registry.Revoke(context.Background(), id)
 }
 
 // IssueCredential issues a credential via the named provider and returns
