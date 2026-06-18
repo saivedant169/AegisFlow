@@ -38,8 +38,9 @@ type JSONRPCResponse struct {
 
 // JSONRPCError is a JSON-RPC 2.0 error object.
 type JSONRPCError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
 // ToolCallParams represents the parameters for a tools/call request.
@@ -308,7 +309,18 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 		if g.approvals != nil {
 			g.approvals.Submit(env)
 		}
-		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32002, Message: "tool call requires approval: " + params.Name}}
+		// Return a resumable contract: the client polls the approval and, once
+		// granted, re-issues the identical call (which hits ConsumeApproval above).
+		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{
+			Code:    -32002,
+			Message: "tool call requires approval: " + params.Name,
+			Data: map[string]string{
+				"status":      "pending_approval",
+				"approval_id": env.ID,
+				"tool":        params.Name,
+				"resume":      "re-issue the identical tools/call once approved",
+			},
+		}}
 	case envelope.DecisionAllow:
 		log.Printf("[mcpgw] ALLOWED tool call: %s", params.Name)
 		upstream := g.findUpstream(params.Name)
@@ -325,15 +337,68 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 	}
 }
 
-// processToolsList evaluates a tools/list request and returns the response.
+// processToolsList evaluates a tools/list request and returns the response,
+// hiding tools the policy would block so the gateway doesn't advertise
+// capabilities it will reject.
 func (g *Gateway) processToolsList(req *JSONRPCRequest) JSONRPCResponse {
 	for _, up := range g.upstreams {
 		resp, err := g.proxyToUpstream(&up, req)
 		if err == nil && resp.Error == nil {
-			return *resp
+			return g.filterToolsByPolicy(req.ID, *resp)
 		}
 	}
 	return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: json.RawMessage(`{"tools":[]}`)}
+}
+
+// filterToolsByPolicy drops any tool whose policy decision is block from a
+// tools/list result, preserving the rest of the payload. On any parse failure it
+// passes the result through unchanged (fail-open on listing, never on calls).
+func (g *Gateway) filterToolsByPolicy(id json.RawMessage, resp JSONRPCResponse) JSONRPCResponse {
+	if g.policyEngine == nil || len(resp.Result) == 0 {
+		return resp
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(resp.Result, &payload); err != nil {
+		return resp
+	}
+	rawTools, ok := payload["tools"]
+	if !ok {
+		return resp
+	}
+	var tools []json.RawMessage
+	if err := json.Unmarshal(rawTools, &tools); err != nil {
+		return resp
+	}
+
+	kept := make([]json.RawMessage, 0, len(tools))
+	for _, raw := range tools {
+		var t struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(raw, &t); err != nil || t.Name == "" {
+			kept = append(kept, raw) // unknown shape — keep it
+			continue
+		}
+		env := envelope.NewEnvelope(
+			envelope.ActorInfo{Type: "agent", ID: "mcp-client"},
+			"mcp-session", envelope.ProtocolMCP, t.Name, t.Name, inferCapability(t.Name),
+		)
+		if g.policyEngine.Evaluate(env) == envelope.DecisionBlock {
+			continue
+		}
+		kept = append(kept, raw)
+	}
+
+	keptJSON, err := json.Marshal(kept)
+	if err != nil {
+		return resp
+	}
+	payload["tools"] = keptJSON
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return resp
+	}
+	return JSONRPCResponse{JSONRPC: "2.0", ID: id, Result: out}
 }
 
 func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
