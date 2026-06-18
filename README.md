@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">AegisFlow</h1>
+  <img src="aegisflow-dark.svg" alt="AegisFlow — Secure workflows, from trigger to done" width="640"/>
   <p align="center">
     <strong>Local-first runtime governance for coding agents and tool-using agents</strong>
   </p>

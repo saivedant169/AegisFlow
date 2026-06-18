@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="'Space Grotesk','DejaVu Sans',sans-serif">
+  <rect width="1280" height="640" fill="#0D1117"/>
+  <text x="640" y="330" text-anchor="middle" font-size="104" font-weight="700" letter-spacing="-1.5">
+    <tspan fill="#E6EDF3">Aegis</tspan><tspan fill="#5B9BF5" dx="-13">Flow</tspan>
+  </text>
+  <text x="640" y="384" text-anchor="middle" fill="#8B949E" font-size="24" font-weight="500" letter-spacing="0.2">Secure workflows, from trigger to done.</text>
+</svg>
