@@ -429,6 +429,23 @@ layer adds, and run your own load test for capacity planning.
 | **Memory** | ~29 MB RSS after 10K iterations |
 | **Binary Size** | ~15 MB |
 
+### End-to-end HTTP throughput (real)
+
+Measured through the **actual HTTP server** — TCP, JSON codec, and the full
+governance pipeline (input policy → route → output policy → usage/analytics) —
+with a zero-latency mock provider, so the numbers reflect the gateway's own
+overhead rather than provider or network latency. Apple M1, single process,
+`hey -n 30000 -c 50`:
+
+| Metric | Value |
+|--------|-------|
+| **Throughput** | ~55,400 req/s |
+| **p50 / p95 / p99** | 0.6 / 2.4 / 3.6 ms |
+| **Errors** | 0 / 30,000 (all HTTP 200) |
+
+Reproduce: `./scripts/loadtest_e2e.sh` (requires [`hey`](https://github.com/rakyll/hey)).
+Single-node figure — add provider/network latency for capacity planning.
+
 ### Governance Overhead
 
 Micro-benchmarks of the governance pipeline measured on Apple M1 (8GB RAM).
