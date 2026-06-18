@@ -178,6 +178,15 @@ type ActionEnvelope struct {
 - **Evidence over logs** -- hash-chained records with session manifests, not just log lines
 - **Single binary** -- one Go binary, YAML config, no external dependencies for basic usage
 
+### What it does not govern
+
+AegisFlow only sees actions that **route through it** — MCP tool calls via the
+MCP gateway, and model/API traffic pointed at it (e.g. `ANTHROPIC_BASE_URL`).
+An editor's **built-in** tools that bypass MCP — Cursor's native file edits,
+Claude Code's built-in shell/file tools — do **not** pass through AegisFlow and
+are not governed unless you route them through it (MCP server / proxy). Govern
+the choke points you actually wire; don't assume blanket coverage.
+
 ---
 
 ## Legacy / Supporting Capabilities
