@@ -26,6 +26,7 @@ type AnthropicProvider struct {
 type anthropicRequest struct {
 	Model      string             `json:"model"`
 	MaxTokens  int                `json:"max_tokens"`
+	System     string             `json:"system,omitempty"` // Anthropic takes system as a top-level field
 	Messages   []anthropicMessage `json:"messages"`
 	Tools      []anthropicReqTool `json:"tools,omitempty"`
 	ToolChoice json.RawMessage    `json:"tool_choice,omitempty"`
@@ -185,9 +186,16 @@ func (a *AnthropicProvider) Healthy(ctx context.Context) bool {
 
 func (a *AnthropicProvider) translateRequest(req *types.ChatCompletionRequest) anthropicRequest {
 	msgs := make([]anthropicMessage, 0, len(req.Messages))
+	var system string
 	for _, m := range req.Messages {
 		switch {
 		case m.Role == "system":
+			// Anthropic carries system as a top-level field, not a message.
+			// Dropping it silently lost injected system prompts.
+			if system != "" {
+				system += "\n"
+			}
+			system += m.Content
 			continue
 		case m.Role == "tool":
 			// Tool result -> a user message carrying a tool_result block.
@@ -221,6 +229,7 @@ func (a *AnthropicProvider) translateRequest(req *types.ChatCompletionRequest) a
 	return anthropicRequest{
 		Model:      req.Model,
 		MaxTokens:  maxTokens,
+		System:     system,
 		Messages:   msgs,
 		Tools:      toolsToAnthropic(req.Tools),
 		ToolChoice: toolChoiceToAnthropic(req.ToolChoice),

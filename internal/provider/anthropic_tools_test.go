@@ -69,6 +69,35 @@ func TestAnthropicProvider_ToolsRoundTrip(t *testing.T) {
 	}
 }
 
+// System messages must reach Anthropic as the top-level system field, not be
+// dropped (which silently lost injected system prompts).
+func TestAnthropicProvider_SystemPromptForwarded(t *testing.T) {
+	var got anthropicRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&got)
+		w.Write([]byte(`{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer srv.Close()
+
+	p := newTestAnthropicProvider(srv)
+	_, err := p.ChatCompletion(context.Background(), &types.ChatCompletionRequest{
+		Model: "claude-x",
+		Messages: []types.Message{
+			{Role: "system", Content: "You are governed."},
+			{Role: "user", Content: "hi"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.System != "You are governed." {
+		t.Errorf("system prompt not forwarded as top-level field: %q", got.System)
+	}
+	if len(got.Messages) != 1 || got.Messages[0].Role != "user" {
+		t.Errorf("system message must not appear in messages: %+v", got.Messages)
+	}
+}
+
 // An assistant tool call + a tool result must serialize into Anthropic tool_use
 // and tool_result content blocks.
 func TestAnthropicProvider_ToolMessagesToBlocks(t *testing.T) {
