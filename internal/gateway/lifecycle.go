@@ -156,10 +156,17 @@ type govResult struct {
 // original ChatCompletion sequence exactly. Shared so /v1/messages can't drift
 // from /v1/chat/completions (it previously skipped kill-switch and budget).
 func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletionRequest) govResult {
+	// logBlock records a blocked request to the admin feed so operators see
+	// input-stage blocks, not just output-stage ones (and not just successes).
+	logBlock := func(status int) {
+		h.logRequest(rc.startTime, rc.httpReq, rc.tenantID, req.Model, "", status, 0, false, "")
+	}
+
 	// Behavioral kill-switch.
 	if h.behavioralRegistry != nil && rc.sessionID != "" {
 		sa := h.behavioralRegistry.GetOrCreate(rc.sessionID)
 		if sa.Blocked() {
+			logBlock(http.StatusForbidden)
 			return govResult{
 				Blocked: true, Status: http.StatusForbidden, Kind: blockKillSwitch,
 				Message: "session blocked by behavioral kill switch — cumulative risk score exceeded threshold",
@@ -185,6 +192,7 @@ func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletio
 		allowed, w, blockMsg := h.budgetCheck(rc.tenantID, req.Model)
 		if !allowed {
 			h.recordAnalytics(rc.tenantID, req.Model, "", http.StatusTooManyRequests, rc.startTime, 0)
+			logBlock(http.StatusTooManyRequests)
 			return govResult{Blocked: true, Status: http.StatusTooManyRequests, Kind: blockBudget, Message: blockMsg}
 		}
 		warnings = w
@@ -197,6 +205,7 @@ func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletio
 		if err != nil {
 			log.Printf("policy engine input check error: %v", err)
 			h.recordAnalytics(rc.tenantID, req.Model, "", http.StatusInternalServerError, rc.startTime, 0)
+			logBlock(http.StatusInternalServerError)
 			return govResult{Blocked: true, Status: http.StatusInternalServerError, Kind: blockPolicyError, Message: "policy engine error"}
 		}
 		if v != nil {
@@ -210,6 +219,7 @@ func (h *Handler) runInputGovernance(rc requestContext, req *types.ChatCompletio
 					}
 					h.auditLog("system", "system", "policy.block", "policy:"+v.PolicyName, auditDetail(detail), rc.tenantID, req.Model)
 				}
+				logBlock(http.StatusForbidden)
 				return govResult{Blocked: true, Status: http.StatusForbidden, Kind: blockInputPolicy, Message: policy.FormatViolation(v)}
 			}
 			h.fireWebhook("policy_warning", v.PolicyName, string(v.Action), rc.tenantID, req.Model, v.Message)

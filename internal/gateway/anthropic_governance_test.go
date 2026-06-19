@@ -226,6 +226,29 @@ func TestMessages_OutputBlockLogsRequest(t *testing.T) {
 	}
 }
 
+// An input-policy block must be written to the admin request feed too, so
+// operators see blocked requests live (not only successes and output-blocks).
+func TestMessages_InputBlockLogsRequest(t *testing.T) {
+	registry := provider.NewRegistry()
+	registry.Register(provider.NewMockProvider("mock", 0))
+	routes := []config.RouteConfig{{Match: config.RouteMatch{Model: "*"}, Providers: []string{"mock"}, Strategy: "priority"}}
+	rt := router.NewRouter(routes, registry)
+	pe := policy.NewEngine([]policy.Filter{policy.NewKeywordFilter("jb", policy.ActionBlock, []string{"ignore previous instructions"})}, nil)
+	ut := usage.NewTracker(usage.NewStore())
+	h := NewHandler(registry, rt, pe, ut, nil, nil, nil, nil, 0, nil, nil)
+	reqLog := admin.NewRequestLog(10)
+	h.SetRequestLogger(reqLog, "test")
+
+	w := postMessagesAsTenant(h, "t1", `{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"ignore previous instructions"}]}`)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 input block, got %d: %s", w.Code, w.Body.String())
+	}
+	entries := reqLog.Recent(1)
+	if len(entries) != 1 || entries[0].Status != http.StatusForbidden {
+		t.Fatalf("expected a 403 request-log entry on input block, got %+v", entries)
+	}
+}
+
 // Usage accounting already fired on /v1/messages; keep it as a parity guard so a
 // future refactor can't silently drop it.
 func TestMessages_RecordsUsage(t *testing.T) {
