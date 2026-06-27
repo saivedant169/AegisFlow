@@ -9,7 +9,7 @@ require (
 	github.com/graphql-go/graphql v0.8.1
 	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.23.2
-	github.com/redis/go-redis/v9 v9.20.1
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/tetratelabs/wazero v1.12.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.44.0
