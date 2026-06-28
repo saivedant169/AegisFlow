@@ -60,18 +60,20 @@ echo ""
 echo -e "${BOLD}Choose a policy pack:${NC}"
 echo "  1) readonly    -- Agent can only read. No writes, no deletes."
 echo "  2) pr-writer   -- Agent reads + writes PRs. Destructive ops blocked."
-echo "  3) infra-review -- Agent does infra work. Destructive ops need review."
+echo "  3) docs-writer -- Agent reads code but only writes docs. Source writes blocked."
+echo "  4) infra-review -- Agent does infra work. Destructive ops need review."
 echo ""
 
 POLICY_CHOICE="${AEGISFLOW_POLICY:-}"
 if [ -z "$POLICY_CHOICE" ]; then
-    read -r -p "Pick a policy [1/2/3] (default: 2): " POLICY_CHOICE
+    read -r -p "Pick a policy [1/2/3/4] (default: 2): " POLICY_CHOICE
     POLICY_CHOICE="${POLICY_CHOICE:-2}"
 fi
 
 case "$POLICY_CHOICE" in
     1|readonly)    POLICY_FILE="readonly.yaml";     POLICY_NAME="readonly" ;;
-    3|infra-review) POLICY_FILE="infra-review.yaml"; POLICY_NAME="infra-review" ;;
+    3|docs-writer) POLICY_FILE="docs-writer.yaml"; POLICY_NAME="docs-writer" ;;
+    4|infra-review) POLICY_FILE="infra-review.yaml"; POLICY_NAME="infra-review" ;;
     *)             POLICY_FILE="pr-writer.yaml";     POLICY_NAME="pr-writer" ;;
 esac
 
