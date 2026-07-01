@@ -32,12 +32,13 @@ This builds AegisFlow, copies your chosen policy pack, starts the service, and v
 
 ### Step 2: Pick a policy pack
 
-Four policy packs are included in `policies/`. Copy one to configure your governance posture:
+Five policy packs are included in `policies/`. Copy one to configure your governance posture:
 
 | Pack | Use when... |
 |------|------------|
 | `readonly.yaml` | Agent should only read. No writes, no deletes. Audits and investigations. |
 | `pr-writer.yaml` | Agent writes code and opens PRs. Destructive ops blocked, writes reviewed. |
+| `docs-writer.yaml` | Agent reads code but only writes docs. Source-code writes blocked. See `docs-writer-tuning-notes.md`. |
 | `infra-review.yaml` | Agent does infrastructure work. Everything destructive needs human approval. |
 | `sql-explorer.yaml` | BI/data agent explores a database read-first. SELECT allowed, writes reviewed, destructive SQL blocked. See `sql-explorer-tuning-notes.md`. |
 

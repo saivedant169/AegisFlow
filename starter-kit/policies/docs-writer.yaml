@@ -1,0 +1,204 @@
+# AegisFlow Policy Pack: Docs Writer
+#
+# Use this when an agent is allowed to improve documentation but should not
+# modify product source code. It can read the repo, inspect implementation
+# details, edit Markdown/docs files, run docs checks, and open a reviewed PR.
+#
+# Philosophy: "read broadly, write narrowly."
+#   - Reading anything in the repo is free, except secrets.
+#   - Markdown and docs locations are the only intended write surface.
+#   - Opening a PR is a review checkpoint.
+#   - Source-code writes, destructive shell, SQL writes, and dangerous remote
+#     mutations are blocked or reviewed.
+#
+# When NOT to use this pack:
+#   - Feature/code work              -> use pr-writer.yaml
+#   - Infra/Terraform/k8s work       -> use infra-review.yaml
+#   - Database exploration           -> use sql-explorer.yaml
+#   - Audits / read-only assistants  -> use readonly.yaml
+
+tool_policies:
+  enabled: true
+  default_decision: "review"
+  rules:
+    # GitHub: reads are always free.
+    - { protocol: "git", tool: "github.list_*",   decision: "allow" }
+    - { protocol: "git", tool: "github.get_*",    decision: "allow" }
+    - { protocol: "git", tool: "github.search_*", decision: "allow" }
+    - { protocol: "mcp", tool: "github.list_*",   decision: "allow" }
+    - { protocol: "mcp", tool: "github.get_*",    decision: "allow" }
+    - { protocol: "mcp", tool: "github.search_*", decision: "allow" }
+
+    # GitHub: branch/commit flow is allowed for docs work.
+    - { protocol: "git", tool: "github.create_branch", decision: "allow" }
+    - { protocol: "mcp", tool: "github.create_branch", decision: "allow" }
+    - { protocol: "git", tool: "github.create_commit", decision: "allow" }
+    - { protocol: "mcp", tool: "github.create_commit", decision: "allow" }
+
+    # GitHub: direct writes are reviewed for docs paths and blocked for source.
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.md",       decision: "review" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.mdx",      decision: "review" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "README*",    decision: "review" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "CHANGELOG*", decision: "review" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "docs/**",    decision: "review" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.md",       decision: "review" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.mdx",      decision: "review" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "README*",    decision: "review" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "CHANGELOG*", decision: "review" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "docs/**",    decision: "review" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.go",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.py",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.js",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.jsx",   decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.ts",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.tsx",   decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.rs",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.java",  decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.kt",    decision: "block" }
+    - { protocol: "git", tool: "github.create_or_update_file", target: "*.swift", decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.go",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.py",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.js",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.jsx",   decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.ts",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.tsx",   decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.rs",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.java",  decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.kt",    decision: "block" }
+    - { protocol: "mcp", tool: "github.create_or_update_file", target: "*.swift", decision: "block" }
+
+    # GitHub: opening a PR is the review point.
+    - { protocol: "git", tool: "github.create_pull_request", decision: "review" }
+    - { protocol: "mcp", tool: "github.create_pull_request", decision: "review" }
+
+    # GitHub: risky and destructive ops.
+    - { protocol: "git", tool: "github.merge_pull_request",       decision: "review" }
+    - { protocol: "mcp", tool: "github.merge_pull_request",       decision: "review" }
+    - { protocol: "git", tool: "github.create_deployment",        decision: "review" }
+    - { protocol: "mcp", tool: "github.create_deployment",        decision: "review" }
+    - { protocol: "git", tool: "github.update_branch_protection", decision: "review" }
+    - { protocol: "git", tool: "github.delete_repo",              decision: "block" }
+    - { protocol: "mcp", tool: "github.delete_repo",              decision: "block" }
+    - { protocol: "git", tool: "github.delete_branch", target: "main",   decision: "block" }
+    - { protocol: "git", tool: "github.delete_branch", target: "master", decision: "block" }
+    - { protocol: "mcp", tool: "github.delete_branch", target: "main",   decision: "block" }
+    - { protocol: "mcp", tool: "github.delete_branch", target: "master", decision: "block" }
+    - { protocol: "git", tool: "github.force_push",          decision: "block" }
+    - { protocol: "git", tool: "github.invite_collaborator", decision: "block" }
+
+    # Shell: reads and everyday navigation.
+    - { protocol: "shell", tool: "shell.ls",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.pwd",   decision: "allow" }
+    - { protocol: "shell", tool: "shell.echo",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.grep",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.find",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.head",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.tail",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.wc",    decision: "allow" }
+    - { protocol: "shell", tool: "shell.diff",  decision: "allow" }
+    - { protocol: "shell", tool: "shell.less",  decision: "allow" }
+
+    # cat is allow-by-default, but never let it read secrets.
+    - { protocol: "shell", tool: "shell.cat", target: ".env",            decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "*.env",           decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "/etc/shadow",     decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "/etc/passwd",     decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "**/.ssh/*",       decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", target: "**/credentials*", decision: "block" }
+    - { protocol: "shell", tool: "shell.cat", decision: "allow" }
+
+    # Shell: direct docs edits are reviewed; source-code edits are blocked.
+    - { protocol: "shell", tool: "shell.*", target: "*.md",       decision: "review" }
+    - { protocol: "shell", tool: "shell.*", target: "*.mdx",      decision: "review" }
+    - { protocol: "shell", tool: "shell.*", target: "README*",    decision: "review" }
+    - { protocol: "shell", tool: "shell.*", target: "CHANGELOG*", decision: "review" }
+    - { protocol: "shell", tool: "shell.*", target: "docs/**",    decision: "review" }
+    - { protocol: "shell", tool: "shell.*", target: "*.go",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.py",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.js",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.jsx",   decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.ts",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.tsx",   decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.rs",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.java",  decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.kt",    decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "*.swift", decision: "block" }
+
+    # Shell: git read/local workflow.
+    - { protocol: "shell", tool: "shell.git", target: "git status*",       decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git log*",          decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git diff*",         decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git show*",         decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git blame*",        decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git branch*",       decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git checkout*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git switch*",       decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git fetch*",        decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git add*",          decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git commit*",       decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git stash*",        decision: "allow" }
+    - { protocol: "shell", tool: "shell.git", target: "git push --force*", decision: "block" }
+    - { protocol: "shell", tool: "shell.git", target: "git push -f*",      decision: "block" }
+    - { protocol: "shell", tool: "shell.git", target: "git push*",         decision: "review" }
+    - { protocol: "shell", tool: "shell.git", target: "git reset --hard*", decision: "review" }
+    - { protocol: "shell", tool: "shell.git", decision: "allow" }
+
+    # Shell: docs validation and site builds.
+    - { protocol: "shell", tool: "shell.pytest", decision: "allow" }
+    - { protocol: "shell", tool: "shell.go",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo", target: "cargo test*",      decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo", target: "cargo build*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo", target: "cargo check*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.cargo", decision: "review" }
+    - { protocol: "shell", tool: "shell.npm", target: "npm test*",          decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm", target: "npm run test*",      decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm", target: "npm run build*",     decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm", target: "npm ci*",            decision: "allow" }
+    - { protocol: "shell", tool: "shell.npm", target: "npm install*",       decision: "review" }
+    - { protocol: "shell", tool: "shell.npm", decision: "review" }
+    - { protocol: "shell", tool: "shell.make", target: "make test*",        decision: "allow" }
+    - { protocol: "shell", tool: "shell.make", target: "make build*",       decision: "allow" }
+    - { protocol: "shell", tool: "shell.make", target: "make lint*",        decision: "allow" }
+    - { protocol: "shell", tool: "shell.make", decision: "review" }
+
+    # Shell: infra tools are outside docs-only scope.
+    - { protocol: "shell", tool: "shell.kubectl",   decision: "review" }
+    - { protocol: "shell", tool: "shell.terraform", decision: "review" }
+    - { protocol: "shell", tool: "shell.docker",    decision: "review" }
+
+    # Shell: protected paths and destructive commands.
+    - { protocol: "shell", tool: "shell.*", target: "/etc/*",          decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/.ssh/*",       decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/.env",         decision: "block" }
+    - { protocol: "shell", tool: "shell.*", target: "**/credentials*", decision: "block" }
+    - { protocol: "shell", tool: "shell.rm",       decision: "block" }
+    - { protocol: "shell", tool: "shell.dd",       decision: "block" }
+    - { protocol: "shell", tool: "shell.mkfs",     decision: "block" }
+    - { protocol: "shell", tool: "shell.chmod",    decision: "block" }
+    - { protocol: "shell", tool: "shell.shutdown", decision: "block" }
+    - { protocol: "shell", tool: "shell.reboot",   decision: "block" }
+    - { protocol: "shell", tool: "shell.killall",  decision: "block" }
+    - { protocol: "shell", tool: "shell.env",      decision: "block" }
+    - { protocol: "shell", tool: "shell.printenv", decision: "block" }
+
+    # SQL: docs agents may inspect, not mutate.
+    - { protocol: "sql", tool: "sql.select",   decision: "allow" }
+    - { protocol: "sql", tool: "sql.insert",   decision: "review" }
+    - { protocol: "sql", tool: "sql.update",   decision: "review" }
+    - { protocol: "sql", tool: "sql.delete",   decision: "block" }
+    - { protocol: "sql", tool: "sql.drop_*",   decision: "block" }
+    - { protocol: "sql", tool: "sql.truncate", decision: "block" }
+    - { protocol: "sql", tool: "sql.grant",    decision: "block" }
+    - { protocol: "sql", tool: "sql.revoke",   decision: "block" }
+
+    # HTTP: link checking is fine; mutations are not.
+    - { protocol: "http", tool: "http.get",    decision: "allow" }
+    - { protocol: "http", tool: "http.head",   decision: "allow" }
+    - { protocol: "http", tool: "http.post",   decision: "review" }
+    - { protocol: "http", tool: "http.put",    decision: "review" }
+    - { protocol: "http", tool: "http.patch",  decision: "review" }
+    - { protocol: "http", tool: "http.delete", decision: "block" }
+
+    # Global backstop: anything tagged as delete is blocked.
+    - { protocol: "*", tool: "*", capability: "delete", decision: "block" }
+
