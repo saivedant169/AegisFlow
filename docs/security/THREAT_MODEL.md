@@ -93,10 +93,10 @@ Extensions run within AegisFlow's process. WASM plugins execute in a sandboxed r
 - Shell sandbox with environment variable redaction
 - Behavioral detection engine identifies exfiltration patterns (read secret + outbound HTTP)
 - Network egress policy restricts outbound connections
-- Tool policy blocks access to sensitive file paths (.env, /etc/shadow, credential files)
+- Tool policy blocks access to sensitive file paths (.env, /etc/shadow, credential files) on a best-effort basis
 - Attack demo validates 20+ exfiltration scenarios are blocked
 
-**Residual risk:** Exfiltration through side channels not covered by network policy (e.g., DNS tunneling). Mitigated by monitoring and network-level controls outside AegisFlow.
+**Residual risk:** Path-based secret blocking is best-effort, not a hard boundary. It depends on the connector extracting the target path from the action, so obfuscated reads (`python -c 'open(".env").read()'`, `cat < .env`, `xxd .env`) or reads through a tool the policy does not name can slip past a path rule. Treat path rules as a speed bump; the real controls are default-deny, human review of unclassified actions, and the behavioral exfiltration detection (read secret plus outbound HTTP). The strongest posture is to not hand the agent secret access in the first place. Separately, side-channel exfiltration not covered by network policy (e.g. DNS tunneling) is mitigated by monitoring and network-level controls outside AegisFlow.
 
 ---
 

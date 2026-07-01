@@ -4,6 +4,12 @@ All notable changes to AegisFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project loosely follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while it is pre-1.0.
 
+## [Unreleased]
+
+### Security
+
+- Tool-policy target globs now use doublestar matching, so `**` patterns (e.g. `**/.ssh/*`, `**/credentials*`, `docs/**`) match nested paths. The previous `path.Match` did not support `**` and never crossed `/`, which silently disabled nested-path secret-block rules and could let a nested secret (e.g. a read of a deep `.ssh` key) fall through to an allow rule. Path-based blocking is still best-effort; see T2 in the threat model. (#111)
+
 ## [0.8.0] - 2026-06-03
 
 Runtime-governance identity, an Anthropic-native gateway path, and operator DX. This release lets Claude Code and the Anthropic SDK route through AegisFlow so their prompts are governed and audited before they reach a provider, surfaces policy decisions in Prometheus, adds a data-explorer policy pack, and sharpens the CLI and docs.
