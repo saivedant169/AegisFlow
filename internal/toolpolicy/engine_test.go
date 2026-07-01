@@ -143,3 +143,34 @@ func TestEmptyRulesUsesDefault(t *testing.T) {
 		t.Fatalf("expected default allow, got %s", d)
 	}
 }
+
+// TestDoublestarTargetMatching verifies that "**" target globs cross "/" so
+// nested secrets and docs paths match. path.Match never crossed "/", which
+// silently let nested secrets (e.g. a cat of a deep .ssh key) through.
+func TestDoublestarTargetMatching(t *testing.T) {
+	engine := NewEngine([]ToolRule{
+		{Protocol: "git", Tool: "github.create_or_update_file", Target: "**/.ssh/*", Decision: "block"},
+		{Protocol: "git", Tool: "github.create_or_update_file", Target: "docs/**", Decision: "review"},
+		{Protocol: "git", Tool: "github.create_or_update_file", Target: "*.go", Decision: "block"},
+		{Protocol: "git", Tool: "github.create_or_update_file", Decision: "allow"},
+	}, "block")
+
+	cases := []struct {
+		target string
+		want   envelope.Decision
+	}{
+		{"home/user/.ssh/id_rsa", envelope.DecisionBlock}, // ** crosses "/"
+		{".ssh/id_rsa", envelope.DecisionBlock},           // ** matches zero dirs
+		{"docs/guide/setup.md", envelope.DecisionReview},  // docs/** nested
+		{"docs/intro.md", envelope.DecisionReview},        // docs/** direct child
+		{"main.go", envelope.DecisionBlock},               // *.go, single segment
+		{"pkg/main.go", envelope.DecisionAllow},           // *.go must not cross "/" (use **/*.go to block nested)
+		{"README.md", envelope.DecisionAllow},             // no rule matches
+	}
+	for _, tc := range cases {
+		env := testEnvelope(envelope.ProtocolGit, "github.create_or_update_file", tc.target, envelope.CapWrite)
+		if got := engine.Evaluate(env); got != tc.want {
+			t.Errorf("target %q: expected %s, got %s", tc.target, tc.want, got)
+		}
+	}
+}

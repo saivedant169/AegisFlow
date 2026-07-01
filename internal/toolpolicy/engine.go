@@ -1,8 +1,9 @@
 package toolpolicy
 
 import (
-	"path"
 	"sync"
+
+	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 )
@@ -83,17 +84,20 @@ func (e *Engine) matches(rule ToolRule, env *envelope.ActionEnvelope) bool {
 		}
 	}
 
-	// Tool match (glob)
+	// Tool match (glob). doublestar so "**" and path-aware globs work.
 	if rule.Tool != "" && rule.Tool != "*" {
-		matched, _ := path.Match(rule.Tool, env.Tool)
+		matched, _ := doublestar.Match(rule.Tool, env.Tool)
 		if !matched {
 			return false
 		}
 	}
 
-	// Target match (glob, optional)
+	// Target match (glob, optional). doublestar so patterns like
+	// "**/.ssh/*", "**/credentials*", and "docs/**" match nested paths.
+	// The standard library path.Match does not support "**" and never
+	// crosses "/", which silently let nested secrets through.
 	if rule.Target != "" && rule.Target != "*" {
-		matched, _ := path.Match(rule.Target, env.Target)
+		matched, _ := doublestar.Match(rule.Target, env.Target)
 		if !matched {
 			return false
 		}
