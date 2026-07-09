@@ -86,7 +86,7 @@ docker run --rm -p 8080:8080 -p 8081:8081 \
   saivedant169/aegisflow:v0.8.0
 ```
 
-Building from source still works (`make build`, Go 1.26.4+) if you prefer.
+Building from source still works (`make build`, Go 1.26.5+) if you prefer.
 
 ---
 
@@ -214,7 +214,7 @@ Putting nginx or Caddy in front for TLS, SSE buffering, and admin-port isolation
 ### Option 2: Run locally
 
 ```bash
-# Install Go 1.26.4+
+# Install Go 1.26.5+
 brew install go
 
 # Clone and build
