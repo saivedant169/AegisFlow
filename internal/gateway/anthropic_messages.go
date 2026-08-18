@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -246,9 +247,22 @@ func writeAnthropicError(w http.ResponseWriter, status int, errType, message str
 	})
 }
 
+type contextKey string
+
+const anthropicVersionKey = contextKey("anthropic-version")
+
 // Messages handles POST /v1/messages (Anthropic Messages API).
 func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+
+	version := r.Header.Get("anthropic-version")
+	if version == "" {
+		version = "2023-06-01" // default fallback behavior
+	} else if version != "2023-06-01" {
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "unsupported anthropic-version header")
+		return
+	}
+	r = r.WithContext(context.WithValue(r.Context(), anthropicVersionKey, version))
 
 	var in anthropicMessagesRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, h.maxBodySize)).Decode(&in); err != nil {

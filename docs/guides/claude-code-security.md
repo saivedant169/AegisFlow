@@ -23,6 +23,8 @@ export ANTHROPIC_API_KEY=<aegisflow-tenant-key>
 
 AegisFlow exposes `POST /v1/messages` and `POST /v1/messages/count_tokens`. Input policy runs before provider call. Output policy and evidence handling run before response completes.
 
+The `anthropic-version` header is required for `POST /v1/messages`. If the header is missing, AegisFlow defaults to `2023-06-01` to maintain compatibility with older integrations. If an unsupported version is provided, AegisFlow will reject the request with an Anthropic-compatible JSON error. Valid versions are attached to the request context for auditing.
+
 Tool passthrough on this route is optional and disabled by default:
 
 ```yaml

@@ -360,3 +360,46 @@ func TestAnthropicErrorEnvelope_JSON(t *testing.T) {
 		t.Fatalf("unexpected: %s", buf.String())
 	}
 }
+
+func TestMessages_AnthropicVersion_Valid(t *testing.T) {
+	h := setupTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	w := httptest.NewRecorder()
+	h.Messages(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for valid version, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMessages_AnthropicVersion_Unsupported(t *testing.T) {
+	h := setupTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("anthropic-version", "2024-01-01") // unsupported version
+	w := httptest.NewRecorder()
+	h.Messages(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unsupported version, got %d: %s", w.Code, w.Body.String())
+	}
+	var env anthropicErrorEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if env.Type != "error" || env.Error.Type != "invalid_request_error" || env.Error.Message != "unsupported anthropic-version header" {
+		t.Fatalf("expected specific error format, got %+v", env)
+	}
+}
+
+func TestMessages_AnthropicVersion_Missing(t *testing.T) {
+	h := setupTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	// explicitly missing anthropic-version header
+	w := httptest.NewRecorder()
+	h.Messages(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for missing version (should fallback), got %d: %s", w.Code, w.Body.String())
+	}
+}
