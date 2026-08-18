@@ -222,12 +222,37 @@ func main() {
 	case "help", "--help", "-h":
 		printUsage()
 	case "version":
-		fmt.Println("aegisctl", version)
+		cmdVersion(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
 		printUsage()
 		os.Exit(1)
 	}
+}
+
+// cmdVersion prints the aegisctl version. With --json it emits a single
+// JSON object {"version":"<version>"} (no ANSI escapes, trailing newline);
+// otherwise it prints the human-readable "aegisctl <version>" line.
+func cmdVersion(args []string) {
+	jsonOut := false
+	for _, a := range args {
+		if a == "--json" || a == "-json" {
+			jsonOut = true
+		}
+	}
+	if jsonOut {
+		out := struct {
+			Version string `json:"version"`
+		}{Version: version}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(out); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+	fmt.Println("aegisctl", version)
 }
 
 func printUsage() {
@@ -257,7 +282,7 @@ Commands:
   supply-chain Manage supply chain trust (list, sign, verify)
   test-action Run an agent action through governance pipeline (add --dry-run for local-only, no audit/queue)
   test [msg]  Send a test chat completion
-  version     Show version
+  version     Show version (add --json for machine output)
   help        Show this help
 
 Environment:
