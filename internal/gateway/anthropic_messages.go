@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -258,7 +259,7 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	version := r.Header.Get("anthropic-version")
 	if version == "" {
 		version = "2023-06-01" // default fallback behavior
-	} else if version != "2023-06-01" {
+	} else if matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2}$`, version); !matched {
 		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "unsupported anthropic-version header")
 		return
 	}

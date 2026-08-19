@@ -373,11 +373,23 @@ func TestMessages_AnthropicVersion_Valid(t *testing.T) {
 	}
 }
 
+func TestMessages_AnthropicVersion_OtherDate(t *testing.T) {
+	h := setupTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("anthropic-version", "2023-01-01") // valid format
+	w := httptest.NewRecorder()
+	h.Messages(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for valid format, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestMessages_AnthropicVersion_Unsupported(t *testing.T) {
 	h := setupTestHandler()
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"mock","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("anthropic-version", "2024-01-01") // unsupported version
+	req.Header.Set("anthropic-version", "v1.0") // unsupported version format
 	w := httptest.NewRecorder()
 	h.Messages(w, req)
 	if w.Code != http.StatusBadRequest {
