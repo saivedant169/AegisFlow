@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib" // maintained Postgres driver; lib/pq is unmaintained (GO-2026-6166..6173, no fix)
 )
 
 type UsageEvent struct {
@@ -47,7 +47,7 @@ type PostgresStore struct {
 }
 
 func NewPostgresStore(connStr string) (*PostgresStore, error) {
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
