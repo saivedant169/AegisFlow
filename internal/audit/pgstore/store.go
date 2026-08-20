@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/audit"
 )
@@ -57,6 +58,19 @@ func (s *PostgresStore) LastHash() (string, error) {
 		return "", nil
 	}
 	return hash, err
+}
+
+func (s *PostgresStore) LatestTimestamp() (string, error) {
+	var ts time.Time
+	err := s.db.QueryRowContext(context.Background(),
+		`SELECT timestamp FROM audit_log_v2 ORDER BY id DESC LIMIT 1`).Scan(&ts)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return ts.UTC().Format(time.RFC3339Nano), nil
 }
 
 func (s *PostgresStore) Query(filters audit.QueryFilters) ([]audit.Entry, error) {

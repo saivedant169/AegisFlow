@@ -22,3 +22,7 @@ func (a *AdminAdapter) Verify() (interface{}, error) {
 func (a *AdminAdapter) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
 	a.logger.Log(actor, actorRole, action, resource, detail, tenantID, model)
 }
+
+func (a *AdminAdapter) LatestTimestamp() (string, error) {
+	return a.logger.LatestTimestamp()
+}

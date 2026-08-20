@@ -37,6 +37,7 @@ type Store interface {
 	Query(filters QueryFilters) ([]Entry, error)
 	LastHash() (string, error)
 	Migrate() error
+	LatestTimestamp() (string, error)
 }
 
 type QueryFilters struct {
@@ -110,6 +111,10 @@ func (l *Logger) Stop() {
 
 func (l *Logger) Query(filters QueryFilters) ([]Entry, error) {
 	return l.store.Query(filters)
+}
+
+func (l *Logger) LatestTimestamp() (string, error) {
+	return l.store.LatestTimestamp()
 }
 
 func computeHash(e Entry) string {

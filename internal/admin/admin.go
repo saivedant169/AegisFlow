@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ type AuditProvider interface {
 	Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error)
 	Verify() (interface{}, error)
 	Log(actor, actorRole, action, resource, detail, tenantID, model string)
+	LatestTimestamp() (string, error)
 }
 
 // FederationProvider is the interface consumed by the admin API to avoid an
@@ -82,6 +84,7 @@ type ApprovalProvider interface {
 // wrap a *credential.Registry so it satisfies this interface.
 type CredentialProvider interface {
 	ActiveCredentials() interface{}
+	ActiveCredentialCount() int
 	RevokeCredential(id string) error
 	// IssueCredential issues a credential and returns its provenance metadata
 	// (never the secret). The provenance is suitable for embedding in evidence
@@ -280,6 +283,7 @@ func (s *Server) Router() http.Handler {
 	// Read-only endpoints — accessible without API key on admin port.
 	// The admin port (8081) should not be publicly exposed. These endpoints
 	// are open so the embedded dashboard can fetch data without auth.
+	r.Get("/admin/v1/system/status", s.handleSystemStatus)
 	r.Get("/admin/v1/usage", s.usageHandler)
 	r.Get("/admin/v1/providers", s.providersHandler)
 	r.Get("/admin/v1/tenants", s.tenantsHandler)
@@ -379,6 +383,45 @@ func writeAPIError(w http.ResponseWriter, code int, errType, message string) {
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	status := map[string]interface{}{
+		"active_credentials":     0,
+		"latest_audit_timestamp": "",
+		"loaded_policy_pack":     os.Getenv("AEGISFLOW_POLICY_PACK"),
+		"mcp_gateway":            "disabled",
+	}
+
+	if pack, ok := status["loaded_policy_pack"].(string); !ok || pack == "" {
+		status["loaded_policy_pack"] = "custom"
+	}
+
+	if s.credentialProvider != nil {
+		status["active_credentials"] = s.credentialProvider.ActiveCredentialCount()
+	}
+
+	if s.auditProvider != nil {
+		if ts, err := s.auditProvider.LatestTimestamp(); err == nil {
+			status["latest_audit_timestamp"] = ts
+		}
+	}
+
+	if s.cfg.MCPGateway.Enabled {
+		mcpURL := fmt.Sprintf("http://%s:%d/", s.cfg.MCPGateway.Host, s.cfg.MCPGateway.Port)
+		client := &http.Client{Timeout: 2 * time.Second}
+		// A simple GET request to the root should return something or at least connect
+		resp, err := client.Get(mcpURL)
+		if err == nil {
+			resp.Body.Close()
+			status["mcp_gateway"] = "reachable"
+		} else {
+			status["mcp_gateway"] = "unreachable"
+		}
+	}
+
+	json.NewEncoder(w).Encode(status)
 }
 
 func (s *Server) usageHandler(w http.ResponseWriter, r *http.Request) {

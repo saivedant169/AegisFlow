@@ -313,6 +313,26 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 		os.Exit(1)
 	}
 
+	mcpGatewayHealthy := true
+	sysStatus := fetchJSON(adminURL + "/admin/v1/system/status")
+	if sysMap, ok := sysStatus.(map[string]interface{}); ok {
+		fmt.Println("\nSystem")
+		fmt.Println("────────────────────────────────────────────────────")
+		fmt.Printf("  Loaded Policy Pack: %s\n", sysMap["loaded_policy_pack"])
+		fmt.Printf("  Active Credentials: %.0f\n", toFloat(sysMap["active_credentials"]))
+		if ts, ok := sysMap["latest_audit_timestamp"].(string); ok && ts != "" {
+			fmt.Printf("  Latest Audit Entry: %s\n", ts)
+		} else {
+			fmt.Println("  Latest Audit Entry: (none)")
+		}
+
+		mcpVal := sysMap["mcp_gateway"]
+		fmt.Printf("  MCP Gateway:        %v\n", mcpVal)
+		if mcpVal == "unreachable" {
+			mcpGatewayHealthy = false
+		}
+	}
+
 	// Providers
 	fmt.Println("\nProviders")
 	fmt.Println("────────────────────────────────────────────────────")
@@ -424,6 +444,10 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 		fmt.Println("WARNING: Gateway is DOWN")
 		os.Exit(1)
 	}
+	if !mcpGatewayHealthy {
+		fmt.Println("WARNING: MCP Gateway is configured but unreachable")
+		os.Exit(1)
+	}
 	fmt.Println("All systems operational.")
 }
 
@@ -440,6 +464,12 @@ func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) {
 	}
 
 	if adOK {
+		if sysMap, ok := fetchJSON(adminURL + "/admin/v1/system/status").(map[string]interface{}); ok {
+			out["system"] = sysMap
+			if sysMap["mcp_gateway"] == "unreachable" {
+				out["healthy"] = false
+			}
+		}
 		if approvals, ok := fetchJSON(adminURL + "/admin/v1/approvals").(map[string]interface{}); ok {
 			if pending, ok := approvals["pending"].([]interface{}); ok {
 				out["pending"] = len(pending)

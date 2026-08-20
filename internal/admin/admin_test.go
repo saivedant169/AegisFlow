@@ -48,6 +48,10 @@ func (s *verifyOnlyAuditProvider) Verify() (interface{}, error) {
 func (s *verifyOnlyAuditProvider) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
 }
 
+func (s *verifyOnlyAuditProvider) LatestTimestamp() (string, error) {
+	return "2026-08-20T22:00:00Z", nil
+}
+
 func newFullAdminServer() *Server {
 	srv := newIntegrationAdminServer()
 	srv.approvalProvider = &stubApprovalProvider{
@@ -199,9 +203,10 @@ func (s *stubCredentialProvider) RevokeCredential(id string) error {
 	}
 	return errors.New("not found")
 }
-func (s *stubCredentialProvider) IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error) {
+func (s *stubCredentialProvider) IssueCredential(p, t, targ, cap, env string) (interface{}, error) {
 	return map[string]interface{}{"id": "cred-new"}, nil
 }
+func (s *stubCredentialProvider) ActiveCredentialCount() int { return 0 }
 
 type stubManifestProvider struct{}
 

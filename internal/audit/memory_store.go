@@ -34,6 +34,16 @@ func (s *MemoryStore) LastHash() (string, error) {
 	return s.entries[len(s.entries)-1].EntryHash, nil
 }
 
+func (s *MemoryStore) LatestTimestamp() (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.entries) == 0 {
+		return "", nil
+	}
+	// Note: using time.RFC3339Nano for consistent timestamp format
+	return s.entries[len(s.entries)-1].Timestamp.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"), nil
+}
+
 func (s *MemoryStore) Query(filters QueryFilters) ([]Entry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

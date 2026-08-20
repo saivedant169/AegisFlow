@@ -63,6 +63,12 @@ func (a *AdminAdapter) ActiveCredentials() interface{} {
 	return result
 }
 
+// ActiveCredentialCount returns the number of active credentials.
+func (a *AdminAdapter) ActiveCredentialCount() int {
+	creds := a.registry.ActiveCredentials()
+	return len(creds)
+}
+
 // RevokeCredential revokes a credential by ID.
 func (a *AdminAdapter) RevokeCredential(id string) error {
 	if id == "" {
