@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -44,15 +45,8 @@ func TestCmdStatus_Healthy(t *testing.T) {
 	wOut.Close()
 	os.Stdout = oldStdout
 
-	import_io := true
-	_ = import_io
-
-	// Better to use io.Copy or just read all
-	os.Stdout = oldStdout
-
-	outBytes := make([]byte, 8192)
-	n, _ := rOut.Read(outBytes)
-	out := string(outBytes[:n])
+	outBytes, _ := io.ReadAll(rOut)
+	out := string(outBytes)
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
@@ -107,11 +101,8 @@ func TestCmdStatus_Unhealthy(t *testing.T) {
 	wOut.Close()
 	os.Stdout = oldStdout
 
-	os.Stdout = oldStdout
-
-	outBytes := make([]byte, 8192)
-	n, _ := rOut.Read(outBytes)
-	out := string(outBytes[:n])
+	outBytes, _ := io.ReadAll(rOut)
+	out := string(outBytes)
 
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(out), &result); err != nil {

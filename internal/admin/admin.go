@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -389,13 +388,8 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	status := map[string]interface{}{
 		"active_credentials":     0,
-		"latest_audit_timestamp": "",
-		"loaded_policy_pack":     os.Getenv("AEGISFLOW_POLICY_PACK"),
+		"latest_audit_timestamp": "(none)",
 		"mcp_gateway":            "disabled",
-	}
-
-	if pack, ok := status["loaded_policy_pack"].(string); !ok || pack == "" {
-		status["loaded_policy_pack"] = "custom"
 	}
 
 	if s.credentialProvider != nil {
@@ -403,7 +397,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.auditProvider != nil {
-		if ts, err := s.auditProvider.LatestTimestamp(); err == nil {
+		if ts, err := s.auditProvider.LatestTimestamp(); err == nil && ts != "" {
 			status["latest_audit_timestamp"] = ts
 		}
 	}
