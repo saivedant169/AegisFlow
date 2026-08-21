@@ -388,7 +388,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	status := map[string]interface{}{
 		"active_credentials":     0,
-		"latest_audit_timestamp": "(none)",
+		"latest_audit_timestamp": "",
 		"mcp_gateway":            "disabled",
 	}
 

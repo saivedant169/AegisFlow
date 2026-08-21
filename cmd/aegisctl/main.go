@@ -318,7 +318,6 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if sysMap, ok := sysStatus.(map[string]interface{}); ok {
 		fmt.Println("\nSystem")
 		fmt.Println("────────────────────────────────────────────────────")
-		fmt.Printf("  Loaded Policy Pack: %s\n", sysMap["loaded_policy_pack"])
 		fmt.Printf("  Active Credentials: %.0f\n", toFloat(sysMap["active_credentials"]))
 		if ts, ok := sysMap["latest_audit_timestamp"].(string); ok && ts != "" {
 			fmt.Printf("  Latest Audit Entry: %s\n", ts)

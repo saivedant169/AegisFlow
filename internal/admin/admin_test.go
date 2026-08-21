@@ -1367,8 +1367,8 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 	if body["active_credentials"] != float64(0) {
 		t.Errorf("expected 0 active_credentials, got %v", body["active_credentials"])
 	}
-	if body["latest_audit_timestamp"] != "(none)" {
-		t.Errorf("expected (none) latest_audit_timestamp, got %v", body["latest_audit_timestamp"])
+	if body["latest_audit_timestamp"] != "" {
+		t.Errorf("expected \"\" latest_audit_timestamp, got %v", body["latest_audit_timestamp"])
 	}
 	if body["mcp_gateway"] != "disabled" {
 		t.Errorf("expected disabled mcp_gateway, got %v", body["mcp_gateway"])
