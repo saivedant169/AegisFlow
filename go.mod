@@ -11,6 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/tetratelabs/wazero v1.12.0
 	go.opentelemetry.io/otel v1.45.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.45.0

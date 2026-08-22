@@ -490,14 +490,15 @@ type CostOptConfig struct {
 }
 
 type ServerConfig struct {
-	Host             string        `yaml:"host"`
-	Port             int           `yaml:"port"`
-	AdminPort        int           `yaml:"admin_port"`
-	ReadTimeout      time.Duration `yaml:"read_timeout"`
-	WriteTimeout     time.Duration `yaml:"write_timeout"`
-	GracefulShutdown time.Duration `yaml:"graceful_shutdown"`
-	MaxBodySize      int64         `yaml:"max_body_size"`
-	CORS             CORSConfig    `yaml:"cors"`
+	Host              string        `yaml:"host"`
+	Port              int           `yaml:"port"`
+	AdminPort         int           `yaml:"admin_port"`
+	ReadTimeout       time.Duration `yaml:"read_timeout"`
+	WriteTimeout      time.Duration `yaml:"write_timeout"`
+	GracefulShutdown  time.Duration `yaml:"graceful_shutdown"`
+	MaxBodySize       int64         `yaml:"max_body_size"`
+	CORS              CORSConfig    `yaml:"cors"`
+	RequestValidation bool          `yaml:"request_validation"`
 }
 
 type CORSConfig struct {

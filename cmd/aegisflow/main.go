@@ -304,6 +304,7 @@ func main() {
 	reqLog := admin.NewRequestLog(200)
 
 	handler := gateway.NewHandler(registry, rt, pe, ut, responseCache, wh, pgStore, analyticsCollector, cfg.Server.MaxBodySize, recordSpendFn, budgetCheckFn)
+	handler.SetRequestValidation(cfg.Server.RequestValidation)
 	handler.SetRequestLogger(reqLog, cfg.Federation.ControlPlane.Name)
 	handler.SetMessagesToolPassthrough(cfg.MessagesAPI.ToolPassthrough)
 	if semanticCache != nil {
