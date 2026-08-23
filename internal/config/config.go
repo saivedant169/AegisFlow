@@ -692,6 +692,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg := &Config{}
+	cfg.Server.RequestValidation = true
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}

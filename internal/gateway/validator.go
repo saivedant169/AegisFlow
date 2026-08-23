@@ -10,8 +10,6 @@ import (
 
 var (
 	chatCompletionSchema *jsonschema.Schema
-	completionSchema     *jsonschema.Schema
-	embeddingSchema      *jsonschema.Schema
 )
 
 func init() {
@@ -29,38 +27,6 @@ func init() {
 		"required": ["model", "messages"],
 		"additionalProperties": true
 	}`)
-
-	completionSchema = jsonschema.MustCompileString("completion.json", `{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"model": { "type": "string", "minLength": 1 },
-			"prompt": {
-				"anyOf": [
-					{ "type": "string" },
-					{ "type": "array", "items": { "type": "string" } }
-				]
-			}
-		},
-		"required": ["model", "prompt"],
-		"additionalProperties": true
-	}`)
-
-	embeddingSchema = jsonschema.MustCompileString("embedding.json", `{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"model": { "type": "string", "minLength": 1 },
-			"input": {
-				"anyOf": [
-					{ "type": "string" },
-					{ "type": "array", "items": { "type": "string" } }
-				]
-			}
-		},
-		"required": ["model", "input"],
-		"additionalProperties": true
-	}`)
 }
 
 // formatValidationError maps a jsonschema.ValidationError to an OpenAI-compatible error (message, param, code).
@@ -70,36 +36,30 @@ func formatValidationError(err error) (message, param, code string) {
 		return err.Error(), "", "invalid_request_error"
 	}
 
+	var targetErr *jsonschema.ValidationError
 	if len(validationErr.Causes) > 0 {
-		// Use the first cause for more specific error message
-		cause := validationErr.Causes[0]
-		param = strings.TrimPrefix(cause.InstanceLocation, "/")
-		param = strings.ReplaceAll(param, "/", ".")
-		message = cause.Message
-
-		if strings.Contains(cause.Message, "missing properties") {
-			parts := strings.Split(cause.Message, "'")
-			if len(parts) >= 3 {
-				param = parts[1]
-				message = fmt.Sprintf("Missing required parameter: '%s'.", param)
-			}
-		} else if strings.Contains(cause.Message, "expected") {
-			code = "invalid_type"
-		}
+		targetErr = validationErr.Causes[0]
 	} else {
-		param = strings.TrimPrefix(validationErr.InstanceLocation, "/")
-		param = strings.ReplaceAll(param, "/", ".")
-		message = validationErr.Message
+		targetErr = validationErr
+	}
 
-		if strings.Contains(validationErr.Message, "missing properties") {
-			parts := strings.Split(validationErr.Message, "'")
-			if len(parts) >= 3 {
-				param = parts[1]
-				message = fmt.Sprintf("Missing required parameter: '%s'.", param)
-			}
-		} else if strings.Contains(validationErr.Message, "expected") {
-			code = "invalid_type"
+	param = strings.TrimPrefix(targetErr.InstanceLocation, "/")
+	param = strings.ReplaceAll(param, "/", ".")
+	message = targetErr.Message
+
+	keyword := targetErr.KeywordLocation
+	if idx := strings.LastIndex(keyword, "/"); idx != -1 {
+		keyword = keyword[idx+1:]
+	}
+
+	if keyword == "required" {
+		parts := strings.Split(targetErr.Message, "'")
+		if len(parts) >= 3 {
+			param = parts[1]
+			message = fmt.Sprintf("Missing required parameter: '%s'.", param)
 		}
+	} else if keyword == "type" {
+		code = "invalid_type"
 	}
 
 	if code == "" {

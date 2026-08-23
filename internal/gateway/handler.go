@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"log"
@@ -202,8 +201,6 @@ func (h *Handler) ChatCompletion(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "failed to read request body")
 		return
 	}
-	// Restore body for downstream use
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	if h.requestValidation {
 		if msg, param, code, vErr := validateRequest(bodyBytes, chatCompletionSchema); vErr != nil {
@@ -454,10 +451,8 @@ func writeValidationError(w http.ResponseWriter, code, param, message string) {
 	w.WriteHeader(http.StatusBadRequest)
 
 	errResp := types.NewErrorResponse(http.StatusBadRequest, "invalid_request_error", message)
-	errResp.Error.Code = http.StatusBadRequest // keeping it as int
 	if code != "" {
-		// some implementations map the string code to an extra field, but we only have int Code.
-		// We'll rely on Type="invalid_request_error" and Param for OpenAI compat.
+		errResp.Error.ErrorCode = code
 	}
 	if param != "" {
 		errResp.Error.Param = param

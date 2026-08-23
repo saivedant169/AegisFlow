@@ -3,10 +3,11 @@ package types
 import "fmt"
 
 type APIError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Param   string `json:"param,omitempty"`
+	Code      int    `json:"-"`
+	ErrorCode string `json:"code,omitempty"`
+	Message   string `json:"message"`
+	Type      string `json:"type"`
+	Param     string `json:"param,omitempty"`
 }
 
 func (e *APIError) Error() string {
