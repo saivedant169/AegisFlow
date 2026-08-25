@@ -5,7 +5,7 @@ go 1.26.6
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/uuid v1.6.0
 	github.com/graphql-go/graphql v0.8.1
 	github.com/jackc/pgx/v5 v5.10.0
@@ -21,9 +21,9 @@ require (
 	golang.org/x/net v0.58.0
 	golang.org/x/text v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
-	k8s.io/client-go v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
+	k8s.io/client-go v0.36.4
 	modernc.org/sqlite v1.57.0
 	sigs.k8s.io/controller-runtime v0.24.1
 )
