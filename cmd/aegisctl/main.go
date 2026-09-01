@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -66,7 +67,13 @@ func main() {
 		}
 		cmdStatus(gatewayURL, adminURL, jsonOut)
 	case "usage":
-		cmdUsage(adminURL)
+		jsonOut := false
+		for _, a := range os.Args[2:] {
+			if a == "--json" || a == "-json" {
+				jsonOut = true
+			}
+		}
+		cmdUsage(adminURL, jsonOut)
 	case "models":
 		cmdModels(gatewayURL)
 	case "providers":
@@ -266,7 +273,7 @@ Commands:
   policy-pack Manage policy packs (list, show)
   plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
   status      Check gateway and admin health (add --json for machine output)
-  usage       Show usage per tenant and model
+  usage       Show usage per tenant and model (add --json for machine output)
   models      List available models
   providers   List configured providers with health
   policies    List configured policies
@@ -493,15 +500,97 @@ func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) {
 	_ = enc.Encode(out)
 }
 
-func cmdUsage(adminURL string) {
+type usageModelSummary struct {
+	Model            string  `json:"model"`
+	Requests         float64 `json:"requests"`
+	TotalTokens      float64 `json:"total_tokens"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+}
+
+type usageTenantSummary struct {
+	Tenant string              `json:"tenant"`
+	Models []usageModelSummary `json:"models"`
+}
+
+func cmdUsage(adminURL string, jsonOut bool) {
 	data := fetchJSON(adminURL + "/admin/v1/usage")
 	if data == nil {
+		if jsonOut {
+			out := struct {
+				Tenants []usageTenantSummary `json:"tenants"`
+			}{Tenants: []usageTenantSummary{}}
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(out)
+		}
 		return
 	}
 
 	usageMap, ok := data.(map[string]interface{})
 	if !ok {
+		if jsonOut {
+			out := struct {
+				Tenants []usageTenantSummary `json:"tenants"`
+			}{Tenants: []usageTenantSummary{}}
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(out)
+			return
+		}
 		fmt.Println("No usage data")
+		return
+	}
+
+	tenantIDs := make([]string, 0, len(usageMap))
+	for tenantID := range usageMap {
+		tenantIDs = append(tenantIDs, tenantID)
+	}
+
+	sort.Strings(tenantIDs)
+
+	if jsonOut {
+		tenants := make([]usageTenantSummary, 0, len(tenantIDs))
+		for _, tenantID := range tenantIDs {
+			tenant, ok := usageMap[tenantID].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			byModel, ok := tenant["by_model"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			models := make([]string, 0, len(byModel))
+			for model := range byModel {
+				models = append(models, model)
+			}
+			sort.Strings(models)
+
+			summary := usageTenantSummary{Tenant: tenantID, Models: []usageModelSummary{}}
+			for _, model := range models {
+				m, ok := byModel[model].(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				summary.Models = append(summary.Models, usageModelSummary{
+					Model: model,
+					Requests: toFloat(m["requests"]),
+					TotalTokens: toFloat(m["total_tokens"]),
+					EstimatedCostUSD: toFloat(m["estimated_cost_usd"]),
+				})
+			}
+
+			tenants = append(tenants, summary)
+		}
+		
+		out := struct {
+			Tenants []usageTenantSummary `json:"tenants"`
+		}{Tenants: tenants}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(out)
 		return
 	}
 
