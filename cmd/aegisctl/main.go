@@ -575,16 +575,16 @@ func cmdUsage(adminURL string, jsonOut bool) {
 				}
 
 				summary.Models = append(summary.Models, usageModelSummary{
-					Model: model,
-					Requests: toFloat(m["requests"]),
-					TotalTokens: toFloat(m["total_tokens"]),
+					Model:            model,
+					Requests:         toFloat(m["requests"]),
+					TotalTokens:      toFloat(m["total_tokens"]),
 					EstimatedCostUSD: toFloat(m["estimated_cost_usd"]),
 				})
 			}
 
 			tenants = append(tenants, summary)
 		}
-		
+
 		out := struct {
 			Tenants []usageTenantSummary `json:"tenants"`
 		}{Tenants: tenants}

@@ -1,4 +1,5 @@
 package main
+
 import (
 	"encoding/json"
 	"net/http"
@@ -6,6 +7,7 @@ import (
 	"strings"
 	"testing"
 )
+
 func TestCmdUsage_JSON(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/v1/usage", func(w http.ResponseWriter, r *http.Request) {
