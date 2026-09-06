@@ -525,21 +525,22 @@ type ProviderAPIKey struct {
 }
 
 type ProviderConfig struct {
-	Name         string            `yaml:"name"`
-	Type         string            `yaml:"type"`
-	Enabled      bool              `yaml:"enabled"`
-	Default      bool              `yaml:"default"`
-	BaseURL      string            `yaml:"base_url"`
-	APIKeyEnv    string            `yaml:"api_key_env"`   // backward compat: single key from env
-	APIKeys      []ProviderAPIKey  `yaml:"api_keys"`      // multi-key rotation
-	KeySelection string            `yaml:"key_selection"` // "round-robin" (default; only supported strategy)
-	Models       []string          `yaml:"models"`
-	Timeout      time.Duration     `yaml:"timeout"`
-	MaxRetries   int               `yaml:"max_retries"`
-	Retry        RetryConfig       `yaml:"retry"`
-	APIVersion   string            `yaml:"api_version"`
-	Config       map[string]string `yaml:"config"`
-	Region       string            `yaml:"region"`
+	Name              string            `yaml:"name"`
+	Type              string            `yaml:"type"`
+	Enabled           bool              `yaml:"enabled"`
+	Default           bool              `yaml:"default"`
+	BaseURL           string            `yaml:"base_url"`
+	APIKeyEnv         string            `yaml:"api_key_env"`         // backward compat: single key from env
+	APIKeys           []ProviderAPIKey  `yaml:"api_keys"`            // multi-key rotation
+	KeySelection      string            `yaml:"key_selection"`       // "round-robin" (default; only supported strategy)
+	RateLimitCooldown time.Duration     `yaml:"rate_limit_cooldown"` // zero uses the rotator default (60s)
+	Models            []string          `yaml:"models"`
+	Timeout           time.Duration     `yaml:"timeout"`
+	MaxRetries        int               `yaml:"max_retries"`
+	Retry             RetryConfig       `yaml:"retry"`
+	APIVersion        string            `yaml:"api_version"`
+	Config            map[string]string `yaml:"config"`
+	Region            string            `yaml:"region"`
 }
 
 type RetryConfig struct {
@@ -1037,6 +1038,9 @@ func validateConfig(cfg *Config) error {
 		providerNames[provider.Name] = true
 		if provider.Retry.MaxAttempts < 1 {
 			return fmt.Errorf("provider %q retry.max_attempts must be at least 1", provider.Name)
+		}
+		if provider.RateLimitCooldown < 0 {
+			return fmt.Errorf("provider %q rate_limit_cooldown must not be negative", provider.Name)
 		}
 	}
 

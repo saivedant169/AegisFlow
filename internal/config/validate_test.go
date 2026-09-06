@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // loadFromYAML is a test helper that writes YAML to a temp file and calls Load.
@@ -61,6 +62,32 @@ providers:
     type: "openai"
     enabled: true
 `, "duplicate provider name")
+}
+
+func TestLoadProviderRateLimitCooldown(t *testing.T) {
+	cfg, err := loadFromYAML(t, `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    rate_limit_cooldown: 45s
+`)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got := cfg.Providers[0].RateLimitCooldown; got != 45*time.Second {
+		t.Fatalf("rate_limit_cooldown = %s, want 45s", got)
+	}
+}
+
+func TestValidateProviderRateLimitCooldownRejectsNegativeDuration(t *testing.T) {
+	expectValidationError(t, `
+providers:
+  - name: "openai"
+    type: "openai"
+    enabled: true
+    rate_limit_cooldown: -1s
+`, "rate_limit_cooldown must not be negative")
 }
 
 func TestValidateRouteReferencesNonExistentProvider(t *testing.T) {

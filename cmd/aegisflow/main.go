@@ -923,7 +923,7 @@ func buildKeyRotator(pc config.ProviderConfig) *provider.KeyRotator {
 	if len(keys) == 0 && pc.APIKeyEnv != "" {
 		keys = append(keys, os.Getenv(pc.APIKeyEnv))
 	}
-	return provider.NewKeyRotator(keys, pc.KeySelection, 0)
+	return provider.NewKeyRotator(keys, pc.KeySelection, pc.RateLimitCooldown)
 }
 
 func initProviders(cfg *config.Config, registry *provider.Registry) {

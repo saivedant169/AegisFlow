@@ -5,7 +5,32 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/config"
 )
+
+func TestBuildKeyRotatorUsesProviderCooldown(t *testing.T) {
+	cooldown := 50 * time.Millisecond
+	rotator := buildKeyRotator(config.ProviderConfig{
+		APIKeys:           []config.ProviderAPIKey{{Key: "test-key"}},
+		RateLimitCooldown: cooldown,
+	})
+
+	key, ok := rotator.Pick()
+	if !ok {
+		t.Fatal("expected configured key to be available")
+	}
+	rotator.MarkRateLimited(key)
+	if rotator.Available() {
+		t.Fatal("expected key to be unavailable during cooldown")
+	}
+
+	time.Sleep(cooldown + 10*time.Millisecond)
+	if !rotator.Available() {
+		t.Fatalf("expected key to be available after %s cooldown", cooldown)
+	}
+}
 
 func TestDefaultConfigPathUsesFallback(t *testing.T) {
 	t.Setenv("AEGISFLOW_CONFIG", "")

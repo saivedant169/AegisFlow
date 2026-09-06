@@ -32,7 +32,6 @@ type KeyRotator struct {
 // NewKeyRotator creates a rotator from the given key values.
 // strategy must be "round-robin" (the only supported strategy; defaults to it if empty).
 // rateLimitCooldown controls how long a 429-hit key is excluded before being re-admitted.
-// TODO: make rateLimitCooldown configurable per-provider via YAML (currently defaults to 60s).
 func NewKeyRotator(keys []string, strategy string, rateLimitCooldown time.Duration) *KeyRotator {
 	if strategy == "" {
 		strategy = "round-robin"

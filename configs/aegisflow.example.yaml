@@ -30,6 +30,7 @@ providers:
     enabled: false              # Set to true and provide API key to use
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"   # Environment variable containing the API key
+    rate_limit_cooldown: 60s     # Exclude a 429-hit key for this long (default: 60s)
     models:                     # Models available from this provider
       - "gpt-4o"
       - "gpt-4o-mini"
