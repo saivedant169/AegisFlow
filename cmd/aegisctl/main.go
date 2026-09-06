@@ -77,7 +77,13 @@ func main() {
 	case "models":
 		cmdModels(gatewayURL)
 	case "providers":
-		cmdProviders(adminURL)
+		jsonOut := false
+		for _, a := range os.Args[2:] {
+			if a == "--json" || a == "-json" {
+				jsonOut = true
+			}
+		}
+		cmdProviders(adminURL, jsonOut)
 	case "policies":
 		cmdPolicies(adminURL)
 	case "tenants":
@@ -275,7 +281,7 @@ Commands:
   status      Check gateway and admin health (add --json for machine output)
   usage       Show usage per tenant and model (add --json for machine output)
   models      List available models
-  providers   List configured providers with health
+  providers   List configured providers with health (add --json for machine output)
   policies    List configured policies
   tenants     List tenants with rate limits
   pending     List pending approval items (add --json for machine output)
@@ -655,7 +661,23 @@ func cmdModels(gatewayURL string) {
 	w.Flush()
 }
 
-func cmdProviders(adminURL string) {
+type providerResponse struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`
+	Enabled bool     `json:"enabled"`
+	Healthy bool     `json:"healthy"`
+	Models  []string `json:"models"`
+}
+
+type providerSummary struct {
+	Name   string   `json:"name"`
+	Type   string   `json:"type"`
+	Status string   `json:"status"`
+	Health string   `json:"health"`
+	Models []string `json:"models"`
+}
+
+func cmdProviders(adminURL string, jsonOut bool) {
 	resp, err := client.Get(adminURL + "/admin/v1/providers")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -663,21 +685,13 @@ func cmdProviders(adminURL string) {
 	}
 	defer resp.Body.Close()
 
-	var providers []struct {
-		Name    string   `json:"name"`
-		Type    string   `json:"type"`
-		Enabled bool     `json:"enabled"`
-		Healthy bool     `json:"healthy"`
-		Models  []string `json:"models"`
-	}
+	var providers []providerResponse
 	if err := decodeJSON(resp, &providers); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tHEALTH\tMODELS")
-	fmt.Fprintln(w, "────\t────\t──────\t──────\t──────")
+	summaries := make([]providerSummary, 0, len(providers))
 	for _, p := range providers {
 		status := "disabled"
 		if p.Enabled {
@@ -687,11 +701,30 @@ func cmdProviders(adminURL string) {
 		if p.Healthy {
 			health = "healthy"
 		}
+		summaries = append(summaries, providerSummary{
+			Name: p.Name, Type: p.Type, Status: status, Health: health, Models: p.Models,
+		})
+	}
+
+	if jsonOut {
+		out := struct {
+			Providers []providerSummary `json:"providers"`
+		}{Providers: summaries}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(out)
+		return
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tHEALTH\tMODELS")
+	fmt.Fprintln(w, "────\t────\t──────\t──────\t──────")
+	for _, p := range summaries {
 		models := strings.Join(p.Models, ", ")
 		if len(models) > 40 {
 			models = models[:37] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, status, health, models)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, p.Status, p.Health, models)
 	}
 	w.Flush()
 }
