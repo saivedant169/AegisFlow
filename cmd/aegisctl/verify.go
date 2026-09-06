@@ -8,12 +8,16 @@ import (
 	"strings"
 )
 
-func cmdVerify(adminURL string, args []string) {
+func cmdVerify(adminURL string, args []string) int {
 	sessionID := ""
+	jsonOut := false
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--session" && i+1 < len(args) {
+		switch {
+		case args[i] == "--session" && i+1 < len(args):
 			sessionID = args[i+1]
 			i++
+		case args[i] == "--json" || args[i] == "-json":
+			jsonOut = true
 		}
 	}
 
@@ -27,27 +31,38 @@ func cmdVerify(adminURL string, args []string) {
 	resp, err := client.Post(url, "application/json", nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	if resp.StatusCode != 200 {
 		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
-		os.Exit(1)
+		return 1
 	}
 
 	var result VerifyResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
-	printVerifyResult(result)
+	if jsonOut {
+		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding response: %v\n", err)
+			return 1
+		}
+	} else {
+		printVerifyResult(result)
+	}
+	if !result.Valid {
+		return 1
+	}
+	return 0
 }
 
 // VerifyResponse matches the evidence.VerifyResult JSON structure.

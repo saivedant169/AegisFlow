@@ -111,7 +111,9 @@ func main() {
 		}
 		cmdDeny(adminURL, os.Args[2], comment)
 	case "verify":
-		cmdVerify(adminURL, os.Args[2:])
+		if code := cmdVerify(adminURL, os.Args[2:]); code != 0 {
+			os.Exit(code)
+		}
 	case "evidence":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: aegisctl evidence <sessions|export|report> [args]")
@@ -268,7 +270,7 @@ func printUsage() {
 Usage: aegisctl <command> [args]
 
 Commands:
-  verify      Verify evidence chain integrity (--session <id> for specific session)
+  verify      Verify evidence chain integrity (add --json; --session <id> for a session)
   evidence    Evidence management (sessions, export, report)
   policy-pack Manage policy packs (list, show)
   plugin      Manage WASM plugins (search, info, install, list, outdated, remove)
