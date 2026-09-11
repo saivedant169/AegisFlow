@@ -32,6 +32,8 @@ while IFS= read -r line; do
 
   response=$(curl -s --max-time "$CURL_MAX_TIME" -X POST "$AEGISFLOW_MCP_URL" \
     -H "Content-Type: application/json" \
+    -H "X-API-Key: ${AEGISFLOW_API_KEY:-}" \
+    -H "X-AegisFlow-Session-ID: ${AEGISFLOW_SESSION_ID:-}" \
     -d "$line" 2>/dev/null)
 
   if [ -n "$response" ]; then

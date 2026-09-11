@@ -253,8 +253,9 @@ upstream_calls="$(grep -c 'tools/call github.create_pull_request' "$RUN_DIR/mock
 pass "argument change requires new approval"
 
 step "7. Verify restored evidence and tamper response"
+session_id="$(curl -fsS "http://127.0.0.1:$ADMIN_PORT/admin/v1/evidence/sessions" -H "X-API-Key: $API_KEY" | jq -r '.[0].session_id')"
 verify_response="$(curl -fsS -X POST \
-  "http://127.0.0.1:$ADMIN_PORT/admin/v1/evidence/sessions/default/verify" \
+  "http://127.0.0.1:$ADMIN_PORT/admin/v1/evidence/sessions/$session_id/verify" \
   -H "X-API-Key: $API_KEY")"
 jq -e '.valid == true and .total_records == 4' <<<"$verify_response" >/dev/null || \
   fail "restored evidence did not verify"

@@ -1,10 +1,15 @@
 package approval
 
-import "github.com/saivedant169/AegisFlow/internal/envelope"
+import (
+	"fmt"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
+)
 
 // AdminAdapter bridges the Queue to the admin API.
 type AdminAdapter struct {
-	queue *Queue
+	queue  *Queue
+	tenant string
+	scoped bool
 }
 
 func NewAdminAdapter(q *Queue) *AdminAdapter {
@@ -12,29 +17,60 @@ func NewAdminAdapter(q *Queue) *AdminAdapter {
 }
 
 func (a *AdminAdapter) Pending() interface{} {
-	return a.queue.Pending()
+	return a.filter(a.queue.Pending())
 }
 
 func (a *AdminAdapter) History(limit int) interface{} {
-	return a.queue.History(limit)
+	items := a.filter(a.queue.History(0))
+	if limit > 0 && len(items) > limit {
+		items = items[len(items)-limit:]
+	}
+	return items
 }
 
 func (a *AdminAdapter) Get(id string) (interface{}, error) {
-	return a.queue.Get(id)
+	item, err := a.queue.Get(id)
+	if err != nil || !a.visible(item) {
+		return nil, fmt.Errorf("approval not found")
+	}
+	return item, nil
 }
 
 func (a *AdminAdapter) Approve(id, reviewer, comment string) (interface{}, error) {
+	if _, err := a.Get(id); err != nil {
+		return nil, err
+	}
 	return a.queue.Approve(id, reviewer, comment)
 }
 
 func (a *AdminAdapter) Deny(id, reviewer, comment string) (interface{}, error) {
+	if _, err := a.Get(id); err != nil {
+		return nil, err
+	}
 	return a.queue.Deny(id, reviewer, comment)
 }
 
 func (a *AdminAdapter) Submit(env interface{}) (string, error) {
 	e, ok := env.(*envelope.ActionEnvelope)
-	if !ok {
-		return "", nil
+	if !ok || (a.scoped && (a.tenant == "" || e.Actor.TenantID != a.tenant)) {
+		return "", fmt.Errorf("invalid approval scope")
 	}
 	return a.queue.Submit(e)
+}
+
+// ForTenant returns a view that cannot access another tenant's approvals.
+func (a *AdminAdapter) ForTenant(tenant string) interface{} {
+	return &AdminAdapter{queue: a.queue, tenant: tenant, scoped: true}
+}
+func (a *AdminAdapter) visible(item *ApprovalItem) bool {
+	return item != nil && (!a.scoped || (a.tenant != "" && item.Envelope != nil && item.Envelope.Actor.TenantID == a.tenant))
+}
+func (a *AdminAdapter) filter(items []*ApprovalItem) []*ApprovalItem {
+	out := make([]*ApprovalItem, 0)
+	for _, item := range items {
+		if a.visible(item) {
+			out = append(out, item)
+		}
+	}
+	return out
 }

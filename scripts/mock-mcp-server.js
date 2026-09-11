@@ -129,7 +129,7 @@ const server = http.createServer((req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, '0.0.0.0', () => {
+server.listen(port, process.env.HOST || '127.0.0.1', () => {
   console.log(`[mock-mcp] Mock MCP server running on port ${port}`);
   console.log(`[mock-mcp] Available tools: ${tools.map(t => t.name).join(', ')}`);
 });

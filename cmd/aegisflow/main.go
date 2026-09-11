@@ -833,7 +833,7 @@ func main() {
 		mcpGateway := mcpgw.NewGateway(tpEngine, evidenceRegistry, approvalQueue, upstreams)
 		mcpAddr := fmt.Sprintf("%s:%d", cfg.MCPGateway.Host, cfg.MCPGateway.Port)
 
-		var mcpHandler http.Handler = mcpGateway
+		mcpHandler := middleware.SoftAuth(cfg)(mcpGateway)
 		if cfg.MCPGateway.RequireAuth {
 			mcpHandler = middleware.Auth(cfg)(mcpGateway)
 			log.Printf("[init] MCP gateway requires API-key auth")

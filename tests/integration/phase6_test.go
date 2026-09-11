@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/mcpgw"
+	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
 
@@ -39,7 +41,12 @@ func jsonInt(n int) string {
 // helper: POST to a gateway test server.
 func gwPost(t *testing.T, url string, body []byte) *http.Response {
 	t.Helper()
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", url+"/mcp", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-API-Key", "integration-agent")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("POST failed: %v", err)
 	}
@@ -86,7 +93,7 @@ func TestMCPToolCallAllowedE2E(t *testing.T) {
 	gw := mcpgw.NewGateway(pe, ev, aq, []mcpgw.UpstreamConfig{
 		{Name: "github", URL: upstream.URL, Tools: []string{"github.*"}},
 	})
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	body := toolCallBody(t, 1, "github.list_repos", map[string]any{"org": "test"})
@@ -125,7 +132,7 @@ func TestMCPToolCallBlockedE2E(t *testing.T) {
 	aq := approval.NewQueue(100)
 
 	gw := mcpgw.NewGateway(pe, ev, aq, nil)
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	body := toolCallBody(t, 1, "github.delete_repo", map[string]any{"repo": "important"})
@@ -157,7 +164,7 @@ func TestMCPToolCallReviewE2E(t *testing.T) {
 	aq := approval.NewQueue(100)
 
 	gw := mcpgw.NewGateway(pe, ev, aq, nil)
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	body := toolCallBody(t, 1, "github.create_pr", map[string]any{"title": "fix bug"})
@@ -398,7 +405,7 @@ func TestToolPolicyGlobMatchingE2E(t *testing.T) {
 	gw := mcpgw.NewGateway(pe, ev, approval.NewQueue(100), []mcpgw.UpstreamConfig{
 		{Name: "github", URL: upstream.URL, Tools: []string{"github.*"}},
 	})
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	tests := []struct {
@@ -458,7 +465,7 @@ func TestFullLifecycleE2E(t *testing.T) {
 	gw := mcpgw.NewGateway(pe, ev, aq, []mcpgw.UpstreamConfig{
 		{Name: "github", URL: upstream.URL, Tools: []string{"github.*"}},
 	})
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	// Step 1: Allowed read.
@@ -530,7 +537,7 @@ func TestMCPGatewayNoUpstreamE2E(t *testing.T) {
 	ev := evidence.NewSessionChain("sess-no-upstream")
 
 	gw := mcpgw.NewGateway(pe, ev, nil, nil) // no upstreams
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(middleware.Auth(&config.Config{Tenants: []config.TenantConfig{{ID: "integration", APIKeys: []config.APIKeyEntry{{Key: "integration-agent", Role: "viewer"}}}}})(gw))
 	defer srv.Close()
 
 	body := toolCallBody(t, 1, "unknown.tool", map[string]any{})

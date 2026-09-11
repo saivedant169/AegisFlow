@@ -10,10 +10,9 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-    - gosimple
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck

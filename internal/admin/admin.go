@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -298,18 +299,18 @@ func (s *Server) Router() http.Handler {
 	r.Get("/admin/v1/rollouts", s.rolloutsListHandler)
 	r.Get("/admin/v1/rollouts/{id}", s.rolloutGetHandler)
 	r.Get("/admin/v1/whoami", s.whoamiHandler)
-	r.Get("/admin/v1/approvals", s.handleApprovalsPending)
-	r.Get("/admin/v1/approvals/history", s.handleApprovalsHistory)
-	r.Get("/admin/v1/approvals/{id}", s.handleApprovalGet)
+	r.Get("/admin/v1/approvals", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleApprovalsPending }))
+	r.Get("/admin/v1/approvals/history", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleApprovalsHistory }))
+	r.Get("/admin/v1/approvals/{id}", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleApprovalGet }))
 	r.Get("/admin/v1/credentials", s.handleCredentialsList)
 	r.Get("/admin/v1/tickets", s.handleTicketsList)
 	r.Get("/admin/v1/tickets/{id}/verify", s.handleTicketVerify)
-	r.Get("/admin/v1/evidence/sessions", s.handleEvidenceSessions)
-	r.Get("/admin/v1/evidence/sessions/{id}/export", s.handleEvidenceExport)
-	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.handleEvidenceVerify)
-	r.Get("/admin/v1/evidence/sessions/{id}/report", s.handleEvidenceReport)
-	r.Get("/admin/v1/evidence/sessions/{id}/report.html", s.handleEvidenceReportHTML)
-	r.Post("/admin/v1/test-action", s.handleTestAction)
+	r.Get("/admin/v1/evidence/sessions", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleEvidenceSessions }))
+	r.Get("/admin/v1/evidence/sessions/{id}/export", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleEvidenceExport }))
+	r.Post("/admin/v1/evidence/sessions/{id}/verify", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleEvidenceVerify }))
+	r.Get("/admin/v1/evidence/sessions/{id}/report", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleEvidenceReport }))
+	r.Get("/admin/v1/evidence/sessions/{id}/report.html", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleEvidenceReportHTML }))
+	r.With(middleware.RBAC("operator")).Post("/admin/v1/test-action", s.handleTestAction)
 	r.Post("/admin/v1/simulate", s.handleSimulate)
 	r.Get("/admin/v1/actions/{id}/why", s.handleActionWhy)
 	r.Get("/admin/v1/manifests", s.handleManifestList)
@@ -350,8 +351,8 @@ func (s *Server) Router() http.Handler {
 		r.Post("/admin/v1/rollouts/{id}/resume", s.rolloutResumeHandler)
 		r.Post("/admin/v1/rollouts/{id}/rollback", s.rolloutRollbackHandler)
 		r.Post("/admin/v1/alerts/{id}/acknowledge", s.alertAcknowledgeHandler)
-		r.Post("/admin/v1/approvals/{id}/approve", s.handleApprovalApprove)
-		r.Post("/admin/v1/approvals/{id}/deny", s.handleApprovalDeny)
+		r.Post("/admin/v1/approvals/{id}/approve", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleApprovalApprove }))
+		r.Post("/admin/v1/approvals/{id}/deny", s.tenantHandler(func(scoped *Server) http.HandlerFunc { return scoped.handleApprovalDeny }))
 		r.Post("/admin/v1/credentials/{id}/revoke", s.handleCredentialRevoke)
 		r.Post("/admin/v1/tickets/{id}/revoke", s.handleTicketRevoke)
 		r.Post("/admin/v1/policy-versions/{version}/rollback", s.handlePolicyVersionRollback)
@@ -944,10 +945,11 @@ func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
 		Reviewer string `json:"reviewer"`
 		Comment  string `json:"comment"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
-	if body.Reviewer == "" {
-		body.Reviewer = "admin"
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+		return
 	}
+	body.Reviewer = middleware.PrincipalFromContext(r.Context())
 	item, err := s.approvalProvider.Approve(id, body.Reviewer, body.Comment)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -967,10 +969,11 @@ func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 		Reviewer string `json:"reviewer"`
 		Comment  string `json:"comment"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
-	if body.Reviewer == "" {
-		body.Reviewer = "admin"
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
+		writeAPIError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+		return
 	}
+	body.Reviewer = middleware.PrincipalFromContext(r.Context())
 	item, err := s.approvalProvider.Deny(id, body.Reviewer, body.Comment)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -1021,9 +1024,9 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	// Create the action envelope
 	actor := envelope.ActorInfo{
 		Type:      "agent",
-		ID:        "aegisctl-test",
-		SessionID: "test-session",
-		TenantID:  "test-tenant",
+		ID:        middleware.PrincipalFromContext(r.Context()),
+		SessionID: middleware.ScopedSessionID(r.Context(), "test-action"),
+		TenantID:  middleware.TenantFromContext(r.Context()).ID,
 	}
 	env := envelope.NewEnvelope(actor, "test-action", envelope.Protocol(req.Protocol), req.Tool, req.Target, cap)
 	for k, v := range req.Params {
@@ -1479,4 +1482,42 @@ func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Requ
 		"status":         "ok",
 		"rolled_back_to": version,
 	})
+}
+
+// tenantHandler fails closed when a provider cannot enforce tenant scope.
+func (s *Server) tenantHandler(selectHandler func(*Server) http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenant := middleware.TenantFromContext(r.Context())
+		if tenant == nil || middleware.PrincipalFromContext(r.Context()) == "" {
+			writeAPIError(w, http.StatusUnauthorized, "authentication_error", "authentication required")
+			return
+		}
+		scoped := *s
+		type tenantProvider interface{ ForTenant(string) interface{} }
+		if s.approvalProvider != nil {
+			provider, ok := s.approvalProvider.(tenantProvider)
+			if !ok {
+				writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "approval tenant scope unavailable")
+				return
+			}
+			scoped.approvalProvider, ok = provider.ForTenant(tenant.ID).(ApprovalProvider)
+			if !ok {
+				writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "approval tenant scope unavailable")
+				return
+			}
+		}
+		if s.evidenceProvider != nil {
+			provider, ok := s.evidenceProvider.(tenantProvider)
+			if !ok {
+				writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "evidence tenant scope unavailable")
+				return
+			}
+			scoped.evidenceProvider, ok = provider.ForTenant(tenant.ID).(EvidenceProvider)
+			if !ok {
+				writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "evidence tenant scope unavailable")
+				return
+			}
+		}
+		selectHandler(&scoped)(w, r)
+	}
 }

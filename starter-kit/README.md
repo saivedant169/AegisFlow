@@ -19,6 +19,26 @@ You need one of:
 - **Go 1.26.6+** if you want to build from source
 - **Node.js 18+** -- only if you want to run the mock MCP server for testing
 
+## Focused PR-writer installer
+
+From the repository root, run `bash starter-kit/install-pr-writer.sh`. This path requires Go 1.26.6+, Node.js 18+, and curl for the stdio bridge. It builds local binaries and runs free mock services on loopback.
+
+The installer refuses occupied ports. Set `AEGISFLOW_INSTALL_BASE_PORT=18080` to use ports 18080 through 18083. Defaults are 8080, 8081, 8082, and mock port 3000. Existing services are never stopped by port number.
+
+Existing `.mcp.json` settings are merged, with the previous AegisFlow entry backed up in private installation state. Uninstall restores that entry while preserving unrelated changes made later. If the installed entry itself changed, uninstall preserves the file and reports the conflict. Repeated installation refuses to replace a managed running installation: uninstall first, then reinstall.
+
+Agent and reviewer keys are separate, randomly generated, and stored under `.aegisflow-run/` with private permissions. The bridge receives the viewer key. For approval and evidence commands:
+
+```sh
+export AEGISFLOW_API_KEY="$(cat .aegisflow-run/reviewer.key)"
+export AEGISFLOW_ADMIN_URL=http://127.0.0.1:8081
+# Use the aegisctl path printed by the installer.
+```
+
+Generated runtime config and binaries live under `.aegisflow-run/run-*`. User config under `configs/` remains unchanged. `bash starter-kit/uninstall-pr-writer.sh` stops recorded processes and restores the MCP entry; SQLite state, keys, and logs remain for subsequent installs. Legacy PID files alone never authorize stopping a process.
+
+For identity, retry, and upgrade behavior, see [MCP identity boundaries](../docs/mcp-identity.md). Run `make e2e-installer` with Python 3 to verify installation against a disposable checkout.
+
 ## 15-Minute Quickstart
 
 ### Step 1: Install

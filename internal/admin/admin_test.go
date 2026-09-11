@@ -327,6 +327,7 @@ func TestHandleTestAction_Allow(t *testing.T) {
 
 	payload := []byte(`{"protocol":"mcp","tool":"list_repos","target":"github.com/org","capability":"read"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -357,6 +358,7 @@ func TestHandleTestAction_Block(t *testing.T) {
 
 	payload := []byte(`{"protocol":"shell","tool":"rm","target":"/etc","capability":"delete"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -379,6 +381,7 @@ func TestHandleTestAction_Review(t *testing.T) {
 
 	payload := []byte(`{"protocol":"git","tool":"push","target":"main","capability":"deploy"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -403,6 +406,7 @@ func TestHandleTestAction_MissingFields(t *testing.T) {
 
 	payload := []byte(`{"protocol":"mcp"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -418,6 +422,7 @@ func TestHandleTestActionInvalidJSON(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/test-action", bytes.NewReader([]byte(`{`)))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -711,6 +716,7 @@ func TestApprovalsPendingEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -724,6 +730,7 @@ func TestApprovalsHistoryEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/history", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -737,6 +744,7 @@ func TestApprovalsGetEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/appr-1", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -750,6 +758,7 @@ func TestApprovalsGetNotFound(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/approvals/nonexistent", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -764,6 +773,7 @@ func TestApprovalApproveEndpoint(t *testing.T) {
 
 	payload := []byte(`{"reviewer":"bob","comment":"looks good"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/approvals/appr-1/approve", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
@@ -780,6 +790,7 @@ func TestApprovalDenyEndpoint(t *testing.T) {
 
 	payload := []byte(`{"reviewer":"bob","comment":"too risky"}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/approvals/appr-1/deny", bytes.NewReader(payload))
+	req.Header.Set("X-API-Key", "operator-key")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
@@ -797,6 +808,7 @@ func TestEvidenceSessionsEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -810,6 +822,7 @@ func TestEvidenceExportEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions/sess-1/export", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -823,6 +836,7 @@ func TestEvidenceExportNotFound(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/evidence/sessions/missing/export", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -836,6 +850,7 @@ func TestEvidenceVerifyEndpoint(t *testing.T) {
 	router := server.Router()
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/v1/evidence/sessions/sess-1/verify", nil)
+	req.Header.Set("X-API-Key", "operator-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -1377,3 +1392,6 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 		t.Errorf("expected loaded_policy_pack to be removed, got %v", body["loaded_policy_pack"])
 	}
 }
+
+func (s *stubApprovalProvider) ForTenant(string) interface{} { return s }
+func (s *stubEvidenceProvider) ForTenant(string) interface{} { return s }

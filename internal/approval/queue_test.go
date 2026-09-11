@@ -399,3 +399,18 @@ func TestConsumeApprovalForEnvelope_NilSafe(t *testing.T) {
 		t.Fatal("nil envelope must not be approved")
 	}
 }
+
+func TestResolveRejectsExpiredBeforeCleanup(t *testing.T) {
+	queue := NewQueue(10)
+	queue.Timeout = -time.Second
+	id, err := queue.Submit(testEnv("expired"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queue.Approve(id, "reviewer", "late"); err == nil {
+		t.Fatal("expired approval accepted before cleanup")
+	}
+	if queue.ConsumeApprovalForEnvelope(testEnv("expired")) {
+		t.Fatal("expired approval consumed")
+	}
+}

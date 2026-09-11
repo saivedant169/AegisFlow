@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,6 +79,21 @@ func NewPersistentQueue(maxSize int, db *sql.DB, signingKey []byte) (*Queue, err
 	}
 	for _, item := range pending {
 		q.pending[item.ID] = item
+	}
+	// Legacy MCP approvals lack trusted identity and must be reviewed again.
+	items := append(append([]*ApprovalItem{}, history...), pending...)
+	for _, item := range items {
+		actor := item.Envelope.Actor
+		if item.Envelope.Protocol == envelope.ProtocolMCP && (actor.TenantID == "" || actor.SessionID == "" || !strings.HasPrefix(actor.ID, "principal-v1-")) && !item.consumed && (item.Status == StatusPending || item.Status == StatusApproved) {
+			item.Status = StatusExpired
+			if err := store.Save(item); err != nil {
+				return nil, fmt.Errorf("expire legacy approval: %w", err)
+			}
+			if _, ok := q.pending[item.ID]; ok {
+				delete(q.pending, item.ID)
+				q.history = append(q.history, item)
+			}
+		}
 	}
 	return q, nil
 }
@@ -163,7 +179,7 @@ func (q *Queue) Pending() []*ApprovalItem {
 
 	items := make([]*ApprovalItem, 0, len(q.pending))
 	for _, item := range q.pending {
-		items = append(items, item)
+		items = append(items, snapshotItem(item))
 	}
 	return items
 }
@@ -174,11 +190,11 @@ func (q *Queue) Get(id string) (*ApprovalItem, error) {
 	defer q.mu.RUnlock()
 
 	if item, ok := q.pending[id]; ok {
-		return item, nil
+		return snapshotItem(item), nil
 	}
 	for _, item := range q.history {
 		if item.ID == id {
-			return item, nil
+			return snapshotItem(item), nil
 		}
 	}
 	return nil, errors.New("approval item not found: " + id)
@@ -204,6 +220,10 @@ func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, er
 	}
 
 	now := time.Now().UTC()
+	if !now.Before(item.ExpireAt) {
+		q.mu.Unlock()
+		return nil, errors.New("approval item expired: " + id)
+	}
 	updated := *item
 	updated.Status = status
 	updated.ReviewedAt = &now
@@ -343,6 +363,18 @@ func (q *Queue) History(limit int) []*ApprovalItem {
 	}
 	start := len(q.history) - limit
 	result := make([]*ApprovalItem, limit)
-	copy(result, q.history[start:])
+	for i, item := range q.history[start:] {
+		result[i] = snapshotItem(item)
+	}
 	return result
+}
+
+func snapshotItem(item *ApprovalItem) *ApprovalItem {
+	copy := *item
+	copy.Envelope, _ = cloneApprovalEnvelope(item.Envelope)
+	if item.ReviewedAt != nil {
+		reviewed := *item.ReviewedAt
+		copy.ReviewedAt = &reviewed
+	}
+	return &copy
 }

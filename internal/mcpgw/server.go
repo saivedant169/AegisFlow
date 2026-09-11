@@ -99,6 +99,13 @@ func (g *Gateway) Close() {
 // ServeHTTP routes incoming requests to the appropriate handler.
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Path
+	if p == "/health" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		}
+		return
+	}
 
 	// GET /sse -> SSE stream
 	if r.Method == http.MethodGet && p == "/sse" {
@@ -118,12 +125,16 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// POST /mcp -> direct JSON-RPC (original behaviour)
-	if r.Method == http.MethodPost {
+	if r.Method == http.MethodPost && p == "/mcp" {
 		g.handleDirectMessage(w, r)
 		return
 	}
 
-	g.writeError(w, nil, -32600, "method not allowed")
+	if p == "/mcp" || p == "/sse" || strings.HasPrefix(p, "/mcp/session/") {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 // handleDirectMessage is the original synchronous POST /mcp handler.
@@ -136,7 +147,7 @@ func (g *Gateway) handleDirectMessage(w http.ResponseWriter, r *http.Request) {
 
 	switch req.Method {
 	case "tools/call":
-		g.handleToolCall(w, &req)
+		g.handleToolCall(w, &req, requestActor(r, "http:"+r.Header.Get("X-AegisFlow-Session-ID")))
 	case "tools/list":
 		g.handleToolsList(w, &req)
 	case "initialize":
@@ -152,13 +163,17 @@ func (g *Gateway) handleDirectMessage(w http.ResponseWriter, r *http.Request) {
 // with the URL the client should POST JSON-RPC messages to, then keeps the
 // connection open and streams responses back as "message" events.
 func (g *Gateway) handleSSE(w http.ResponseWriter, r *http.Request) {
+	if middleware.PrincipalFromContext(r.Context()) == "" {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	session := g.sse.CreateSession()
+	session := g.sse.createSession(requestActor(r, "sse:"+r.Header.Get("X-AegisFlow-Session-ID")))
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -190,7 +205,8 @@ func (g *Gateway) handleSSE(w http.ResponseWriter, r *http.Request) {
 // response through the corresponding SSE stream.
 func (g *Gateway) handleSessionMessage(w http.ResponseWriter, r *http.Request, sessionID string) {
 	session := g.sse.GetSession(sessionID)
-	if session == nil {
+	caller := requestActor(r, "")
+	if session == nil || session.Actor.ID != caller.ID || session.Actor.TenantID != caller.TenantID {
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
 	}
@@ -220,7 +236,7 @@ func (g *Gateway) processSessionRequest(session *SSESession, req *JSONRPCRequest
 		// Silent acknowledgement – nothing to send back.
 		return
 	case "tools/call":
-		resp = g.processToolCall(req)
+		resp = g.processToolCall(req, session.Actor)
 	case "tools/list":
 		resp = g.processToolsList(req)
 	default:
@@ -266,14 +282,14 @@ func formatUpstreamError(toolName string, upstream *UpstreamConfig, err error) s
 }
 
 // processToolCall evaluates a tools/call request for direct and SSE transports.
-func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
+func (g *Gateway) processToolCall(req *JSONRPCRequest, actor envelope.ActorInfo) JSONRPCResponse {
 	var params ToolCallParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32602, Message: "invalid params"}}
 	}
 
 	env := envelope.NewEnvelope(
-		envelope.ActorInfo{Type: "agent", ID: "mcp-client"},
+		actor,
 		"mcp-session",
 		envelope.ProtocolMCP,
 		params.Name,
@@ -297,6 +313,9 @@ func (g *Gateway) processToolCall(req *JSONRPCRequest) JSONRPCResponse {
 		log.Printf("[mcpgw] BLOCKED tool call: %s", params.Name)
 		return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32001, Message: "tool call blocked by policy: " + params.Name}}
 	case envelope.DecisionReview:
+		if actor.TenantID == "" || actor.ID == "" {
+			return JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Error: &JSONRPCError{Code: -32006, Message: "authentication required for reviewed tool calls"}}
+		}
 		// Check if this tool was already approved
 		if g.approvals != nil && g.approvals.ConsumeApprovalForEnvelope(env) {
 			log.Printf("[mcpgw] PREVIOUSLY APPROVED tool call: %s", params.Name)
@@ -411,8 +430,8 @@ func (g *Gateway) filterToolsByPolicy(id json.RawMessage, resp JSONRPCResponse) 
 	return JSONRPCResponse{JSONRPC: "2.0", ID: id, Result: out}
 }
 
-func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest) {
-	resp := g.processToolCall(req)
+func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest, actor envelope.ActorInfo) {
+	resp := g.processToolCall(req, actor)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
@@ -578,4 +597,14 @@ func splitToolName(tool string) []string {
 
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// requestActor uses authenticated context; client labels only subdivide its scope.
+func requestActor(r *http.Request, sessionLabel string) envelope.ActorInfo {
+	actor := envelope.ActorInfo{Type: "agent", ID: middleware.PrincipalFromContext(r.Context())}
+	if tenant := middleware.TenantFromContext(r.Context()); tenant != nil {
+		actor.TenantID = tenant.ID
+	}
+	actor.SessionID = middleware.ScopedSessionID(r.Context(), sessionLabel)
+	return actor
 }

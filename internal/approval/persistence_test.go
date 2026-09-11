@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/state"
 )
 
@@ -299,5 +300,74 @@ func TestPersistentQueueRejectsDifferentSigningKey(t *testing.T) {
 	defer secondState.Close()
 	if _, err := NewPersistentQueue(100, secondState.DB(), []byte("different-key")); err == nil {
 		t.Fatal("approval state accepted a different signing key")
+	}
+}
+
+func TestPersistentQueueExpiresUnboundMCPApprovals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	db, err := state.OpenSQLite(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := []byte("migration-key")
+	queue, err := NewPersistentQueue(100, db.DB(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"pending", "approved", "consumed", "bound"} {
+		env := testEnv(name)
+		env.Protocol = envelope.ProtocolMCP
+		env.Actor = envelope.ActorInfo{Type: "agent", ID: "mcp-client"}
+		if name == "bound" {
+			env.Actor = envelope.ActorInfo{Type: "agent", ID: "principal-v1-test", TenantID: "tenant-a", SessionID: "session-v1-test"}
+		}
+		id, err := queue.Submit(env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name != "pending" {
+			if _, err := queue.Approve(id, "reviewer", "checked"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if name == "consumed" && !queue.ConsumeApprovalForEnvelope(env) {
+			t.Fatal("consume failed")
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for restart := 0; restart < 2; restart++ {
+		db, err = state.OpenSQLite(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		queue, err = NewPersistentQueue(100, db.DB(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(queue.Pending()) != 0 {
+			t.Fatal("legacy pending approval restored")
+		}
+		for _, name := range []string{"pending", "approved", "consumed", "bound"} {
+			item, err := queue.Get("env-" + name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "pending" || name == "approved" {
+				if item.Status != StatusExpired {
+					t.Fatalf("%s: %s", name, item.Status)
+				}
+			}
+			if name == "consumed" && !item.consumed {
+				t.Fatal("consumed state lost")
+			}
+			if name == "bound" && item.Status != StatusApproved {
+				t.Fatal("bound approval lost")
+			}
+		}
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

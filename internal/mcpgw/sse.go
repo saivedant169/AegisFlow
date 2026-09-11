@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type SSEEvent struct {
 // SSESession tracks a single SSE client connection.
 type SSESession struct {
 	ID      string
+	Actor   envelope.ActorInfo
 	Events  chan SSEEvent
 	Done    chan struct{}
 	Created time.Time
@@ -38,9 +40,17 @@ func NewSSEManager() *SSEManager {
 
 // CreateSession creates a new SSE session with a random ID.
 func (m *SSEManager) CreateSession() *SSESession {
+	return m.createSession(envelope.ActorInfo{})
+}
+
+func (m *SSEManager) createSession(actor envelope.ActorInfo) *SSESession {
 	id := generateSessionID()
+	if actor.SessionID != "" {
+		actor.SessionID += "-" + id
+	}
 	s := &SSESession{
 		ID:      id,
+		Actor:   actor,
 		Events:  make(chan SSEEvent, 64),
 		Done:    make(chan struct{}),
 		Created: time.Now(),

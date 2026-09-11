@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
 
@@ -31,7 +32,10 @@ func TestSSEEndpointEvent(t *testing.T) {
 	engine := toolpolicy.NewEngine(nil, "allow")
 	gw := NewGateway(engine, nil, nil, nil)
 
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-API-Key", "test-agent")
+		middleware.Auth(testIdentityConfig())(gw).ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/sse")
@@ -86,7 +90,10 @@ func TestSSEToolCallViaSession(t *testing.T) {
 		{Name: "github", URL: upstream.URL, Tools: []string{"github.*"}},
 	})
 
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-API-Key", "test-agent")
+		middleware.Auth(testIdentityConfig())(gw).ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	// Connect SSE stream.
@@ -131,7 +138,10 @@ func TestSSEToolCallBlocked(t *testing.T) {
 	}, "block")
 
 	gw := NewGateway(engine, nil, nil, nil)
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-API-Key", "test-agent")
+		middleware.Auth(testIdentityConfig())(gw).ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	sseResp, err := http.Get(srv.URL + "/sse")
@@ -182,7 +192,10 @@ func TestSSESessionCleanup(t *testing.T) {
 func TestSSEInitializeHandshake(t *testing.T) {
 	engine := toolpolicy.NewEngine(nil, "allow")
 	gw := NewGateway(engine, nil, nil, nil)
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-API-Key", "test-agent")
+		middleware.Auth(testIdentityConfig())(gw).ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	sseResp, err := http.Get(srv.URL + "/sse")
@@ -229,7 +242,10 @@ func TestSSEInitializeHandshake(t *testing.T) {
 func TestSSEMultipleRequestsOnOneSession(t *testing.T) {
 	engine := toolpolicy.NewEngine(nil, "allow")
 	gw := NewGateway(engine, nil, nil, nil)
-	srv := httptest.NewServer(gw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-API-Key", "test-agent")
+		middleware.Auth(testIdentityConfig())(gw).ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	sseResp, err := http.Get(srv.URL + "/sse")

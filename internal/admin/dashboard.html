@@ -2298,6 +2298,7 @@ async function fetchWhoami() {
 async function fetchApprovals() {
   try {
     const resp = await fetch('/admin/v1/approvals');
+    if (!resp.ok) throw new Error('Authenticated CLI or API required');
     const data = await resp.json();
     const pending = data.pending || data || [];
     const pendingList = Array.isArray(pending) ? pending : [];
@@ -2331,7 +2332,7 @@ async function fetchApprovals() {
         </td>
       </tr>`;
     }).join('');
-  } catch (e) { console.error('fetchApprovals:', e); }
+  } catch (e) { document.getElementById('approvalsTable').innerHTML = '<tr><td colspan="7">Approval access requires AEGISFLOW_API_KEY through aegisctl or API.</td></tr>'; }
 }
 
 async function approveItem(id) {
@@ -2354,6 +2355,7 @@ async function denyItem(id) {
 async function fetchEvidence() {
   try {
     const resp = await fetch('/admin/v1/evidence/sessions');
+    if (!resp.ok) throw new Error('Authenticated CLI or API required');
     const sessions = await resp.json();
     const list = Array.isArray(sessions) ? sessions : [];
     document.getElementById('evidenceSessionCount').textContent = list.length;
@@ -2384,7 +2386,7 @@ async function fetchEvidence() {
         <td><a href="/admin/v1/evidence/sessions/${s.session_id}/report.html" target="_blank" style="color:var(--accent-blue);text-decoration:none;">View Report</a></td>
       </tr>`;
     }).join('');
-  } catch (e) { console.error('fetchEvidence:', e); }
+  } catch (e) { document.getElementById('evidenceTable').innerHTML = '<tr><td colspan="6">Evidence access requires AEGISFLOW_API_KEY through aegisctl or API.</td></tr>'; }
 }
 
 // --- Governance: Behavioral ---

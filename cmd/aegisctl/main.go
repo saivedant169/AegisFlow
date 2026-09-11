@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -19,7 +20,29 @@ const (
 
 var version = "dev"
 
-var client = &http.Client{Timeout: 10 * time.Second}
+var client = &http.Client{Timeout: 10 * time.Second, Transport: authenticatedTransport{}, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	if req.URL.Scheme != via[0].URL.Scheme || req.URL.Host != via[0].URL.Host {
+		return http.ErrUseLastResponse
+	}
+	return nil
+}}
+
+type authenticatedTransport struct{}
+
+func (authenticatedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	copy := req.Clone(req.Context())
+	admin, err := url.Parse(getEnv("AEGISFLOW_ADMIN_URL", defaultAdminURL))
+	if err != nil {
+		return nil, err
+	}
+	if key := os.Getenv("AEGISFLOW_API_KEY"); key != "" && copy.Header.Get("X-API-Key") == "" && copy.URL.Scheme == admin.Scheme && copy.URL.Host == admin.Host && strings.HasPrefix(copy.URL.Path, "/admin/v1/") {
+		copy.Header.Set("X-API-Key", key)
+	}
+	return http.DefaultTransport.RoundTrip(copy)
+}
 
 func main() {
 	if len(os.Args) < 2 {

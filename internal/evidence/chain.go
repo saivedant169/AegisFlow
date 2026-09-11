@@ -108,6 +108,11 @@ func (c *SessionChain) Record(env *envelope.ActionEnvelope) (*Record, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// A session cannot change tenant while scoped readers export it.
+	if len(c.records) > 0 && c.records[0].Envelope.Actor.TenantID != env.Actor.TenantID {
+		return nil, errors.New("evidence session belongs to another tenant")
+	}
+
 	snapshot, err := cloneEnvelope(env)
 	if err != nil {
 		return nil, fmt.Errorf("copy evidence envelope: %w", err)

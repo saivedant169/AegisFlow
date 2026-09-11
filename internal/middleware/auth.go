@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -14,6 +16,23 @@ type contextKey string
 
 const TenantContextKey contextKey = "tenant"
 const RoleContextKey contextKey = "role"
+const principalContextKey contextKey = "principal"
+
+// PrincipalFromContext identifies the authenticated key without exposing it.
+func PrincipalFromContext(ctx context.Context) string {
+	principal, _ := ctx.Value(principalContextKey).(string)
+	return principal
+}
+
+// ScopedSessionID binds a client session label to authenticated identity.
+func ScopedSessionID(ctx context.Context, label string) string {
+	tenant := TenantFromContext(ctx)
+	if tenant == nil || PrincipalFromContext(ctx) == "" {
+		return ""
+	}
+	data, _ := json.Marshal([]string{"session-v1", tenant.ID, PrincipalFromContext(ctx), label})
+	return fmt.Sprintf("session-v1-%x", sha256.Sum256(data))
+}
 
 func TenantFromContext(ctx context.Context) *config.TenantConfig {
 	t, _ := ctx.Value(TenantContextKey).(*config.TenantConfig)
@@ -29,7 +48,7 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip auth for health checks
-			if r.URL.Path == "/health" {
+			if r.URL.Path == "/health" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -52,6 +71,8 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), TenantContextKey, match.Tenant)
 			ctx = context.WithValue(ctx, RoleContextKey, match.Role)
+			data, _ := json.Marshal([]string{"principal-v1", match.Tenant.ID, apiKey})
+			ctx = context.WithValue(ctx, principalContextKey, fmt.Sprintf("principal-v1-%x", sha256.Sum256(data)))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -78,6 +99,8 @@ func SoftAuth(cfg *config.Config) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), TenantContextKey, match.Tenant)
 			ctx = context.WithValue(ctx, RoleContextKey, match.Role)
+			data, _ := json.Marshal([]string{"principal-v1", match.Tenant.ID, apiKey})
+			ctx = context.WithValue(ctx, principalContextKey, fmt.Sprintf("principal-v1-%x", sha256.Sum256(data)))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

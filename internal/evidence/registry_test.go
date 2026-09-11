@@ -107,3 +107,26 @@ func TestRegistryAdminAdapter(t *testing.T) {
 		t.Fatalf("expected 1 session manifest, got %+v", listed)
 	}
 }
+
+func TestRegistryRejectsCrossTenantSessionAppend(t *testing.T) {
+	registry := NewChainRegistry([]byte("tenant-test-key"))
+	defer registry.Close()
+	first := envelope.NewEnvelope(envelope.ActorInfo{ID: "agent-a", TenantID: "tenant-a", SessionID: "shared-label"}, "task", envelope.ProtocolMCP, "repo.read", "repo", envelope.CapRead)
+	if _, err := registry.Record(first); err != nil {
+		t.Fatal(err)
+	}
+	second := envelope.NewEnvelope(envelope.ActorInfo{ID: "agent-b", TenantID: "tenant-b", SessionID: "shared-label"}, "task", envelope.ProtocolMCP, "repo.read", "repo", envelope.CapRead)
+	if _, err := registry.Record(second); err == nil {
+		t.Fatal("another tenant appended to owned evidence session")
+	}
+	chain, err := registry.get("shared-label")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chain.Count() != 1 {
+		t.Fatal("rejected action changed evidence")
+	}
+	if !VerifySignatures(chain.Records(), []byte("tenant-test-key")).Valid {
+		t.Fatal("rejection damaged evidence integrity")
+	}
+}

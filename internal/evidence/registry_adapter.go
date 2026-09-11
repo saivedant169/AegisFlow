@@ -9,7 +9,9 @@ import (
 // the single-chain AdminAdapter uses, but resolves the right per-session chain
 // for each call.
 type RegistryAdminAdapter struct {
-	reg *ChainRegistry
+	tenant string
+	scoped bool
+	reg    *ChainRegistry
 }
 
 func NewRegistryAdminAdapter(reg *ChainRegistry) *RegistryAdminAdapter {
@@ -21,7 +23,7 @@ func (a *RegistryAdminAdapter) ExportSession(sessionID string) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	if chain == nil {
+	if chain == nil || (a.scoped && !chainOwnedBy(chain, a.tenant)) {
 		return nil, fmt.Errorf("session %q not found", sessionID)
 	}
 	bundle, err := chain.Export()
@@ -36,7 +38,7 @@ func (a *RegistryAdminAdapter) VerifySession(sessionID string) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	if chain == nil {
+	if chain == nil || (a.scoped && !chainOwnedBy(chain, a.tenant)) {
 		return nil, fmt.Errorf("session %q not found", sessionID)
 	}
 	// Verify signatures when the registry is keyed, otherwise just the structure.
@@ -53,7 +55,9 @@ func (a *RegistryAdminAdapter) ListSessions() (interface{}, error) {
 	}
 	manifests := make([]SessionManifest, 0, len(chains))
 	for _, c := range chains {
-		manifests = append(manifests, c.Manifest())
+		if !a.scoped || chainOwnedBy(c, a.tenant) {
+			manifests = append(manifests, c.Manifest())
+		}
 	}
 	return manifests, nil
 }
@@ -63,7 +67,7 @@ func (a *RegistryAdminAdapter) RenderReport(sessionID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if chain == nil {
+	if chain == nil || (a.scoped && !chainOwnedBy(chain, a.tenant)) {
 		return "", fmt.Errorf("session %q not found", sessionID)
 	}
 	return RenderMarkdownReport(chain)
@@ -74,8 +78,13 @@ func (a *RegistryAdminAdapter) RenderHTMLReport(sessionID string) (string, error
 	if err != nil {
 		return "", err
 	}
-	if chain == nil {
+	if chain == nil || (a.scoped && !chainOwnedBy(chain, a.tenant)) {
 		return "", fmt.Errorf("session %q not found", sessionID)
 	}
 	return RenderHTMLReport(chain)
+}
+
+// ForTenant returns a view limited to evidence owned by one tenant.
+func (a *RegistryAdminAdapter) ForTenant(tenant string) interface{} {
+	return &RegistryAdminAdapter{reg: a.reg, tenant: tenant, scoped: true}
 }

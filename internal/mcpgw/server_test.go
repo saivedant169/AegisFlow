@@ -11,8 +11,10 @@ import (
 	"testing"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
+	"github.com/saivedant169/AegisFlow/internal/middleware"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
 
@@ -127,7 +129,8 @@ func TestToolCallReview(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	gw.ServeHTTP(rec, req)
+	req.Header.Set("X-API-Key", "test-agent")
+	middleware.Auth(testIdentityConfig())(gw).ServeHTTP(rec, req)
 
 	var resp JSONRPCResponse
 	json.NewDecoder(rec.Body).Decode(&resp)
@@ -552,7 +555,8 @@ func TestToolCallReportsApprovalQueueFailure(t *testing.T) {
 	body := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"repo.write","arguments":{}}}`)
 	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
-	gw.ServeHTTP(rec, req)
+	req.Header.Set("X-API-Key", "test-agent")
+	middleware.Auth(testIdentityConfig())(gw).ServeHTTP(rec, req)
 
 	var response JSONRPCResponse
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
@@ -594,5 +598,35 @@ func TestGatewayReflectsEngineRuleChanges(t *testing.T) {
 
 	if r := call(); r.Error == nil || r.Error.Code != -32001 {
 		t.Fatalf("expected a policy block after the rule change, got %+v", r.Error)
+	}
+}
+
+func testIdentityConfig() *config.Config {
+	return &config.Config{Tenants: []config.TenantConfig{{ID: "test-tenant", APIKeys: []config.APIKeyEntry{{Key: "test-agent", Role: "viewer"}}}}}
+}
+
+func TestAnonymousReviewNeverCreatesApproval(t *testing.T) {
+	queue := approval.NewQueue(10)
+	gateway := NewGateway(toolpolicy.NewEngine([]toolpolicy.ToolRule{{Protocol: "mcp", Tool: "repo.write", Decision: "review"}}, "block"), nil, queue, nil)
+	defer gateway.Close()
+	request := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"repo.write","arguments":{}}}`))
+	response := httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	var rpc JSONRPCResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &rpc); err != nil {
+		t.Fatal(err)
+	}
+	if rpc.Error == nil || rpc.Error.Code != -32006 {
+		t.Fatalf("anonymous review response: %s", response.Body.String())
+	}
+	if len(queue.Pending()) != 0 {
+		t.Fatal("anonymous approval queued")
+	}
+	for _, method := range []string{"GET", "HEAD"} {
+		response = httptest.NewRecorder()
+		middleware.Auth(testIdentityConfig())(gateway).ServeHTTP(response, httptest.NewRequest(method, "/health", nil))
+		if response.Code != 200 {
+			t.Fatalf("%s health: %d", method, response.Code)
+		}
 	}
 }
