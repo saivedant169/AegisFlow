@@ -17,7 +17,7 @@ aegisctl models
 
 Use origins without URL credentials, path prefixes, queries, or fragments. A trailing slash is accepted. The CLI sends the configured key only to `/admin/v1/` paths on the configured admin origin and `/v1/` paths on the configured gateway origin. Health checks receive no API key. Plugin registry and artifact downloads use separate unauthenticated clients.
 
-No demonstration key is supplied implicitly. The `test` and `models` commands use the same environment credential as admin commands. Use a credential assigned the required role on the server; an agent key is not automatically a reviewer key. The PR-writer installer provides a separate reviewer key, described in the [starter kit](../starter-kit/README.md).
+No demonstration key is supplied implicitly. The `test` and `models` commands use the same environment credential as admin commands. Use a credential assigned the required role on the server; an agent key is not automatically a reviewer key. The PR-writer installer provides a separate reviewer key, described in the [starter kit](https://github.com/saivedant169/AegisFlow/blob/main/starter-kit/README.md).
 
 Provider listings and several diagnostic admin endpoints remain public on the admin listener. Protected approval and evidence endpoints require authentication. Setting a client key does not change server endpoint permissions. Keep the admin listener private.
 
