@@ -487,6 +487,16 @@ func writePluginsConfig(path string, cfg PluginsConfig) error {
 
 // writePluginFile replaces a complete file only after its new contents close successfully.
 func writePluginFile(path string, data []byte) error {
+	mode := os.FileMode(0644)
+	info, err := os.Lstat(path)
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing to replace non-regular plugin file: %s", path)
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspecting plugin file: %w", err)
+	}
 	f, err := os.CreateTemp(filepath.Dir(path), ".plugin-*")
 	if err != nil {
 		return err
@@ -500,7 +510,7 @@ func writePluginFile(path string, data []byte) error {
 		cleanup.Close(f)
 		return err
 	}
-	if err := f.Chmod(0644); err != nil {
+	if err := f.Chmod(mode); err != nil {
 		cleanup.Close(f)
 		return err
 	}

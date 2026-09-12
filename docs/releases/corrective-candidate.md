@@ -53,3 +53,7 @@ The installer resolves `latest` once through the release API, then downloads the
 ## Remaining release gate
 
 These changes do not certify release readiness. Full repository lint, complete claim reconciliation, and exact-candidate release checks remain required. Credential issuance cannot be re-enabled until its identity, scope, revocation, and failure-handling requirements are implemented and tested.
+
+## Plugin file updates
+
+Plugin configuration updates preserve existing file permission bits. Updates reject symlink and other non-regular destinations instead of silently replacing them. If your plugin config is a symlink, use the actual regular config file path where the command supports it, or manage that configuration separately. Plugin removal reports an error before deleting the plugin binary when config persistence fails.

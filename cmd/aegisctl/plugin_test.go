@@ -135,3 +135,45 @@ func TestPluginInstallRollsBackOnConfigFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestPluginReplacementPreservesPermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "plugins.yaml")
+	if err := os.WriteFile(path, []byte("previous"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePluginFile(path, []byte("updated")); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("permissions widened: got %o, want 600", info.Mode().Perm())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "updated" {
+		t.Fatalf("replacement failed: %q %v", data, err)
+	}
+}
+
+func TestPluginReplacementRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.yaml")
+	link := filepath.Join(dir, "plugins.yaml")
+	if err := os.WriteFile(target, []byte("previous"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePluginFile(link, []byte("updated")); err == nil {
+		t.Fatal("symlink replacement claimed success")
+	}
+	if got, err := os.Readlink(link); err != nil || got != target {
+		t.Fatalf("symlink changed: %q %v", got, err)
+	}
+	if got, err := os.ReadFile(target); err != nil || string(got) != "previous" {
+		t.Fatalf("target changed: %q %v", got, err)
+	}
+}

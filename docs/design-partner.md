@@ -1,5 +1,7 @@
 # Design-partner program
 
+Start with [first-user discovery](design-partner/discovery.md) before scheduling installations. Four qualified interviews and two concrete trial commitments are the expansion gate.
+
 A repeatable process for turning interest into real onboarding. The goal of a
 design partner is not a logo — it is **one real install and honest friction
 data** from someone who is not already inside your head.

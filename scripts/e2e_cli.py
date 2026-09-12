@@ -70,8 +70,8 @@ def main():
         env = {k: v for k, v in os.environ.items() if not k.startswith("AEGISFLOW_")}
         env["AEGISFLOW_API_KEY"] = KEY
 
-        def run(args, success, overrides=None, contains=None):
-            result = subprocess.run([binary, *args], env=env | (overrides or {}), capture_output=True, text=True, timeout=20)
+        def run(args, success, overrides=None, contains=None, cwd=None):
+            result = subprocess.run([binary, *args], env=env | (overrides or {}), capture_output=True, text=True, timeout=20, cwd=cwd)
             assert (result.returncode == 0) == success, (args, result.returncode, result.stdout, result.stderr)
             assert KEY not in result.stdout + result.stderr, "credential disclosed"
             assert "panic:" not in result.stderr, result.stderr
@@ -117,6 +117,27 @@ def main():
                 run([command, "--dry-run", "--protocol", "shell", "--tool", "get_item", "--target", "fixture"], True, contains="local")
             assert len(Fixture.seen) == before, "local or invalid command contacted server"
         print("PASS: compiled CLI authentication, failures, redaction, redirects, JSON requests, explicit local mode")
+
+        plugin_config = tmp / "plugins.yaml"
+        wasm = tmp / "demo.wasm"
+        plugin_yaml = 'policies:\n  input:\n    - name: demo\n      path: demo.wasm\n'
+        plugin_config.write_text(plugin_yaml)
+        plugin_config.chmod(0o600)
+        wasm.write_bytes(b"plugin fixture")
+        run(["plugin", "remove", "demo"], True, contains="Removed", cwd=tmp)
+        assert plugin_config.stat().st_mode & 0o777 == 0o600, "private config permissions widened"
+        assert not wasm.exists(), "removed plugin still exists"
+        target = tmp / "original.yaml"
+        target.write_text(plugin_yaml)
+        target.chmod(0o600)
+        plugin_config.unlink()
+        plugin_config.symlink_to(target)
+        wasm.write_bytes(b"plugin fixture")
+        run(["plugin", "remove", "demo"], False, contains="non-regular", cwd=tmp)
+        assert plugin_config.is_symlink(), "config symlink replaced"
+        assert target.read_text() == plugin_yaml, "symlink target changed"
+        assert wasm.read_bytes() == b"plugin fixture", "failed removal deleted plugin"
+        print("PASS: plugin removal preserves private config permissions and rejects symlink replacement")
 
         gateway = tmp / "aegisflow"
         subprocess.run(["go", "build", "-o", str(gateway), "./cmd/aegisflow"], cwd=ROOT, check=True, timeout=600)
