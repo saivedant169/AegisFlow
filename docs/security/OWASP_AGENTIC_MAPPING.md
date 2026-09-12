@@ -6,11 +6,11 @@
 
 > **Enforcement status:** Controls **wired into the runtime today**: MCP gateway
 > + `toolpolicy` engine, input/output policy, behavioral analysis + kill-switch,
-> RBAC, approval queue, task-scoped credentials, signed evidence chain, WASM
+> RBAC, approval queue, signed evidence chain, WASM
 > plugin sandbox (wazero). The **execution-gate sandboxes** (shell, SQL, Git,
 > HTTP), **network policy**, and the **identity / separation-of-duties
 > hierarchy** are experimental libraries — unit-tested but **not yet wired**.
-> Mappings that name them describe planned, not shipped, mitigations.
+> Mappings that name them describe planned, not shipped, mitigations. Runtime upstream credential issuance is disabled; credential-related entries below are design goals, not available protection. See [runtime support](../runtime-support.md).
 
 ---
 
@@ -231,7 +231,7 @@ rules:
 2. **RBAC** with three-role hierarchy (admin, operator, viewer) for the control plane
 3. **Separation of duties** ensures policy authors cannot approve their own policies
 4. **Per-protocol policy evaluation** enforces access control consistently across MCP, shell, SQL, Git, and HTTP
-5. **Task-scoped credentials** replace inherited user tokens with short-lived, least-privilege access
+5. **Task-scoped credentials** remain a design goal; runtime issuance is disabled
 6. **Environment-aware policies** differentiate between dev, staging, and production
 
 **Verification:** Attempt to approve an action with a viewer-role API key. Confirm it is denied with 403 Forbidden.

@@ -1,5 +1,5 @@
 site_name: AegisFlow
-site_description: Local-first policy gateway for coding agents, MCP tools, approvals, scoped credentials, and tamper-evident evidence.
+site_description: Local-first policy gateway for coding agents, MCP tools, approvals, and tamper-evident evidence.
 site_url: https://saivedant169.github.io/AegisFlow/
 repo_url: https://github.com/saivedant169/AegisFlow
 repo_name: saivedant169/AegisFlow
@@ -56,6 +56,7 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - Runtime support: runtime-support.md
   - Getting started:
       - Local quickstart: getting-started.md
       - Governed PR proof: PR_WRITER.md

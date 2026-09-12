@@ -359,8 +359,11 @@ func TestHTTPProxyAllowGetE2E(t *testing.T) {
 
 	// Evidence should record the allowed request.
 	records := ev.Records()
-	if len(records) != 1 {
-		t.Fatalf("expected 1 evidence record, got %d", len(records))
+	if len(records) != 2 {
+		t.Fatalf("expected decision and outcome records, got %d", len(records))
+	}
+	if records[0].Envelope.Result != nil || records[1].Envelope.Result == nil || !records[1].Envelope.Result.Success {
+		t.Fatal("missing dispatch lifecycle evidence")
 	}
 	if records[0].Envelope.PolicyDecision != envelope.DecisionAllow {
 		t.Errorf("expected allow in evidence, got %s", records[0].Envelope.PolicyDecision)

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // UpstreamClient communicates with a single upstream MCP server.
@@ -46,7 +48,7 @@ func (u *UpstreamClient) Send(req *JSONRPCRequest) (*JSONRPCResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("upstream %s: %w", u.name, err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

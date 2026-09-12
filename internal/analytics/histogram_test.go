@@ -1,6 +1,8 @@
 package analytics
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestHistogramEmpty(t *testing.T) {
 	var h latencyHistogram
@@ -35,7 +37,7 @@ func TestHistogramMonotonic(t *testing.T) {
 		h.observe(i)
 	}
 	p50, p95, p99 := h.percentile(50), h.percentile(95), h.percentile(99)
-	if !(p50 <= p95 && p95 <= p99) {
+	if p50 > p95 || p95 > p99 {
 		t.Fatalf("percentiles must be monotonic, got p50=%d p95=%d p99=%d", p50, p95, p99)
 	}
 	// p50 of a uniform 1..1000 spread should land near the middle, not the tail.

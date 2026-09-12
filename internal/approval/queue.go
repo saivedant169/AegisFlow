@@ -252,9 +252,10 @@ func (q *Queue) resolve(id, status, reviewer, comment string) (*ApprovalItem, er
 
 	q.mu.Unlock()
 
-	if status == StatusApproved {
+	switch status {
+	case StatusApproved:
 		q.notify(item, Notifier.NotifyApproved)
-	} else if status == StatusDenied {
+	case StatusDenied:
 		q.notify(item, Notifier.NotifyDenied)
 	}
 

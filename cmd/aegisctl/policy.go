@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"text/tabwriter"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 func cmdPolicyHistory(adminURL string) {
@@ -14,7 +16,7 @@ func cmdPolicyHistory(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var versions []struct {
 		Version         int    `json:"version"`
@@ -34,16 +36,19 @@ func cmdPolicyHistory(adminURL string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "VERSION\tTIMESTAMP\tRULES\tDEFAULT\tSOURCE")
+	checkOutput(fmt.Fprintln(tw, "VERSION\tTIMESTAMP\tRULES\tDEFAULT\tSOURCE"))
 	for _, v := range versions {
 		ts := v.Timestamp
 		if len(ts) > 19 {
 			ts = ts[:19]
 		}
-		fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\n",
-			v.Version, ts, v.RuleCount, v.DefaultDecision, v.Source)
+		checkOutput(fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\n",
+			v.Version, ts, v.RuleCount, v.DefaultDecision, v.Source))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdPolicyCurrent(adminURL string) {
@@ -52,7 +57,7 @@ func cmdPolicyCurrent(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var version map[string]interface{}
 	if err := decodeJSON(resp, &version); err != nil {
@@ -72,11 +77,14 @@ func cmdPolicyRollback(adminURL string, versionStr string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		var result map[string]interface{}
-		decodeJSON(resp, &result)
+		if err := decodeJSON(resp, &result); err != nil {
+			fmt.Fprintln(os.Stderr, "Error: invalid rollback response")
+			os.Exit(1)
+		}
 		fmt.Fprintf(os.Stderr, "Error (%d): %v\n", resp.StatusCode, result)
 		os.Exit(1)
 	}

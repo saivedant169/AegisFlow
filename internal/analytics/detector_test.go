@@ -89,7 +89,7 @@ func TestBaselineAnomalyDetected(t *testing.T) {
 	for m := 0; m < 80; m++ {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
 		// Alternate between 9 and 11 requests to produce non-zero stddev
-		count := 10
+		var count int
 		if m%2 == 0 {
 			count = 9
 		} else {
@@ -230,7 +230,7 @@ func TestBaselineExactly60Buckets(t *testing.T) {
 	// Record exactly 60 minutes of steady traffic (boundary case for the >= 60 check).
 	for m := 0; m < 55; m++ {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
-		count := 10
+		var count int
 		if m%2 == 0 {
 			count = 8
 		} else {

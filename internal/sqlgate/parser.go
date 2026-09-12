@@ -14,8 +14,7 @@ type SQLClassification struct {
 }
 
 var (
-	reLeadingWhitespace = regexp.MustCompile(`^\s+`)
-	reExtraSpaces       = regexp.MustCompile(`\s+`)
+	reExtraSpaces = regexp.MustCompile(`\s+`)
 )
 
 // ClassifySQL performs keyword-based classification of a SQL query string.

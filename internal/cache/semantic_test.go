@@ -12,10 +12,10 @@ func newTestEmbedder() *MockEmbedder {
 	// "hello" and "hi" get similar vectors; "goodbye" gets a different one.
 	return &MockEmbedder{
 		EmbedFn: func(ctx context.Context, text string) ([]float64, error) {
-			switch {
-			case text == "user: hello\n" || text == "user: hi there\n":
+			switch text {
+			case "user: hello\n", "user: hi there\n":
 				return []float64{0.9, 0.1, 0.0}, nil
-			case text == "user: goodbye\n":
+			case "user: goodbye\n":
 				return []float64{0.0, 0.1, 0.9}, nil
 			default:
 				return []float64{0.5, 0.5, 0.0}, nil

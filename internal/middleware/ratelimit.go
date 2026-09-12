@@ -28,7 +28,10 @@ func RateLimit(limiter ratelimit.Limiter) func(http.Handler) http.Handler {
 				log.Printf("rate limiter error (denying request): %v", err)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(503, "service_error", "rate limiter unavailable — try again later"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(503, "service_error", "rate limiter unavailable: try again later")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 
@@ -36,7 +39,10 @@ func RateLimit(limiter ratelimit.Limiter) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", "60")
 				w.WriteHeader(http.StatusTooManyRequests)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(429, "rate_limit_error", "rate limit exceeded — retry after 60 seconds"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(429, "rate_limit_error", "rate limit exceeded: retry after 60 seconds")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 

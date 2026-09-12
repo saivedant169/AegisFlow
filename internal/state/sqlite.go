@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // SQLite owns the local runtime state database shared by approval and evidence stores.
@@ -42,7 +44,7 @@ func OpenSQLite(path string) (*SQLite, error) {
 	db.SetMaxIdleConns(1)
 
 	closeOnError := func(err error) (*SQLite, error) {
-		_ = db.Close()
+		cleanup.Close(db)
 		return nil, err
 	}
 	if err := db.Ping(); err != nil {

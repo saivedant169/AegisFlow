@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/analytics"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type AnalyticsStore struct {
@@ -86,7 +87,7 @@ func (s *AnalyticsStore) QueryAggregates(dim, period string, from, to time.Time)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var result []analytics.BucketSummary
 	for rows.Next() {

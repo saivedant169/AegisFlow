@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"time"
 
@@ -107,7 +108,7 @@ func (o *OllamaProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -187,7 +188,7 @@ func (o *OllamaProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		cleanup.Close(resp.Body)
 		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -196,8 +197,8 @@ func (o *OllamaProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 	// To:      data: {"choices":[{"delta":{"content":"hi"}}]}\n\n
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
-		defer resp.Body.Close()
+		defer cleanup.Close(pw)
+		defer cleanup.Close(resp.Body)
 
 		decoder := json.NewDecoder(resp.Body)
 		id := fmt.Sprintf("aegis-ollama-%d", time.Now().UnixNano())
@@ -214,8 +215,12 @@ func (o *OllamaProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 					Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{}, FinishReason: "stop"}},
 				}
 				data, _ := json.Marshal(finalChunk)
-				fmt.Fprintf(pw, "data: %s\n\n", data)
-				fmt.Fprint(pw, "data: [DONE]\n\n")
+				if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+					return
+				}
+				if _, err := fmt.Fprint(pw, "data: [DONE]\n\n"); err != nil {
+					return
+				}
 				break
 			}
 
@@ -224,7 +229,9 @@ func (o *OllamaProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 				Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{Content: chunk.Message.Content}}},
 			}
 			data, _ := json.Marshal(sseChunk)
-			fmt.Fprintf(pw, "data: %s\n\n", data)
+			if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+				return
+			}
 		}
 	}()
 
@@ -237,7 +244,7 @@ func (o *OllamaProvider) Models(ctx context.Context) ([]types.Model, error) {
 	if err == nil {
 		resp, err := o.client.Do(req)
 		if err == nil {
-			defer resp.Body.Close()
+			defer cleanup.Close(resp.Body)
 			var result struct {
 				Models []struct {
 					Name string `json:"name"`
@@ -277,6 +284,6 @@ func (o *OllamaProvider) Healthy(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	cleanup.Close(resp.Body)
 	return resp.StatusCode == http.StatusOK
 }

@@ -122,7 +122,7 @@ This sends 20 attack scenarios and verifies AegisFlow blocks or flags each one.
 2. AegisFlow normalizes it into an `ActionEnvelope`
 3. Policy engine evaluates rules and returns allow/review/block
 4. If review: action enters the approval queue; operator approves or denies
-5. If allowed: AegisFlow issues task-scoped credentials and executes
+5. If allowed: AegisFlow forwards the routed MCP call to its configured upstream. Runtime upstream credential issuance is disabled.
 6. Result recorded in the tamper-evident evidence chain
 
 ---

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 func cmdVerify(adminURL string, args []string) {
@@ -29,7 +31,7 @@ func cmdVerify(adminURL string, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var result VerifyResponse
 	if err := decodeJSON(resp, &result); err != nil {
@@ -77,12 +79,12 @@ func formatVerifyResult(r VerifyResponse) string {
 	} else {
 		sb.WriteString("FAIL  Evidence chain verification failed\n")
 	}
-	sb.WriteString(fmt.Sprintf("  Total entries: %d\n", r.TotalRecords))
+	fmt.Fprintf(&sb, "  Total entries: %d\n", r.TotalRecords)
 	if !r.Valid && r.ErrorAtIndex > 0 {
-		sb.WriteString(fmt.Sprintf("  Error at index: %d\n", r.ErrorAtIndex))
+		fmt.Fprintf(&sb, "  Error at index: %d\n", r.ErrorAtIndex)
 	}
 	if r.Message != "" {
-		sb.WriteString(fmt.Sprintf("  Message: %s\n", r.Message))
+		fmt.Fprintf(&sb, "  Message: %s\n", r.Message)
 	}
 	return sb.String()
 }

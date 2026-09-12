@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // SlackNotifier sends approval lifecycle messages to a Slack webhook.
@@ -162,7 +163,7 @@ func (s *SlackNotifier) send(payload slackPayload) error {
 	if err != nil {
 		return fmt.Errorf("slack: send webhook: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("slack: webhook returned status %d", resp.StatusCode)

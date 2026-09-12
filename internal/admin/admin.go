@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"log"
+
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -13,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 
 	"github.com/saivedant169/AegisFlow/internal/cache"
 	"github.com/saivedant169/AegisFlow/internal/config"
@@ -377,12 +380,17 @@ func (s *Server) GetRequestLog() *RequestLog {
 func writeAPIError(w http.ResponseWriter, code int, errType, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message))
+	if err := json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"ok"}`))
+	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+		return
+	}
 }
 
 func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
@@ -409,19 +417,25 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		// A simple GET request to the root should return something or at least connect
 		resp, err := client.Get(mcpURL)
 		if err == nil {
-			resp.Body.Close()
+			cleanup.Close(resp.Body)
 			status["mcp_gateway"] = "reachable"
 		} else {
 			status["mcp_gateway"] = "unreachable"
 		}
 	}
 
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) usageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.tracker.GetAllUsage())
+	if err := json.NewEncoder(w).Encode(s.tracker.GetAllUsage()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +469,10 @@ func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(providers)
+	if err := json.NewEncoder(w).Encode(providers); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) tenantsHandler(w http.ResponseWriter, r *http.Request) {
@@ -481,7 +498,10 @@ func (s *Server) tenantsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tenants)
+	if err := json.NewEncoder(w).Encode(tenants); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) policiesHandler(w http.ResponseWriter, r *http.Request) {
@@ -509,26 +529,40 @@ func (s *Server) policiesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(policies)
+	if err := json.NewEncoder(w).Encode(policies); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) violationsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.requestLog.RecentViolations(100))
+	if err := json.NewEncoder(w).Encode(s.requestLog.RecentViolations(100)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) cacheHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.cache != nil {
-		json.NewEncoder(w).Encode(s.cache.Stats())
+		if err := json.NewEncoder(w).Encode(s.cache.Stats()); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 	} else {
-		json.NewEncoder(w).Encode(cache.CacheStats{})
+		if err := json.NewEncoder(w).Encode(cache.CacheStats{}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 	}
 }
 
 func (s *Server) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(dashboardHTML)
+	if _, err := w.Write(dashboardHTML); err != nil {
+		return
+	}
 }
 
 // --- Rollout handlers ---
@@ -554,7 +588,10 @@ func (s *Server) rolloutsListHandler(w http.ResponseWriter, r *http.Request) {
 		result = []any{}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 type createRolloutRequest struct {
@@ -607,7 +644,10 @@ func (s *Server) rolloutsCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(created)
+	if err := json.NewEncoder(w).Encode(created); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) rolloutGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -622,7 +662,10 @@ func (s *Server) rolloutGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) rolloutPauseHandler(w http.ResponseWriter, r *http.Request) {
@@ -635,7 +678,10 @@ func (s *Server) rolloutPauseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) rolloutResumeHandler(w http.ResponseWriter, r *http.Request) {
@@ -648,7 +694,10 @@ func (s *Server) rolloutResumeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -661,7 +710,10 @@ func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Budget handlers ---
@@ -669,16 +721,22 @@ func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) 
 func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.budgetProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"statuses":  []interface{}{},
 			"forecasts": []interface{}{},
-		})
+		}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"statuses":  s.budgetProvider.AllStatuses(),
 		"forecasts": s.budgetProvider.ForecastAll(),
-	})
+	}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Cost optimization handlers ---
@@ -686,11 +744,17 @@ func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCostRecommendations(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.costOptProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": []interface{}{}})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": []interface{}{}}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
 	recs := s.costOptProvider.Recommendations()
-	json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": recs})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": recs}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Analytics handlers ---
@@ -710,10 +774,13 @@ func (s *Server) analyticsHandler(w http.ResponseWriter, r *http.Request) {
 	dims := s.analyticsProvider.Dimensions()
 	summary := s.analyticsProvider.RealtimeSummary()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"dimensions": dims,
 		"summary":    summary,
-	})
+	}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) analyticsRealtimeHandler(w http.ResponseWriter, r *http.Request) {
@@ -721,7 +788,10 @@ func (s *Server) analyticsRealtimeHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.analyticsProvider.RealtimeSummary())
+	if err := json.NewEncoder(w).Encode(s.analyticsProvider.RealtimeSummary()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) alertsHandler(w http.ResponseWriter, r *http.Request) {
@@ -729,7 +799,10 @@ func (s *Server) alertsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.analyticsProvider.RecentAlerts(100))
+	if err := json.NewEncoder(w).Encode(s.analyticsProvider.RecentAlerts(100)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request) {
@@ -739,7 +812,10 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	if s.analyticsProvider.AcknowledgeAlert(id) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 	} else {
 		writeAPIError(w, http.StatusNotFound, "not_found", "alert not found")
 	}
@@ -750,7 +826,10 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 	if s.auditProvider == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]interface{}{})
+		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
 	actor := r.URL.Query().Get("actor")
@@ -764,13 +843,19 @@ func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) auditVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	if s.auditProvider == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"valid": true, "message": "audit not configured"})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"valid": true, "message": "audit not configured"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
 	result, err := s.auditProvider.Verify()
@@ -779,7 +864,10 @@ func (s *Server) auditVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Whoami handler ---
@@ -793,7 +881,10 @@ func (s *Server) whoamiHandler(w http.ResponseWriter, r *http.Request) {
 		resp["tenant_name"] = tenant.Name
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Evidence handlers ---
@@ -816,7 +907,10 @@ func (s *Server) handleEvidenceSessions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessions)
+	if err := json.NewEncoder(w).Encode(sessions); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleEvidenceExport(w http.ResponseWriter, r *http.Request) {
@@ -830,7 +924,10 @@ func (s *Server) handleEvidenceExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
@@ -844,7 +941,10 @@ func (s *Server) handleEvidenceVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleEvidenceReport(w http.ResponseWriter, r *http.Request) {
@@ -858,7 +958,9 @@ func (s *Server) handleEvidenceReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	w.Write([]byte(report))
+	if _, err := w.Write([]byte(report)); err != nil {
+		return
+	}
 }
 
 func (s *Server) handleEvidenceReportHTML(w http.ResponseWriter, r *http.Request) {
@@ -872,7 +974,9 @@ func (s *Server) handleEvidenceReportHTML(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(report))
+	if _, err := w.Write([]byte(report)); err != nil {
+		return
+	}
 }
 
 // --- Credential handlers ---
@@ -880,10 +984,16 @@ func (s *Server) handleEvidenceReportHTML(w http.ResponseWriter, r *http.Request
 func (s *Server) handleCredentialsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.credentialProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"credentials": []interface{}{}})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"credentials": []interface{}{}}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"credentials": s.credentialProvider.ActiveCredentials()})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"credentials": s.credentialProvider.ActiveCredentials()}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) {
@@ -897,7 +1007,10 @@ func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Approval handlers ---
@@ -905,19 +1018,31 @@ func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleApprovalsPending(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.approvalProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"pending": []interface{}{}})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"pending": []interface{}{}}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"pending": s.approvalProvider.Pending()})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"pending": s.approvalProvider.Pending()}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleApprovalsHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.approvalProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"history": s.approvalProvider.History(100)})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"history": s.approvalProvider.History(100)}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleApprovalGet(w http.ResponseWriter, r *http.Request) {
@@ -932,7 +1057,10 @@ func (s *Server) handleApprovalGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(item)
+	if err := json.NewEncoder(w).Encode(item); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
@@ -956,7 +1084,10 @@ func (s *Server) handleApprovalApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(item)
+	if err := json.NewEncoder(w).Encode(item); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
@@ -980,7 +1111,10 @@ func (s *Server) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(item)
+	if err := json.NewEncoder(w).Encode(item); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Test Action handler ---
@@ -1060,10 +1194,16 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 		}
 	case envelope.DecisionReview:
 		resp.Message = "Action requires human review"
-		if s.approvalProvider != nil {
-			s.approvalProvider.Submit(env)
-			resp.ApprovalID = env.ID
+		if s.approvalProvider == nil {
+			writeAPIError(w, http.StatusServiceUnavailable, "approval_unavailable", "approval queue unavailable")
+			return
 		}
+		approvalID, err := s.approvalProvider.Submit(env)
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, "approval_unavailable", "could not persist approval")
+			return
+		}
+		resp.ApprovalID = approvalID
 	case envelope.DecisionBlock:
 		resp.Message = "Action is blocked by policy"
 	}
@@ -1083,7 +1223,10 @@ func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Simulate handler (POST /admin/v1/simulate) ---
@@ -1125,7 +1268,10 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Why handler (GET /admin/v1/actions/{id}/why) ---
@@ -1154,7 +1300,10 @@ func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(trace)
+	if err := json.NewEncoder(w).Encode(trace); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Manifest handlers ---
@@ -1162,10 +1311,16 @@ func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleManifestList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		json.NewEncoder(w).Encode([]interface{}{})
+		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.manifestProvider.List())
+	if err := json.NewEncoder(w).Encode(s.manifestProvider.List()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleManifestGet(w http.ResponseWriter, r *http.Request) {
@@ -1180,7 +1335,10 @@ func (s *Server) handleManifestGet(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(m)
+	if err := json.NewEncoder(w).Encode(m); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleManifestDrift(w http.ResponseWriter, r *http.Request) {
@@ -1190,7 +1348,10 @@ func (s *Server) handleManifestDrift(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "manifest provider not available")
 		return
 	}
-	json.NewEncoder(w).Encode(s.manifestProvider.GetDrift(id))
+	if err := json.NewEncoder(w).Encode(s.manifestProvider.GetDrift(id)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 type createManifestRequest struct {
@@ -1266,7 +1427,10 @@ func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
 
 	result, _ := s.manifestProvider.Get(id)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request) {
@@ -1280,7 +1444,10 @@ func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"status": "deactivated"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "deactivated"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Capability ticket handlers ---
@@ -1288,10 +1455,16 @@ func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request
 func (s *Server) handleTicketsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.capabilityProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"tickets": []interface{}{}})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"tickets": []interface{}{}}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"tickets": s.capabilityProvider.ActiveTickets()})
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{"tickets": s.capabilityProvider.ActiveTickets()}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleTicketRevoke(w http.ResponseWriter, r *http.Request) {
@@ -1305,7 +1478,10 @@ func (s *Server) handleTicketRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "revoked"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "revoked"}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
@@ -1320,22 +1496,31 @@ func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleSupplyChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.supplyChainProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"enabled": false,
 			"assets":  []interface{}{},
-		})
+		}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"enabled": true,
 		"assets":  s.supplyChainProvider.ListAssets(),
-	})
+	}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
@@ -1346,12 +1531,15 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.behavioralProvider == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"enabled":    false,
 			"session_id": sessionID,
 			"risk_score": 0,
 			"alerts":     []interface{}{},
-		})
+		}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
 	result, err := s.behavioralProvider.SessionRisk(sessionID)
@@ -1363,25 +1551,40 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusNotFound, "not_found", "session not found")
 		return
 	}
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleHealthDetailed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
-		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.resilienceProvider.DetailedHealth())
+	if err := json.NewEncoder(w).Encode(s.resilienceProvider.DetailedHealth()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleResilienceDegradation(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
-		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.resilienceProvider.DegradationModes())
+	if err := json.NewEncoder(w).Encode(s.resilienceProvider.DegradationModes()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Request) {
@@ -1396,25 +1599,40 @@ func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Req
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(snap)
+	if err := json.NewEncoder(w).Encode(snap); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleResilienceBackupsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
-		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.resilienceProvider.ListBackups())
+	if err := json.NewEncoder(w).Encode(s.resilienceProvider.ListBackups()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
-		json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.resilienceProvider.RetentionStats())
+	if err := json.NewEncoder(w).Encode(s.resilienceProvider.RetentionStats()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // --- Policy version handlers ---
@@ -1422,10 +1640,16 @@ func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Reques
 func (s *Server) handlePolicyVersionsList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.policyVersionProvider == nil {
-		json.NewEncoder(w).Encode([]interface{}{})
+		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 		return
 	}
-	json.NewEncoder(w).Encode(s.policyVersionProvider.ListVersions())
+	if err := json.NewEncoder(w).Encode(s.policyVersionProvider.ListVersions()); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handlePolicyVersionCurrent(w http.ResponseWriter, r *http.Request) {
@@ -1439,7 +1663,10 @@ func (s *Server) handlePolicyVersionCurrent(w http.ResponseWriter, r *http.Reque
 		writeAPIError(w, http.StatusNotFound, "not_found", "no policy versions recorded")
 		return
 	}
-	json.NewEncoder(w).Encode(cur)
+	if err := json.NewEncoder(w).Encode(cur); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handlePolicyVersionGet(w http.ResponseWriter, r *http.Request) {
@@ -1459,7 +1686,10 @@ func (s *Server) handlePolicyVersionGet(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Request) {
@@ -1478,10 +1708,13 @@ func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Requ
 		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":         "ok",
 		"rolled_back_to": version,
-	})
+	}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // tenantHandler fails closed when a provider cannot enforce tenant scope.

@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // apiClient keeps credentials and error bodies inside the configured API boundary.
@@ -70,7 +72,7 @@ func (c *apiClient) Do(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("API request failed; check endpoint configuration and connectivity")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		_ = resp.Body.Close()
+		cleanup.Close(resp.Body)
 		// Do not print response bodies: proxies can echo credentials and request data.
 		return nil, fmt.Errorf("API returned HTTP %d (%s)", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}

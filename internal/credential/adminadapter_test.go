@@ -1,6 +1,7 @@
 package credential
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func TestAdminAdapterActiveCredentials_Redacted(t *testing.T) {
 
 	// Issue a credential so there's something active
 	req := CredentialRequest{TaskID: "task-1", Target: "repo", Capability: "read", TTL: 10 * time.Minute}
-	_, _, err := reg.Issue(nil, "static", req, "env-1")
+	_, _, err := reg.Issue(context.Background(), "static", req, "env-1")
 	if err != nil {
 		t.Fatalf("issue failed: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestAdminAdapterRevokeCredential(t *testing.T) {
 	adapter := NewAdminAdapter(reg)
 
 	req := CredentialRequest{TaskID: "t1", Target: "r", Capability: "read", TTL: 5 * time.Minute}
-	cred, _, _ := reg.Issue(nil, "static", req, "env-1")
+	cred, _, _ := reg.Issue(context.Background(), "static", req, "env-1")
 
 	if err := adapter.RevokeCredential(cred.ID); err != nil {
 		t.Fatalf("revoke failed: %v", err)

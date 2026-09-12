@@ -2,9 +2,13 @@ package httpgate
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
@@ -195,11 +199,14 @@ func TestEvidenceRecorded(t *testing.T) {
 	rec := httptest.NewRecorder()
 	proxy.ServeHTTP(rec, req)
 
-	if chain.Count() != 1 {
-		t.Errorf("expected 1 evidence record, got %d", chain.Count())
+	if chain.Count() != 2 {
+		t.Fatalf("expected decision and outcome records, got %d", chain.Count())
 	}
 
 	records := chain.Records()
+	if records[0].Envelope.Result != nil || records[1].Envelope.Result == nil || !records[1].Envelope.Result.Success {
+		t.Fatal("expected pre-dispatch decision followed by successful outcome")
+	}
 	if records[0].Envelope.Tool != "stripe.get_v1" {
 		t.Errorf("expected tool stripe.get_v1, got %s", records[0].Envelope.Tool)
 	}
@@ -242,5 +249,60 @@ func TestMethodToCapabilityMapping(t *testing.T) {
 				t.Errorf("methodToCapability(%s) = %s, want %s", tt.method, got, tt.want)
 			}
 		})
+	}
+}
+
+type failingChain struct{ calls, failAt int }
+
+func (f *failingChain) SessionID() string { return "failure-test" }
+func (f *failingChain) Record(*envelope.ActionEnvelope) (*evidence.Record, error) {
+	f.calls++
+	if f.calls == f.failAt {
+		return nil, errors.New("storage unavailable")
+	}
+	return &evidence.Record{}, nil
+}
+
+func TestEvidenceFailureStopsDispatchOrSuccess(t *testing.T) {
+	for _, failAt := range []int{1, 2} {
+		t.Run(fmt.Sprint(failAt), func(t *testing.T) {
+			var dispatched atomic.Int32
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { dispatched.Add(1); w.WriteHeader(200) }))
+			defer upstream.Close()
+			proxy, _ := setupProxy(t, nil, "allow", upstream)
+			proxy.chain = &failingChain{failAt: failAt}
+			rec := httptest.NewRecorder()
+			proxy.ServeHTTP(rec, httptest.NewRequest("POST", "/stripe/charge", nil))
+			if rec.Code != 503 {
+				t.Fatalf("status=%d, want 503", rec.Code)
+			}
+			if got := dispatched.Load(); got != int32(failAt-1) {
+				t.Fatalf("upstream calls=%d", got)
+			}
+			if failAt == 2 && !strings.Contains(rec.Body.String(), "do not retry automatically") {
+				t.Fatal("missing ambiguous execution warning")
+			}
+		})
+	}
+}
+
+func TestReviewQueueUnavailable(t *testing.T) {
+	for _, queue := range []*approval.Queue{nil, approval.NewQueue(0)} {
+		proxy, _ := setupProxy(t, nil, "review", nil)
+		proxy.queue = queue
+		rec := httptest.NewRecorder()
+		proxy.ServeHTTP(rec, httptest.NewRequest("POST", "/stripe/charge", nil))
+		if rec.Code != 503 || strings.Contains(rec.Body.String(), "pending_review") {
+			t.Fatalf("false pending review: %d %s", rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestMissingEvidenceReturnsUnavailable(t *testing.T) {
+	proxy := NewProxy(toolpolicy.NewEngine(nil, "allow"), nil, nil, nil)
+	rec := httptest.NewRecorder()
+	proxy.ServeHTTP(rec, httptest.NewRequest("GET", "/stripe/balance", nil))
+	if rec.Code != 503 {
+		t.Fatalf("status=%d, want 503", rec.Code)
 	}
 }

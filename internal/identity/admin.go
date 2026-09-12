@@ -1,6 +1,8 @@
 package identity
 
 import (
+	"log"
+
 	"encoding/json"
 	"net/http"
 
@@ -51,17 +53,20 @@ func (h *AdminHandler) RegisterRoutes(r chi.Router) {
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	errType := "server_error"
-	switch {
-	case status == 400:
+	switch status {
+	case 400:
 		errType = "invalid_request"
-	case status == 404:
+	case 404:
 		errType = "not_found"
-	case status == 409:
+	case 409:
 		errType = "conflict"
 	}
 	writeJSON(w, status, types.NewErrorResponse(status, errType, msg))

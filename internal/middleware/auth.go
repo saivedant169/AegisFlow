@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -57,7 +59,10 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 			if apiKey == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(401, "authentication_error", "missing API key — use X-API-Key header or Authorization: Bearer <key>"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(401, "authentication_error", "missing API key: use X-API-Key header or Authorization: Bearer <key>")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 
@@ -65,7 +70,10 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 			if match == nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(401, "authentication_error", "invalid API key"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(401, "authentication_error", "invalid API key")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 
@@ -92,7 +100,7 @@ func SoftAuth(cfg *config.Config) func(http.Handler) http.Handler {
 
 			match := cfg.FindTenantByAPIKey(apiKey)
 			if match == nil {
-				// Invalid key — still proceed but without context
+				// Invalid key: still proceed but without context
 				next.ServeHTTP(w, r)
 				return
 			}

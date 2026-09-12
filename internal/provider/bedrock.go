@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"strings"
@@ -103,7 +104,7 @@ func (b *BedrockProvider) ChatCompletion(ctx context.Context, req *types.ChatCom
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -128,7 +129,7 @@ func (b *BedrockProvider) ChatCompletionStream(ctx context.Context, req *types.C
 
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
+		defer cleanup.Close(pw)
 		id := fmt.Sprintf("aegis-bedrock-%d", time.Now().UnixNano())
 
 		chunk := types.StreamChunk{
@@ -136,15 +137,21 @@ func (b *BedrockProvider) ChatCompletionStream(ctx context.Context, req *types.C
 			Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{Content: resp.Choices[0].Message.Content}}},
 		}
 		data, _ := json.Marshal(chunk)
-		fmt.Fprintf(pw, "data: %s\n\n", data)
+		if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+			return
+		}
 
 		finalChunk := types.StreamChunk{
 			ID: id, Object: "chat.completion.chunk", Created: time.Now().Unix(), Model: req.Model,
 			Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{}, FinishReason: "stop"}},
 		}
 		data, _ = json.Marshal(finalChunk)
-		fmt.Fprintf(pw, "data: %s\n\n", data)
-		fmt.Fprint(pw, "data: [DONE]\n\n")
+		if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+			return
+		}
+		if _, err := fmt.Fprint(pw, "data: [DONE]\n\n"); err != nil {
+			return
+		}
 	}()
 
 	return pr, nil

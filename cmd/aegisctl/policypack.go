@@ -105,16 +105,19 @@ func cmdPolicyPackList(args []string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tDEFAULT\tRULES\tDESCRIPTION")
-	fmt.Fprintln(tw, "────\t───────\t─────\t───────────")
+	checkOutput(fmt.Fprintln(tw, "NAME\tDEFAULT\tRULES\tDESCRIPTION"))
+	checkOutput(fmt.Fprintln(tw, "────\t───────\t─────\t───────────"))
 	for _, p := range packs {
 		desc := p.Description
 		if len(desc) > 60 {
 			desc = desc[:57] + "..."
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", p.Name, p.DefaultDecision, len(p.Rules), desc)
+		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", p.Name, p.DefaultDecision, len(p.Rules), desc))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdPolicyPackShow(name string, args []string) {
@@ -152,8 +155,8 @@ func cmdPolicyPackShow(name string, args []string) {
 	fmt.Println()
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PROTOCOL\tTOOL\tTARGET\tCAPABILITY\tDECISION")
-	fmt.Fprintln(tw, "────────\t────\t──────\t──────────\t────────")
+	checkOutput(fmt.Fprintln(tw, "PROTOCOL\tTOOL\tTARGET\tCAPABILITY\tDECISION"))
+	checkOutput(fmt.Fprintln(tw, "────────\t────\t──────\t──────────\t────────"))
 	for _, r := range found.Rules {
 		target := r.Target
 		if target == "" {
@@ -163,7 +166,10 @@ func cmdPolicyPackShow(name string, args []string) {
 		if cap == "" {
 			cap = "*"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.Protocol, r.Tool, target, cap, strings.ToUpper(r.Decision))
+		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.Protocol, r.Tool, target, cap, strings.ToUpper(r.Decision)))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }

@@ -1,4 +1,7 @@
 ---
+
+> Archived launch draft for v0.9.0. Do not publish as the development candidate announcement. Runtime upstream credential issuance is disabled; verify release artifacts and version-specific claims before reuse.
+
 title: Put policy between coding agent and its tools
 published: false
 description: A real allow, block, review, retry, and evidence flow with AegisFlow v0.9.0.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type AuditEntry struct {
@@ -75,7 +77,7 @@ func (s *PostgresStore) GetAuditLog(ctx context.Context, tenantID string, limit 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var entries []AuditEntry
 	for rows.Next() {

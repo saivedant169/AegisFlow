@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"time"
 )
@@ -88,7 +89,7 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, text string) ([]float64, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(resp.Body)

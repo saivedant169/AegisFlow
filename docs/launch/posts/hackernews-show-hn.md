@@ -1,5 +1,8 @@
 # Show HN: AegisFlow, local policy gateway for coding agents and MCP tools
 
+> Archived launch draft for v0.9.0. Do not publish as the development candidate announcement. Runtime upstream credential issuance is disabled; verify release artifacts and version-specific claims before reuse.
+
+
 I built AegisFlow because coding agents now call tools with real side effects, while most setups still hand them standing credentials and review results after execution.
 
 AegisFlow is an Apache-2.0 Go service that sits on configured MCP, OpenAI-compatible, or Anthropic Messages API path. Routed tool calls become an `ActionEnvelope` with actor, task, protocol, tool, target, arguments, and requested capability. Policy returns `allow`, `review`, or `block` before upstream execution.

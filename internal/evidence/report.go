@@ -16,20 +16,20 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# Evidence Report: %s\n\n", manifest.SessionID))
-	sb.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().UTC().Format(time.RFC3339)))
+	fmt.Fprintf(&sb, "# Evidence Report: %s\n\n", manifest.SessionID)
+	fmt.Fprintf(&sb, "**Generated:** %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Summary table
 	sb.WriteString("## Summary\n\n")
 	sb.WriteString("| Metric | Value |\n")
 	sb.WriteString("|--------|-------|\n")
-	sb.WriteString(fmt.Sprintf("| Total Actions | %d |\n", manifest.TotalActions))
-	sb.WriteString(fmt.Sprintf("| Allowed | %d |\n", manifest.Allowed))
-	sb.WriteString(fmt.Sprintf("| Reviewed | %d |\n", manifest.Reviewed))
-	sb.WriteString(fmt.Sprintf("| Blocked | %d |\n", manifest.Blocked))
-	sb.WriteString(fmt.Sprintf("| Chain Valid | %v |\n", verify.Valid))
-	sb.WriteString(fmt.Sprintf("| First Hash | `%s` |\n", truncHash(manifest.FirstHash)))
-	sb.WriteString(fmt.Sprintf("| Last Hash | `%s` |\n", truncHash(manifest.LastHash)))
+	fmt.Fprintf(&sb, "| Total Actions | %d |\n", manifest.TotalActions)
+	fmt.Fprintf(&sb, "| Allowed | %d |\n", manifest.Allowed)
+	fmt.Fprintf(&sb, "| Reviewed | %d |\n", manifest.Reviewed)
+	fmt.Fprintf(&sb, "| Blocked | %d |\n", manifest.Blocked)
+	fmt.Fprintf(&sb, "| Chain Valid | %v |\n", verify.Valid)
+	fmt.Fprintf(&sb, "| First Hash | `%s` |\n", truncHash(manifest.FirstHash))
+	fmt.Fprintf(&sb, "| Last Hash | `%s` |\n", truncHash(manifest.LastHash))
 	sb.WriteString("\n")
 
 	if manifest.TotalActions == 0 {
@@ -42,8 +42,8 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 	if verify.Valid {
 		sb.WriteString("All record hashes verified. Chain is intact.\n\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("**INTEGRITY FAILURE** at record %d: %s\n\n",
-			verify.ErrorAtIndex, verify.Message))
+		fmt.Fprintf(&sb, "**INTEGRITY FAILURE** at record %d: %s\n\n",
+			verify.ErrorAtIndex, verify.Message)
 	}
 
 	// Action timeline
@@ -52,14 +52,13 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 	sb.WriteString("|---|------|------|--------|----------|------|\n")
 	for _, r := range records {
 		decision := strings.ToUpper(string(r.Envelope.PolicyDecision))
-		sb.WriteString(fmt.Sprintf("| %d | %s | %s | %s | %s | `%s` |\n",
+		fmt.Fprintf(&sb, "| %d | %s | %s | %s | %s | `%s` |\n",
 			r.Index,
 			r.Timestamp.Format("15:04:05"),
 			r.Envelope.Tool,
 			truncTarget(r.Envelope.Target),
 			decision,
-			truncHash(r.Hash),
-		))
+			truncHash(r.Hash))
 	}
 
 	return sb.String(), nil

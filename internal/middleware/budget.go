@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+
 	"encoding/json"
 	"net/http"
 
@@ -40,7 +42,10 @@ func BudgetCheck(checkFn BudgetCheckFunc) func(http.Handler) http.Handler {
 			if !allowed {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusTooManyRequests)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(429, "budget_exceeded", blockMsg))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(429, "budget_exceeded", blockMsg)); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 

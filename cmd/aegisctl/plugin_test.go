@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestCompareVersion(t *testing.T) {
 	tests := []struct {
@@ -47,5 +52,86 @@ func TestCollectOutdatedPlugins(t *testing.T) {
 	}
 	if outdated[1].Name != "unknown-version" || outdated[1].InstalledVersion != "" || outdated[1].LatestVersion != "0.5.0" {
 		t.Fatalf("unexpected second outdated plugin: %+v", outdated[1])
+	}
+}
+
+func TestPluginCommandsRejectMalformedConfig(t *testing.T) {
+	t.Chdir(t.TempDir())
+	original := []byte("policies: [invalid")
+	if err := os.WriteFile("plugins.yaml", original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, run := range []func() error{
+		func() error { return pluginList(nil) },
+		func() error { return pluginRemove([]string{"demo"}) },
+		func() error { return pluginInstall([]string{"demo"}) },
+	} {
+		if err := run(); err == nil || !strings.Contains(err.Error(), "parsing plugins config") {
+			t.Fatalf("expected parse failure: %v", err)
+		}
+		data, err := os.ReadFile("plugins.yaml")
+		if err != nil || string(data) != string(original) {
+			t.Fatal("malformed config changed")
+		}
+	}
+}
+func TestPluginConfigIOFailures(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := readPluginsConfig(dir); err == nil {
+		t.Fatal("directory read claimed empty config")
+	}
+	path := filepath.Join(dir, "occupied")
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writePluginsConfig(path, PluginsConfig{}); err == nil {
+		t.Fatal("replacement of directory claimed success")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 || !entries[0].IsDir() {
+		t.Fatalf("temporary file leaked: %v %v", entries, err)
+	}
+}
+func TestPluginRemoveReportsPartialFailure(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir("occupied", 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("occupied/keep", []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := PluginsConfig{}
+	cfg.Policies.Input = []PluginPolicyEntry{{Name: "demo", Path: "occupied"}}
+	if err := writePluginsConfig("plugins.yaml", cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := pluginRemove([]string{"demo"}); err == nil || !strings.Contains(err.Error(), "file removal failed") {
+		t.Fatalf("expected partial failure: %v", err)
+	}
+	if _, err := os.Stat("occupied/keep"); err != nil {
+		t.Fatal("unrelated file removed")
+	}
+}
+
+func TestPluginInstallRollsBackOnConfigFailure(t *testing.T) {
+	for _, existing := range []bool{true, false} {
+		dir := t.TempDir()
+		wasm := filepath.Join(dir, "demo.wasm")
+		if existing {
+			if err := os.WriteFile(wasm, []byte("previous"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		err := persistPluginInstall(wasm, []byte("new"), filepath.Join(dir, "missing", "plugins.yaml"), PluginsConfig{})
+		if err == nil {
+			t.Fatal("failed config write claimed install success")
+		}
+		got, readErr := os.ReadFile(wasm)
+		if existing && (readErr != nil || string(got) != "previous") {
+			t.Fatalf("previous binary lost: %s %v", got, readErr)
+		}
+		if !existing && !os.IsNotExist(readErr) {
+			t.Fatalf("orphan binary remains: %v", readErr)
+		}
 	}
 }

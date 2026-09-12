@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
@@ -90,7 +91,7 @@ func remoteSimulate(adminURL, protocol, tool, target, capability string) (*simul
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("server returned %d", resp.StatusCode)
@@ -139,31 +140,30 @@ func formatSimulateOutput(r *simulateResponse) string {
 	// Decision
 	switch r.Decision {
 	case "allow":
-		sb.WriteString(fmt.Sprintf("Decision:       %sALLOWED%s\n", colorGreen, colorReset))
+		fmt.Fprintf(&sb, "Decision:       %sALLOWED%s\n", colorGreen, colorReset)
 	case "review":
-		sb.WriteString(fmt.Sprintf("Decision:       %sREVIEW REQUIRED%s\n", colorYellow, colorReset))
+		fmt.Fprintf(&sb, "Decision:       %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
 	case "block":
-		sb.WriteString(fmt.Sprintf("Decision:       %sBLOCKED%s\n", colorRed, colorReset))
+		fmt.Fprintf(&sb, "Decision:       %sBLOCKED%s\n", colorRed, colorReset)
 	default:
-		sb.WriteString(fmt.Sprintf("Decision:       %s\n", r.Decision))
+		fmt.Fprintf(&sb, "Decision:       %s\n", r.Decision)
 	}
 
-	sb.WriteString(fmt.Sprintf("Action:         %s\n", r.Action))
+	fmt.Fprintf(&sb, "Action:         %s\n", r.Action)
 
 	if r.Trace != nil {
 		if r.Trace.DefaultUsed {
 			sb.WriteString("Matched rule:   (default)\n")
 		} else if r.Trace.MatchedRule != nil {
-			sb.WriteString(fmt.Sprintf("Matched rule:   #%d [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+			fmt.Fprintf(&sb, "Matched rule:   #%d [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
 				r.Trace.MatchedIndex,
 				r.Trace.MatchedRule.Protocol,
 				r.Trace.MatchedRule.Tool,
 				r.Trace.MatchedRule.Target,
 				r.Trace.MatchedRule.Capability,
-				r.Trace.MatchedRule.Decision,
-			))
+				r.Trace.MatchedRule.Decision)
 		}
-		sb.WriteString(fmt.Sprintf("Rules checked:  %d\n", r.Trace.RulesChecked))
+		fmt.Fprintf(&sb, "Rules checked:  %d\n", r.Trace.RulesChecked)
 
 		sb.WriteString("\nTrace:\n")
 		for _, step := range r.Trace.CheckTrace {
@@ -175,11 +175,10 @@ func formatSimulateOutput(r *simulateResponse) string {
 			if step.FailReason != "" {
 				reason = " (" + step.FailReason + ")"
 			}
-			sb.WriteString(fmt.Sprintf("  [%d] %s  protocol=%s tool=%s target=%s cap=%s -> %s%s\n",
+			fmt.Fprintf(&sb, "  [%d] %s  protocol=%s tool=%s target=%s cap=%s -> %s%s\n",
 				step.RuleIndex, status,
 				step.Rule.Protocol, step.Rule.Tool, step.Rule.Target,
-				step.Rule.Capability, step.Rule.Decision, reason,
-			))
+				step.Rule.Capability, step.Rule.Decision, reason)
 		}
 	}
 
@@ -200,7 +199,7 @@ func cmdWhy(adminURL string, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		body, err := io.ReadAll(resp.Body)
@@ -317,37 +316,37 @@ func formatDiffOutput(diff *toolpolicy.DiffResult) string {
 	sb.WriteString(strings.Repeat("-", 60) + "\n")
 
 	if len(diff.Added) > 0 {
-		sb.WriteString(fmt.Sprintf("\n%sAdded rules:%s\n", colorGreen, colorReset))
+		fmt.Fprintf(&sb, "\n%sAdded rules:%s\n", colorGreen, colorReset)
 		for _, r := range diff.Added {
-			sb.WriteString(fmt.Sprintf("  + [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
-				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision))
+			fmt.Fprintf(&sb, "  + [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision)
 		}
 	}
 
 	if len(diff.Removed) > 0 {
-		sb.WriteString(fmt.Sprintf("\n%sRemoved rules:%s\n", colorRed, colorReset))
+		fmt.Fprintf(&sb, "\n%sRemoved rules:%s\n", colorRed, colorReset)
 		for _, r := range diff.Removed {
-			sb.WriteString(fmt.Sprintf("  - [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
-				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision))
+			fmt.Fprintf(&sb, "  - [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision)
 		}
 	}
 
 	if len(diff.Changed) > 0 {
-		sb.WriteString(fmt.Sprintf("\n%sChanged rules:%s\n", colorYellow, colorReset))
+		fmt.Fprintf(&sb, "\n%sChanged rules:%s\n", colorYellow, colorReset)
 		for _, c := range diff.Changed {
-			sb.WriteString(fmt.Sprintf("  ~ [%d] %s -> %s\n", c.Index, c.Before.Decision, c.After.Decision))
-			sb.WriteString(fmt.Sprintf("    before: protocol=%s tool=%s target=%s cap=%s\n",
-				c.Before.Protocol, c.Before.Tool, c.Before.Target, c.Before.Capability))
-			sb.WriteString(fmt.Sprintf("    after:  protocol=%s tool=%s target=%s cap=%s\n",
-				c.After.Protocol, c.After.Tool, c.After.Target, c.After.Capability))
+			fmt.Fprintf(&sb, "  ~ [%d] %s -> %s\n", c.Index, c.Before.Decision, c.After.Decision)
+			fmt.Fprintf(&sb, "    before: protocol=%s tool=%s target=%s cap=%s\n",
+				c.Before.Protocol, c.Before.Tool, c.Before.Target, c.Before.Capability)
+			fmt.Fprintf(&sb, "    after:  protocol=%s tool=%s target=%s cap=%s\n",
+				c.After.Protocol, c.After.Tool, c.After.Target, c.After.Capability)
 		}
 	}
 
 	if len(diff.Impact) > 0 {
-		sb.WriteString(fmt.Sprintf("\n%sImpacted actions:%s\n", colorRed, colorReset))
+		fmt.Fprintf(&sb, "\n%sImpacted actions:%s\n", colorRed, colorReset)
 		for _, ia := range diff.Impact {
-			sb.WriteString(fmt.Sprintf("  ! %s (%s): %s -> %s\n",
-				ia.Tool, ia.Protocol, ia.OldDecision, ia.NewDecision))
+			fmt.Fprintf(&sb, "  ! %s (%s): %s -> %s\n",
+				ia.Tool, ia.Protocol, ia.OldDecision, ia.NewDecision)
 		}
 	}
 

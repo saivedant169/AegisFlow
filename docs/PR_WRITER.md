@@ -128,18 +128,11 @@ Starter installer enables SQLite state under `.aegisflow-run/state.db` and keeps
 
 ![AegisFlow signed evidence verification](assets/shot-evidence-verification.png)
 
-Hash chain detects edits, deletions, and reordered records. It does not prove calls outside AegisFlow never happened.
+Hash links and signatures detect changes to retained records. Detecting a removed tail or an omitted session requires an independently retained checkpoint or export. Verification does not prove calls outside AegisFlow never happened.
 
-## Scoped credentials
+## Upstream credentials
 
-GitHub App and AWS STS brokers can issue task-specific credentials after policy and approval checks. Local proof uses mock upstream, so it does not mint real credential.
-
-Before enabling broker:
-
-1. Configure installation or role with narrow base permissions.
-2. Store private key or cloud credential outside repository.
-3. Confirm requested repository, action, and expiry in evidence.
-4. Test denial and expiry before production use.
+Runtime upstream credential issuance is disabled in this development candidate. The local proof uses a mock upstream and mints no provider credentials. See [candidate migration](releases/corrective-candidate.md).
 
 ## Connect editor
 

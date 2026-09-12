@@ -117,6 +117,7 @@ type stubApprovalProvider struct {
 	historyItems []map[string]interface{}
 	approveErr   error
 	denyErr      error
+	submitErr    error
 }
 
 func (s *stubApprovalProvider) Pending() interface{}          { return s.pendingItems }
@@ -146,7 +147,7 @@ func (s *stubApprovalProvider) Deny(id, reviewer, comment string) (interface{}, 
 	}
 	return map[string]interface{}{"id": id, "status": "denied", "reviewer": reviewer}, nil
 }
-func (s *stubApprovalProvider) Submit(env interface{}) (string, error) { return "sub-1", nil }
+func (s *stubApprovalProvider) Submit(env interface{}) (string, error) { return "sub-1", s.submitErr }
 
 type stubEvidenceProvider struct{}
 
@@ -377,6 +378,7 @@ func TestHandleTestAction_Block(t *testing.T) {
 func TestHandleTestAction_Review(t *testing.T) {
 	server := newIntegrationAdminServer()
 	server.toolPolicyProvider = &stubToolPolicyProvider{decision: "review"}
+	server.approvalProvider = &stubApprovalProvider{}
 	router := server.Router()
 
 	payload := []byte(`{"protocol":"git","tool":"push","target":"main","capability":"deploy"}`)
@@ -1395,3 +1397,21 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 
 func (s *stubApprovalProvider) ForTenant(string) interface{} { return s }
 func (s *stubEvidenceProvider) ForTenant(string) interface{} { return s }
+
+func TestTestActionReviewSubmissionFailure(t *testing.T) {
+	for _, provider := range []ApprovalProvider{nil, &stubApprovalProvider{submitErr: errors.New("storage unavailable")}} {
+		server := newIntegrationAdminServer()
+		server.toolPolicyProvider = &stubToolPolicyProvider{decision: "review"}
+		server.approvalProvider = provider
+		req := httptest.NewRequest("POST", "/admin/v1/test-action", strings.NewReader(`{"protocol":"git","tool":"push","target":"main","capability":"deploy"}`))
+		req.Header.Set("X-API-Key", "operator-key")
+		rec := httptest.NewRecorder()
+		server.Router().ServeHTTP(rec, req)
+		if rec.Code != 503 {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body)
+		}
+		if strings.Contains(rec.Body.String(), "approval_id") {
+			t.Fatal("failed submission claimed an approval")
+		}
+	}
+}

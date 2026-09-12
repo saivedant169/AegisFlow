@@ -41,7 +41,7 @@ docker compose -f deployments/docker-compose.yaml up --build
 
 ## Your First Request
 
-AegisFlow ships with a mock provider enabled by default, so you can start making requests immediately without any API keys.
+AegisFlow ships with a mock provider enabled by default, so no paid provider key is needed. Requests still require a configured tenant key; the following local demo uses the key shipped in the example configuration.
 
 ```bash
 # Check the gateway is running
@@ -100,7 +100,7 @@ export OPENAI_API_KEY="sk-..."
 make run
 ```
 
-Now requests for configured OpenAI-backed models will route to OpenAI with automatic fallback to the mock provider.
+Add a matching route whose provider list includes the enabled provider. Fallback occurs only when configured in that route; enabling a provider alone does not change routing.
 
 ## Monitoring
 

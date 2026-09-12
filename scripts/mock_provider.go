@@ -66,7 +66,10 @@ func newMockProviderHandler(latency time.Duration) http.Handler {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 	})
 
 	mux.HandleFunc("/v1/models", func(w http.ResponseWriter, r *http.Request) {
@@ -77,12 +80,17 @@ func newMockProviderHandler(latency time.Duration) http.Handler {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(models)
+		if err := json.NewEncoder(w).Encode(models); err != nil {
+			log.Print("JSON response write failed")
+			return
+		}
 	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+			return
+		}
 	})
 
 	return mux

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+
 	"encoding/json"
 	"net/http"
 
@@ -23,7 +25,10 @@ func RBAC(requiredRole string) func(http.Handler) http.Handler {
 			if role == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(403, "forbidden", "authentication required"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(403, "forbidden", "authentication required")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 
@@ -31,7 +36,10 @@ func RBAC(requiredRole string) func(http.Handler) http.Handler {
 			if userLevel < requiredLevel {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(403, "forbidden", "insufficient permissions — requires "+requiredRole+" role"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(403, "forbidden", "insufficient permissions: requires "+requiredRole+" role")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 

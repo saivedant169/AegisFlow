@@ -36,7 +36,7 @@ Connect an agent after checks pass:
 
 ## What gets enforced
 
-Every action routed through AegisFlow becomes an `ActionEnvelope`. Policy evaluates protocol, tool, target, capability, actor, task, and session context.
+Routed MCP tool calls become an `ActionEnvelope`. Tool policy evaluates protocol, tool, target, capability, actor, task, and session context. Model API requests use input and output policy; they do not dispatch external tools. See [runtime support and verification](docs/runtime-support.md).
 
 | Routed action | Example | Default PR-writer decision |
 |---|---|---|
@@ -51,19 +51,13 @@ Every action routed through AegisFlow becomes an `ActionEnvelope`. Policy evalua
 Review decisions enter an approval queue. Optional upstream credential issuance is disabled in the development candidate pending broker hardening. See [candidate behavior and migration](docs/releases/corrective-candidate.md); published v0.9.0 has a different persistence and credential contract.
 
 ```text
-Agent or client
-      |
-      v
-MCP, OpenAI-compatible, or Messages API
-      |
-      v
-ActionEnvelope -> policy -> allow | review | block
-                         |             |
-                         v             v
-                 permitted dispatch  evidence chain
-                         |
-                         v
-                  external tool
+MCP client -> authenticated gateway -> tool policy -> decision evidence
+                                           |
+                              allow -> upstream -> result evidence
+                              review -> approval queue -> matching retry
+                              block -> error response
+
+Model API client -> input policy -> provider -> output policy -> response
 ```
 
 ## Boundary support

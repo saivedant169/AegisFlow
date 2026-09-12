@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // STSCredentials holds the temporary credentials returned by STS AssumeRole.
@@ -212,7 +213,7 @@ func (c *HTTPSTSClient) AssumeRole(ctx context.Context, roleARN, sessionName str
 	if err != nil {
 		return nil, fmt.Errorf("sts request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -283,7 +284,7 @@ func formatCanonicalHeaders(req *http.Request, signed []string) string {
 		if h == "host" {
 			val = req.URL.Host
 		} else {
-			val = req.Header.Get(http.CanonicalHeaderKey(h))
+			val = req.Header.Get(h)
 		}
 		b.WriteString(h + ":" + strings.TrimSpace(val) + "\n")
 	}

@@ -195,7 +195,7 @@ func TestAnthropicName(t *testing.T) {
 
 func TestAnthropicModels(t *testing.T) {
 	p := &AnthropicProvider{name: "anth", models: []string{"claude-sonnet-4-20250514", "claude-3-haiku"}}
-	models, err := p.Models(nil)
+	models, err := p.Models(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -446,7 +446,7 @@ func TestNewBedrockProviderDefaults(t *testing.T) {
 
 func TestBedrockModels(t *testing.T) {
 	p := &BedrockProvider{name: "br", models: []string{"anthropic.claude-v2", "amazon.titan"}}
-	models, err := p.Models(nil)
+	models, err := p.Models(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -467,15 +467,15 @@ func TestBedrockEstimateTokens(t *testing.T) {
 
 func TestBedrockHealthy(t *testing.T) {
 	p := &BedrockProvider{accessKey: "ak", secretKey: "sk"}
-	if !p.Healthy(nil) {
+	if !p.Healthy(context.Background()) {
 		t.Error("should be healthy with keys")
 	}
 	p2 := &BedrockProvider{accessKey: "", secretKey: "sk"}
-	if p2.Healthy(nil) {
+	if p2.Healthy(context.Background()) {
 		t.Error("should be unhealthy without access key")
 	}
 	p3 := &BedrockProvider{accessKey: "ak", secretKey: ""}
-	if p3.Healthy(nil) {
+	if p3.Healthy(context.Background()) {
 		t.Error("should be unhealthy without secret key")
 	}
 }

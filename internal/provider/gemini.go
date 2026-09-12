@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"time"
@@ -141,7 +142,7 @@ func (g *GeminiProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -178,7 +179,7 @@ func (g *GeminiProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		cleanup.Close(resp.Body)
 		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -186,8 +187,8 @@ func (g *GeminiProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 	// Convert to OpenAI SSE format.
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
-		defer resp.Body.Close()
+		defer cleanup.Close(pw)
+		defer cleanup.Close(resp.Body)
 
 		id := fmt.Sprintf("aegis-gemini-%d", time.Now().UnixNano())
 		buf := make([]byte, 4096)
@@ -217,7 +218,9 @@ func (g *GeminiProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 						Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{Content: content}}},
 					}
 					data, _ := json.Marshal(chunk)
-					fmt.Fprintf(pw, "data: %s\n\n", data)
+					if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+						return
+					}
 				}
 			}
 			if err == io.EOF {
@@ -227,8 +230,12 @@ func (g *GeminiProvider) ChatCompletionStream(ctx context.Context, req *types.Ch
 					Choices: []types.StreamDelta{{Index: 0, Delta: types.Delta{}, FinishReason: "stop"}},
 				}
 				data, _ := json.Marshal(finalChunk)
-				fmt.Fprintf(pw, "data: %s\n\n", data)
-				fmt.Fprint(pw, "data: [DONE]\n\n")
+				if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+					return
+				}
+				if _, err := fmt.Fprint(pw, "data: [DONE]\n\n"); err != nil {
+					return
+				}
 				break
 			}
 			if err != nil {

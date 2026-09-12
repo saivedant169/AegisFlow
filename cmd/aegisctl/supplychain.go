@@ -36,18 +36,21 @@ func cmdSupplyChainList(adminURL string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tVERSION\tTYPE\tTRUST TIER\tVERIFIED\tLOADED AT")
-	fmt.Fprintln(tw, "────\t───────\t────\t──────────\t────────\t─────────")
+	checkOutput(fmt.Fprintln(tw, "NAME\tVERSION\tTYPE\tTRUST TIER\tVERIFIED\tLOADED AT"))
+	checkOutput(fmt.Fprintln(tw, "────\t───────\t────\t──────────\t────────\t─────────"))
 	for _, a := range resp.Assets {
 		verified := "no"
 		if a.Verified {
 			verified = "yes"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			a.Name, a.Version, a.Type, a.TrustTier, verified,
-			a.LoadedAt.Format("2006-01-02 15:04:05"))
+			a.LoadedAt.Format("2006-01-02 15:04:05")))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdSupplyChainSign(args []string) {

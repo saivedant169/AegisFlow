@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // GitHubAppBroker issues short-lived installation access tokens via the GitHub App API.
@@ -116,7 +117,7 @@ func (b *GitHubAppBroker) Issue(ctx context.Context, req CredentialRequest) (*Cr
 	if err != nil {
 		return nil, fmt.Errorf("calling GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

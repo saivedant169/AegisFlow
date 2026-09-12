@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
@@ -174,6 +175,7 @@ func (g *Gateway) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session := g.sse.createSession(requestActor(r, "sse:"+r.Header.Get("X-AegisFlow-Session-ID")))
+	defer g.sse.RemoveSession(session.ID)
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -182,7 +184,9 @@ func (g *Gateway) handleSSE(w http.ResponseWriter, r *http.Request) {
 	// Send the endpoint event so the client knows where to POST.
 	endpointURL := fmt.Sprintf("/mcp/session/%s", session.ID)
 	evt := SSEEvent{Event: "endpoint", Data: endpointURL}
-	fmt.Fprint(w, evt.Format())
+	if _, err := fmt.Fprint(w, evt.Format()); err != nil {
+		return
+	}
 	flusher.Flush()
 
 	// Keep the connection open, forwarding events until the client disconnects.
@@ -190,12 +194,13 @@ func (g *Gateway) handleSSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ctx.Done():
-			g.sse.RemoveSession(session.ID)
 			return
 		case <-session.Done:
 			return
 		case ev := <-session.Events:
-			fmt.Fprint(w, ev.Format())
+			if _, err := fmt.Fprint(w, ev.Format()); err != nil {
+				return
+			}
 			flusher.Flush()
 		}
 	}
@@ -254,7 +259,10 @@ func (g *Gateway) processSessionRequest(session *SSESession, req *JSONRPCRequest
 func (g *Gateway) handleInitialize(w http.ResponseWriter, req *JSONRPCRequest) {
 	resp := g.buildInitializeResponse(req)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (g *Gateway) buildInitializeResponse(req *JSONRPCRequest) JSONRPCResponse {
@@ -433,7 +441,10 @@ func (g *Gateway) filterToolsByPolicy(id json.RawMessage, resp JSONRPCResponse) 
 func (g *Gateway) handleToolCall(w http.ResponseWriter, req *JSONRPCRequest, actor envelope.ActorInfo) {
 	resp := g.processToolCall(req, actor)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (g *Gateway) handleToolsList(w http.ResponseWriter, req *JSONRPCRequest) {
@@ -443,7 +454,10 @@ func (g *Gateway) handleToolsList(w http.ResponseWriter, req *JSONRPCRequest) {
 		if err == nil && resp.Error == nil {
 			filtered := g.filterToolsByPolicy(req.ID, *resp)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(filtered)
+			if err := json.NewEncoder(w).Encode(filtered); err != nil {
+				log.Print("JSON response write failed")
+				return
+			}
 			return
 		}
 	}
@@ -483,7 +497,7 @@ func (g *Gateway) proxyToUpstream(upstream *UpstreamConfig, req *JSONRPCRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -541,7 +555,10 @@ func (g *Gateway) writeError(w http.ResponseWriter, id json.RawMessage, code int
 		Error:   &JSONRPCError{Code: code, Message: message},
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (g *Gateway) writeResult(w http.ResponseWriter, id json.RawMessage, result json.RawMessage) {
@@ -551,7 +568,10 @@ func (g *Gateway) writeResult(w http.ResponseWriter, id json.RawMessage, result 
 		Result:  result,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 // inferCapability guesses the capability from the tool name.

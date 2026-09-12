@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 func cmdManifestCreate(adminURL string, args []string) {
@@ -52,7 +54,10 @@ func cmdManifestCreate(adminURL string, args []string) {
 			}
 		case "--max-actions":
 			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%d", &maxActions)
+				if _, err := fmt.Sscanf(args[i+1], "%d", &maxActions); err != nil {
+					fmt.Fprintln(os.Stderr, "Error: invalid max-actions")
+					os.Exit(1)
+				}
 				i++
 			}
 		case "--expires-in":
@@ -98,7 +103,7 @@ func cmdManifestCreate(adminURL string, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 201 {
 		respData, _ := io.ReadAll(resp.Body)
@@ -126,7 +131,7 @@ func cmdManifestList(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var manifests []map[string]interface{}
 	if err := decodeJSON(resp, &manifests); err != nil {
@@ -140,8 +145,8 @@ func cmdManifestList(adminURL string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tTASK\tOWNER\tRISK\tACTIVE\tHASH")
-	fmt.Fprintln(tw, "──\t────\t─────\t────\t──────\t────")
+	checkOutput(fmt.Fprintln(tw, "ID\tTASK\tOWNER\tRISK\tACTIVE\tHASH"))
+	checkOutput(fmt.Fprintln(tw, "──\t────\t─────\t────\t──────\t────"))
 	for _, m := range manifests {
 		id := fmt.Sprintf("%v", m["id"])
 		if len(id) > 20 {
@@ -151,10 +156,13 @@ func cmdManifestList(adminURL string) {
 		if len(hash) > 12 {
 			hash = hash[:12] + "..."
 		}
-		fmt.Fprintf(tw, "%s\t%v\t%v\t%v\t%v\t%s\n",
-			id, m["task_id"], m["owner"], m["risk_tier"], m["active"], hash)
+		checkOutput(fmt.Fprintf(tw, "%s\t%v\t%v\t%v\t%v\t%s\n",
+			id, m["task_id"], m["owner"], m["risk_tier"], m["active"], hash))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdManifestDrift(adminURL string, id string) {
@@ -163,7 +171,7 @@ func cmdManifestDrift(adminURL string, id string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var events []map[string]interface{}
 	if err := decodeJSON(resp, &events); err != nil {
@@ -177,15 +185,18 @@ func cmdManifestDrift(adminURL string, id string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TYPE\tTOOL\tPROTOCOL\tSEVERITY\tMESSAGE")
-	fmt.Fprintln(tw, "────\t────\t────────\t────────\t───────")
+	checkOutput(fmt.Fprintln(tw, "TYPE\tTOOL\tPROTOCOL\tSEVERITY\tMESSAGE"))
+	checkOutput(fmt.Fprintln(tw, "────\t────\t────────\t────────\t───────"))
 	for _, e := range events {
 		msg := fmt.Sprintf("%v", e["message"])
 		if len(msg) > 60 {
 			msg = msg[:57] + "..."
 		}
-		fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%s\n",
-			e["type"], e["tool"], e["protocol"], e["severity"], msg)
+		checkOutput(fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t%s\n",
+			e["type"], e["tool"], e["protocol"], e["severity"], msg))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }

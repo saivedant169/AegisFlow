@@ -7,6 +7,8 @@ import (
 	"os"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 func main() {
@@ -18,7 +20,7 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	defer db.Close()
+	defer cleanup.Close(db)
 
 	switch os.Args[1] {
 	case "approval":

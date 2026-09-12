@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"log"
+
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -99,5 +101,8 @@ func (rl *RequestLog) Count() int {
 
 func (rl *RequestLog) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rl.Recent(50))
+	if err := json.NewEncoder(w).Encode(rl.Recent(50)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }

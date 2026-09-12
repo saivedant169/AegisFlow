@@ -1,6 +1,8 @@
 package federation
 
 import (
+	"log"
+
 	"crypto/subtle"
 	"encoding/json"
 	"io"
@@ -74,7 +76,9 @@ func (cp *ControlPlane) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"accepted"}`))
+	if _, err := w.Write([]byte(`{"status":"accepted"}`)); err != nil {
+		return
+	}
 }
 
 // StatusHandler accepts status updates from a data plane.
@@ -108,7 +112,10 @@ func (cp *ControlPlane) PlanesHandler(w http.ResponseWriter, r *http.Request) {
 		planes = append(planes, *ps)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(planes)
+	if err := json.NewEncoder(w).Encode(planes); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (cp *ControlPlane) validateToken(r *http.Request) bool {

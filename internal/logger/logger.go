@@ -2,7 +2,10 @@ package logger
 
 import (
 	"context"
+	"errors"
+	"log"
 	"sync"
+	"syscall"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -77,4 +80,8 @@ func Warn(msg string, fields ...zap.Field)  { Get().Warn(msg, fields...) }
 func Error(msg string, fields ...zap.Field) { Get().Error(msg, fields...) }
 func Debug(msg string, fields ...zap.Field) { Get().Debug(msg, fields...) }
 
-func Sync() { Get().Sync() }
+func Sync() {
+	if err := Get().Sync(); err != nil && !errors.Is(err, syscall.EINVAL) && !errors.Is(err, syscall.ENOTTY) {
+		log.Print("logger sync failed")
+	}
+}

@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // WebhookRequest is the payload sent to the external evaluation endpoint.
@@ -78,14 +80,14 @@ func (w *WebhookEvaluator) Evaluate(req WebhookRequest) {
 			resp, err := w.client.Post(w.url, "application/json", bytes.NewReader(data))
 			if err == nil {
 				if resp.StatusCode < 500 {
-					resp.Body.Close()
+					cleanup.Close(resp.Body)
 					if resp.StatusCode >= 400 {
 						log.Printf("eval webhook: returned %d", resp.StatusCode)
 					}
 					return
 				}
 				log.Printf("eval webhook: returned %d", resp.StatusCode)
-				resp.Body.Close()
+				cleanup.Close(resp.Body)
 			} else {
 				log.Printf("eval webhook: request error: %v", err)
 				if !shouldRetryWebhook(err) {

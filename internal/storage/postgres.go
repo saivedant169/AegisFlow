@@ -8,6 +8,8 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // maintained Postgres driver; lib/pq is unmaintained (GO-2026-6166..6173, no fix)
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type UsageEvent struct {
@@ -163,7 +165,7 @@ func (s *PostgresStore) GetTenantSummaries(ctx context.Context) ([]TenantSummary
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var summaries []TenantSummary
 	for rows.Next() {
@@ -190,7 +192,7 @@ func (s *PostgresStore) GetModelSummaries(ctx context.Context, tenantID string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var summaries []ModelSummary
 	for rows.Next() {
@@ -217,7 +219,7 @@ func (s *PostgresStore) GetRecentEvents(ctx context.Context, limit int) ([]Usage
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var events []UsageEvent
 	for rows.Next() {

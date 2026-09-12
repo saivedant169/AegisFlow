@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type sqliteRecordStore struct {
@@ -62,7 +64,7 @@ func (s *sqliteRecordStore) LoadSession(sessionID string) ([]Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query session: %w", err)
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	records := make([]Record, 0)
 	for rows.Next() {
@@ -108,7 +110,7 @@ func (s *sqliteRecordStore) ListSessionIDs() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list evidence sessions: %w", err)
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var ids []string
 	for rows.Next() {

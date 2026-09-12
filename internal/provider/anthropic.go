@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"os"
 	"time"
@@ -118,7 +119,7 @@ func (a *AnthropicProvider) ChatCompletion(ctx context.Context, req *types.ChatC
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -158,7 +159,7 @@ func (a *AnthropicProvider) ChatCompletionStream(ctx context.Context, req *types
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		cleanup.Close(resp.Body)
 		return nil, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 

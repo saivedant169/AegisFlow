@@ -9,6 +9,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 const (
@@ -617,8 +619,8 @@ func cmdUsage(adminURL string, jsonOut bool) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "TENANT\tMODEL\tREQUESTS\tTOKENS\tCOST")
-	fmt.Fprintln(w, "──────\t─────\t────────\t──────\t────")
+	checkOutput(fmt.Fprintln(w, "TENANT\tMODEL\tREQUESTS\tTOKENS\tCOST"))
+	checkOutput(fmt.Fprintln(w, "──────\t─────\t────────\t──────\t────"))
 
 	for tenantID, v := range usageMap {
 		tenant, ok := v.(map[string]interface{})
@@ -634,15 +636,18 @@ func cmdUsage(adminURL string, jsonOut bool) {
 			if !ok {
 				continue
 			}
-			fmt.Fprintf(w, "%s\t%s\t%.0f\t%.0f\t$%.6f\n",
+			checkOutput(fmt.Fprintf(w, "%s\t%s\t%.0f\t%.0f\t$%.6f\n",
 				tenantID, model,
 				toFloat(m["requests"]),
 				toFloat(m["total_tokens"]),
 				toFloat(m["estimated_cost_usd"]),
-			)
+			))
 		}
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdModels(gatewayURL string) {
@@ -651,7 +656,7 @@ func cmdModels(gatewayURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var result struct {
 		Data []struct {
@@ -665,12 +670,15 @@ func cmdModels(gatewayURL string) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "MODEL\tPROVIDER")
-	fmt.Fprintln(w, "─────\t────────")
+	checkOutput(fmt.Fprintln(w, "MODEL\tPROVIDER"))
+	checkOutput(fmt.Fprintln(w, "─────\t────────"))
 	for _, m := range result.Data {
-		fmt.Fprintf(w, "%s\t%s\n", m.ID, m.Provider)
+		checkOutput(fmt.Fprintf(w, "%s\t%s\n", m.ID, m.Provider))
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdProviders(adminURL string) {
@@ -679,7 +687,7 @@ func cmdProviders(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var providers []struct {
 		Name    string   `json:"name"`
@@ -694,8 +702,8 @@ func cmdProviders(adminURL string) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tHEALTH\tMODELS")
-	fmt.Fprintln(w, "────\t────\t──────\t──────\t──────")
+	checkOutput(fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tHEALTH\tMODELS"))
+	checkOutput(fmt.Fprintln(w, "────\t────\t──────\t──────\t──────"))
 	for _, p := range providers {
 		status := "disabled"
 		if p.Enabled {
@@ -709,9 +717,12 @@ func cmdProviders(adminURL string) {
 		if len(models) > 40 {
 			models = models[:37] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, status, health, models)
+		checkOutput(fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, status, health, models))
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdPolicies(adminURL string) {
@@ -720,7 +731,7 @@ func cmdPolicies(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var policies []struct {
 		Name     string   `json:"name"`
@@ -736,8 +747,8 @@ func cmdPolicies(adminURL string) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tPHASE\tACTION\tRULES")
-	fmt.Fprintln(w, "────\t────\t─────\t──────\t─────")
+	checkOutput(fmt.Fprintln(w, "NAME\tTYPE\tPHASE\tACTION\tRULES"))
+	checkOutput(fmt.Fprintln(w, "────\t────\t─────\t──────\t─────"))
 	for _, p := range policies {
 		rules := append(p.Keywords, p.Patterns...)
 		ruleStr := strings.Join(rules, ", ")
@@ -747,9 +758,12 @@ func cmdPolicies(adminURL string) {
 		if ruleStr == "" {
 			ruleStr = "-"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, p.Phase, strings.ToUpper(p.Action), ruleStr)
+		checkOutput(fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, p.Phase, strings.ToUpper(p.Action), ruleStr))
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdTenants(adminURL string) {
@@ -758,7 +772,7 @@ func cmdTenants(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var tenants []struct {
 		ID                string `json:"id"`
@@ -773,12 +787,15 @@ func cmdTenants(adminURL string) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tKEYS\tREQ/MIN\tTOK/MIN")
-	fmt.Fprintln(w, "──\t────\t────\t───────\t───────")
+	checkOutput(fmt.Fprintln(w, "ID\tNAME\tKEYS\tREQ/MIN\tTOK/MIN"))
+	checkOutput(fmt.Fprintln(w, "──\t────\t────\t───────\t───────"))
 	for _, t := range tenants {
-		fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\n", t.ID, t.Name, t.KeyCount, t.RequestsPerMinute, t.TokensPerMinute)
+		checkOutput(fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\n", t.ID, t.Name, t.KeyCount, t.RequestsPerMinute, t.TokensPerMinute))
 	}
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdTest(gatewayURL, model, message string) {
@@ -796,7 +813,7 @@ func cmdTest(gatewayURL, model, message string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var result struct {
 		Choices []struct {
@@ -840,7 +857,7 @@ func checkHealth(url string) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	cleanup.Close(resp.Body)
 	return resp.StatusCode == 200
 }
 
@@ -850,7 +867,7 @@ func fetchJSON(url string) interface{} {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var result interface{}
 	if err := decodeJSON(resp, &result); err != nil {
@@ -891,7 +908,7 @@ func cmdPending(adminURL string, jsonOut bool) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 	var result map[string]interface{}
 	if err := decodeJSON(resp, &result); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -916,15 +933,18 @@ func cmdPending(adminURL string, jsonOut bool) {
 		return
 	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "ID\tTOOL\tPROTOCOL\tACTOR\tSUBMITTED\n")
+	checkOutput(fmt.Fprintf(tw, "ID\tTOOL\tPROTOCOL\tACTOR\tSUBMITTED\n"))
 	for _, p := range pending {
 		item, _ := p.(map[string]interface{})
 		env, _ := item["envelope"].(map[string]interface{})
 		actor, _ := env["actor"].(map[string]interface{})
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			item["id"], env["tool"], env["protocol"], actor["id"], item["submitted_at"])
+		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			item["id"], env["tool"], env["protocol"], actor["id"], item["submitted_at"]))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdApprove(adminURL, id, comment string) {
@@ -934,7 +954,7 @@ func cmdApprove(adminURL, id, comment string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 	if resp.StatusCode != 200 {
 		var result struct {
 			Error struct {
@@ -958,7 +978,7 @@ func cmdDeny(adminURL, id, comment string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 	if resp.StatusCode != 200 {
 		var result struct {
 			Error struct {

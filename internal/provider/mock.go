@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
 
@@ -82,7 +83,7 @@ func (m *MockProvider) ChatCompletionStream(ctx context.Context, req *types.Chat
 	pr, pw := io.Pipe()
 
 	go func() {
-		defer pw.Close()
+		defer cleanup.Close(pw)
 		for i, word := range words {
 			select {
 			case <-ctx.Done():
@@ -109,7 +110,9 @@ func (m *MockProvider) ChatCompletionStream(ctx context.Context, req *types.Chat
 			}
 
 			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(pw, "data: %s\n\n", data)
+			if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+				return
+			}
 
 			if m.latency > 0 {
 				time.Sleep(m.latency / time.Duration(len(words)))
@@ -131,8 +134,12 @@ func (m *MockProvider) ChatCompletionStream(ctx context.Context, req *types.Chat
 			},
 		}
 		data, _ := json.Marshal(finalChunk)
-		fmt.Fprintf(pw, "data: %s\n\n", data)
-		fmt.Fprint(pw, "data: [DONE]\n\n")
+		if _, err := fmt.Fprintf(pw, "data: %s\n\n", data); err != nil {
+			return
+		}
+		if _, err := fmt.Fprint(pw, "data: [DONE]\n\n"); err != nil {
+			return
+		}
 	}()
 
 	return pr, nil

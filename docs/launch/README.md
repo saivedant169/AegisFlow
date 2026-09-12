@@ -4,7 +4,7 @@ Drafts and verified assets for v0.9.0 release. Review platform rules and final l
 
 ## One-line description
 
-> AegisFlow is a local-first policy gateway for coding agents. It can allow, review, or block routed MCP, shell, SQL, GitHub, and HTTP actions, issue scoped credentials, and verify tamper-evident session evidence.
+> AegisFlow is a local-first policy gateway for coding agents. It allows, reviews, or blocks routed MCP actions and verifies signed session evidence. Standalone execution gates remain experimental; runtime upstream credential issuance is disabled.
 
 ## Proof workflow
 

@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/pkg/types"
 )
@@ -241,10 +242,13 @@ func auditDetail(fields map[string]string) string {
 func writeAnthropicError(w http.ResponseWriter, status int, errType, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(anthropicErrorEnvelope{
+	if err := json.NewEncoder(w).Encode(anthropicErrorEnvelope{
 		Type:  "error",
 		Error: anthropicErrorBody{Type: errType, Message: message},
-	})
+	}); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 type contextKey string
@@ -423,13 +427,22 @@ func (h *Handler) CountTokens(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeSSE writes one Anthropic SSE event (named event + JSON data) and flushes.
-func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, payload any) {
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, payload any) bool {
 	data, _ := json.Marshal(payload)
-	w.Write([]byte("event: " + event + "\n"))
-	w.Write([]byte("data: "))
-	w.Write(data)
-	w.Write([]byte("\n\n"))
+	if _, err := w.Write([]byte("event: " + event + "\n")); err != nil {
+		return false
+	}
+	if _, err := w.Write([]byte("data: ")); err != nil {
+		return false
+	}
+	if _, err := w.Write(data); err != nil {
+		return false
+	}
+	if _, err := w.Write([]byte("\n\n")); err != nil {
+		return false
+	}
 	flusher.Flush()
+	return true
 }
 
 // messagesStream proxies a streaming completion and re-frames the provider's
@@ -453,7 +466,7 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "upstream provider error")
 		return
 	}
-	defer stream.Close()
+	defer cleanup.Close(stream)
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -461,21 +474,28 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
+	outputFailed := false
 	msgID := newAnthropicMsgID()
 	inputTokens := estimateTokens(extractContent(req.Messages))
 
-	writeSSE(w, flusher, "message_start", map[string]any{
+	if !writeSSE(w, flusher, "message_start", map[string]any{
 		"type": "message_start",
 		"message": map[string]any{
 			"id": msgID, "type": "message", "role": "assistant", "model": model,
 			"content": []any{}, "stop_reason": nil, "stop_sequence": nil,
 			"usage": map[string]int{"input_tokens": inputTokens, "output_tokens": 0},
 		},
-	})
-	writeSSE(w, flusher, "content_block_start", map[string]any{
+	}) {
+		outputFailed = true
+		return
+	}
+	if !writeSSE(w, flusher, "content_block_start", map[string]any{
 		"type": "content_block_start", "index": 0,
 		"content_block": map[string]any{"type": "text", "text": ""},
-	})
+	}) {
+		outputFailed = true
+		return
+	}
 
 	// totalOut tracks full output length for the usage estimate; finishReason is
 	// captured from the stream chunks.
@@ -485,10 +505,13 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	emitStreamBlock := func(v *policy.Violation) {
 		h.fireWebhook("stream_policy_violation", v.PolicyName, string(v.Action), tenantID, model, v.Message)
 		// Anthropic error events are terminal — nothing follows.
-		writeSSE(w, flusher, "error", anthropicErrorEnvelope{
+		if !writeSSE(w, flusher, "error", anthropicErrorEnvelope{
 			Type:  "error",
 			Error: anthropicErrorBody{Type: "permission_error", Message: v.Message},
-		})
+		}) {
+			outputFailed = true
+			return
+		}
 		log.Printf("stream terminated: %s", policy.FormatViolation(v))
 	}
 
@@ -496,10 +519,16 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	// scanned-clean run of text as an Anthropic content_block_delta.
 	sc := newStreamScanner(h.policy, streamSink{
 		writeDelta: func(b []byte) {
-			writeSSE(w, flusher, "content_block_delta", map[string]any{
+			if outputFailed {
+				return
+			}
+			if !writeSSE(w, flusher, "content_block_delta", map[string]any{
 				"type": "content_block_delta", "index": 0,
 				"delta": map[string]any{"type": "text_delta", "text": string(b)},
-			})
+			}) {
+				outputFailed = true
+				return
+			}
 		},
 		block: emitStreamBlock,
 	})
@@ -533,7 +562,7 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 		}
 
 		totalOut += len(delta)
-		if !sc.Feed([]byte(delta)) {
+		if !sc.Feed([]byte(delta)) || outputFailed {
 			return
 		}
 	}
@@ -542,30 +571,42 @@ func (h *Handler) messagesStream(w http.ResponseWriter, r *http.Request, req *ty
 	// clean completion.
 	if err := scanner.Err(); err != nil {
 		log.Printf("messages stream: read error: %v", err)
-		writeSSE(w, flusher, "error", anthropicErrorEnvelope{
+		if !writeSSE(w, flusher, "error", anthropicErrorEnvelope{
 			Type:  "error",
 			Error: anthropicErrorBody{Type: "api_error", Message: "upstream stream error"},
-		})
+		}) {
+			outputFailed = true
+			return
+		}
 		h.recordAnalytics(tenantID, model, "", http.StatusBadGateway, startTime, int64(totalOut))
 		return
 	}
 
 	// Flush the scanner's carried tail and release the sub-threshold remainder;
 	// a keyword ending on the very last byte is only caught here.
-	if !sc.Close() {
+	if !sc.Close() || outputFailed {
 		return
 	}
 
-	writeSSE(w, flusher, "content_block_stop", map[string]any{
+	if !writeSSE(w, flusher, "content_block_stop", map[string]any{
 		"type": "content_block_stop", "index": 0,
-	})
+	}) {
+		outputFailed = true
+		return
+	}
 	outTokens := estimateTokensFromBytes(totalOut)
-	writeSSE(w, flusher, "message_delta", map[string]any{
+	if !writeSSE(w, flusher, "message_delta", map[string]any{
 		"type":  "message_delta",
 		"delta": map[string]any{"stop_reason": mapStopReason(finishReason), "stop_sequence": nil},
 		"usage": map[string]int{"input_tokens": inputTokens, "output_tokens": outTokens},
-	})
-	writeSSE(w, flusher, "message_stop", map[string]any{"type": "message_stop"})
+	}) {
+		outputFailed = true
+		return
+	}
+	if !writeSSE(w, flusher, "message_stop", map[string]any{"type": "message_stop"}) {
+		outputFailed = true
+		return
+	}
 
 	// Post-stream governance: usage/db/spend/behavioral/analytics/log — the tail
 	// both stream paths previously skipped. Provider/region are unset on the

@@ -197,3 +197,31 @@ func TestWorkDirInTarget(t *testing.T) {
 		t.Errorf("expected block for /etc, got %s", res.Decision)
 	}
 }
+
+func TestEvidenceFailureReturnsNoDecision(t *testing.T) {
+	for _, cmd := range []string{"ls", "rm"} {
+		ic, chain, _ := newTestInterceptor(nil, "allow", true)
+		prior := buildEnvelope("ls", nil, "/workspace")
+		prior.Actor.TenantID = "another-tenant"
+		if _, err := chain.Record(prior); err != nil {
+			t.Fatal(err)
+		}
+		result, err := ic.Evaluate(cmd, []string{"-rf", "/"}, "/workspace")
+		if err == nil || result != nil {
+			t.Fatalf("evidence failure returned decision: %v, %v", result, err)
+		}
+		if chain.Count() != 1 {
+			t.Fatal("failed record changed chain")
+		}
+	}
+}
+func TestReviewQueueFailureReturnsNoDecision(t *testing.T) {
+	for _, queue := range []*approval.Queue{nil, approval.NewQueue(0)} {
+		ic, _, _ := newTestInterceptor(nil, "review", false)
+		ic.approvals = queue
+		result, err := ic.Evaluate("terraform", []string{"apply"}, "/workspace")
+		if err == nil || result != nil {
+			t.Fatalf("queue failure returned decision: %v, %v", result, err)
+		}
+	}
+}

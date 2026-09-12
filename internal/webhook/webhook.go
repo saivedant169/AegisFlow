@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type Event struct {
@@ -46,7 +48,8 @@ func NewNotifier(url string, secret ...string) *Notifier {
 // ComputeSignature computes HMAC-SHA256 over "timestamp.body" using the secret.
 func ComputeSignature(secret string, timestamp int64, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(fmt.Sprintf("%d.%s", timestamp, body)))
+	// hash.Hash.Write always succeeds.
+	_, _ = fmt.Fprintf(mac, "%d.%s", timestamp, body)
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
@@ -82,7 +85,7 @@ func (n *Notifier) Send(event Event) {
 			log.Printf("webhook: failed to send to %s: %v", n.url, err)
 			return
 		}
-		resp.Body.Close()
+		cleanup.Close(resp.Body)
 
 		if resp.StatusCode >= 400 {
 			log.Printf("webhook: %s returned status %d", n.url, resp.StatusCode)

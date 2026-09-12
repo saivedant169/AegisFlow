@@ -12,6 +12,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
 	"github.com/saivedant169/AegisFlow/pkg/types"
@@ -90,7 +91,7 @@ func (o *OpenAIProvider) ChatCompletion(ctx context.Context, req *types.ChatComp
 		o.markKeyFromError(key, err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	var result types.ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -157,7 +158,7 @@ func (o *OpenAIProvider) Healthy(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	cleanup.Close(resp.Body)
 	return resp.StatusCode == http.StatusOK
 }
 
@@ -205,7 +206,7 @@ func (o *OpenAIProvider) doRequest(ctx context.Context, body []byte, key string)
 		}
 
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		cleanup.Close(resp.Body)
 
 		statusErr := &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(respBody), Header: resp.Header.Clone()}
 		if attempt < attempts && o.retry.shouldRetry(resp.StatusCode) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
 )
@@ -119,7 +120,7 @@ func remoteTestAction(adminURL, protocol, tool, target, capability string, param
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("server returned %d", resp.StatusCode)
@@ -207,21 +208,21 @@ func formatTestActionOutput(result *testActionResult) string {
 	// Decision with color
 	switch result.Decision {
 	case "allow":
-		sb.WriteString(fmt.Sprintf("Decision:      %sALLOWED%s\n", colorGreen, colorReset))
+		fmt.Fprintf(&sb, "Decision:      %sALLOWED%s\n", colorGreen, colorReset)
 	case "review":
-		sb.WriteString(fmt.Sprintf("Decision:      %sREVIEW REQUIRED%s\n", colorYellow, colorReset))
+		fmt.Fprintf(&sb, "Decision:      %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
 	case "block":
-		sb.WriteString(fmt.Sprintf("Decision:      %sBLOCKED%s\n", colorRed, colorReset))
+		fmt.Fprintf(&sb, "Decision:      %sBLOCKED%s\n", colorRed, colorReset)
 	default:
-		sb.WriteString(fmt.Sprintf("Decision:      %s\n", result.Decision))
+		fmt.Fprintf(&sb, "Decision:      %s\n", result.Decision)
 	}
 
-	sb.WriteString(fmt.Sprintf("Envelope ID:   %s\n", result.EnvelopeID))
-	sb.WriteString(fmt.Sprintf("Evidence Hash: %s\n", result.EvidenceHash))
-	sb.WriteString(fmt.Sprintf("Message:       %s\n", result.Message))
+	fmt.Fprintf(&sb, "Envelope ID:   %s\n", result.EnvelopeID)
+	fmt.Fprintf(&sb, "Evidence Hash: %s\n", result.EvidenceHash)
+	fmt.Fprintf(&sb, "Message:       %s\n", result.Message)
 
 	if result.ApprovalID != "" {
-		sb.WriteString(fmt.Sprintf("Approval ID:   %s\n", result.ApprovalID))
+		fmt.Fprintf(&sb, "Approval ID:   %s\n", result.ApprovalID)
 	}
 
 	return sb.String()

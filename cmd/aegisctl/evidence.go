@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"text/tabwriter"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 func cmdEvidenceSessions(adminURL string) {
@@ -14,7 +16,7 @@ func cmdEvidenceSessions(adminURL string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -38,8 +40,8 @@ func cmdEvidenceSessions(adminURL string) {
 	}
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "SESSION ID\tACTIONS\tVALID\tSTARTED\tLAST HASH")
-	fmt.Fprintln(tw, "──────────\t───────\t─────\t───────\t─────────")
+	checkOutput(fmt.Fprintln(tw, "SESSION ID\tACTIONS\tVALID\tSTARTED\tLAST HASH"))
+	checkOutput(fmt.Fprintln(tw, "──────────\t───────\t─────\t───────\t─────────"))
 	for _, s := range sessions {
 		valid := "yes"
 		if !s.ChainValid {
@@ -49,10 +51,13 @@ func cmdEvidenceSessions(adminURL string) {
 		if len(lastHash) > 12 {
 			lastHash = lastHash[:12] + "..."
 		}
-		fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\n",
-			s.SessionID, s.TotalActions, valid, s.StartedAt, lastHash)
+		checkOutput(fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\n",
+			s.SessionID, s.TotalActions, valid, s.StartedAt, lastHash))
 	}
-	tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		os.Exit(1)
+	}
 }
 
 func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
@@ -69,7 +74,7 @@ func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -128,7 +133,7 @@ func cmdEvidenceReport(adminURL string, sessionID string, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

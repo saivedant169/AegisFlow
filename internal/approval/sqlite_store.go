@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type approvalStore interface {
@@ -73,7 +75,7 @@ func (s *sqliteApprovalStore) loadItems(query string, args ...any) ([]*ApprovalI
 	if err != nil {
 		return nil, fmt.Errorf("query approval items: %w", err)
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	items := make([]*ApprovalItem, 0)
 	for rows.Next() {

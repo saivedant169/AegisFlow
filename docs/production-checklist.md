@@ -2,10 +2,14 @@
 
 Use this checklist before exposing AegisFlow outside a local demo.
 
+Use the [development support contract](runtime-support.md); published v0.9.0 has different persistence behavior.
+
 ## Configuration
 
 - Set `AEGISFLOW_CONFIG` to the mounted production config path.
 - Replace all demo tenant API keys.
+- Keep `credentials.enabled` false; runtime issuance is unavailable.
+- For retained evidence and approvals, configure SQLite state and a stable signing key, then test restart and tamper rejection.
 - Prefer `key_env` for tenant API keys and inject values from a secret manager.
 - Keep provider credentials in environment variables or a secret manager, not literal YAML.
 - Keep `policies.governance_mode` set to `governance` unless you are intentionally testing fail-open behavior.

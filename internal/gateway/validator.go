@@ -52,13 +52,14 @@ func formatValidationError(err error) (message, param, code string) {
 		keyword = keyword[idx+1:]
 	}
 
-	if keyword == "required" {
+	switch keyword {
+	case "required":
 		parts := strings.Split(targetErr.Message, "'")
 		if len(parts) >= 3 {
 			param = parts[1]
 			message = fmt.Sprintf("Missing required parameter: '%s'.", param)
 		}
-	} else if keyword == "type" {
+	case "type":
 		code = "invalid_type"
 	}
 

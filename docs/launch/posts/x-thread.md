@@ -1,5 +1,8 @@
 # X thread
 
+> Archived launch draft for v0.9.0. Do not publish as the development candidate announcement. Runtime upstream credential issuance is disabled; verify release artifacts and version-specific claims before reuse.
+
+
 ## 1
 
 Coding agents call tools with real side effects. AegisFlow puts allow, review, or block policy on configured MCP and model paths before upstream execution.
@@ -28,7 +31,7 @@ Attach: `docs/assets/shot-approval-queue.png`
 
 ## 4
 
-v0.9.0 adds supported tool-call translation, per-session signed evidence, scoped credential requests, checksum verification, Sigstore bundle, SBOM, and build provenance.
+v0.9.0 adds supported tool-call translation, per-session signed evidence, checksum verification, Sigstore bundle, SBOM, and build provenance.
 
 Release: https://github.com/saivedant169/AegisFlow/releases/tag/v0.9.0
 

@@ -143,7 +143,7 @@ All connections to upstream services (GitHub API, databases, HTTP endpoints) sho
 
 1. Never store secrets in configuration files or environment variables visible to agents
 2. Use a dedicated secrets manager (HashiCorp Vault, AWS Secrets Manager, GCP Secret Manager)
-3. AegisFlow's credential broker issues task-scoped, short-lived credentials to agents
+3. Keep runtime upstream credential issuance disabled; configure narrow upstream permissions outside the gateway
 4. Rotate all long-lived secrets on a regular schedule
 
 ### Secret types and storage

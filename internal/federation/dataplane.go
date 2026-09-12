@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // DataPlane polls a control plane for config and pushes status/metrics.
@@ -65,13 +67,15 @@ func (dp *DataPlane) pullConfig() {
 		log.Printf("federation: config pull failed: %v", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 	if resp.StatusCode != 200 {
 		log.Printf("federation: config pull returned %d", resp.StatusCode)
 		return
 	}
 	// Read config -- hot-reload integration would go here
-	io.ReadAll(resp.Body)
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		log.Print("federation: config response read failed")
+	}
 }
 
 func (dp *DataPlane) pushStatus() {
@@ -89,7 +93,7 @@ func (dp *DataPlane) pushStatus() {
 		log.Printf("federation: status push failed: %v", err)
 		return
 	}
-	resp.Body.Close()
+	cleanup.Close(resp.Body)
 }
 
 // PushMetrics sends arbitrary metrics data to the control plane.
@@ -101,6 +105,6 @@ func (dp *DataPlane) PushMetrics(metricsData []byte) error {
 	if err != nil {
 		return fmt.Errorf("metrics push: %w", err)
 	}
-	resp.Body.Close()
+	cleanup.Close(resp.Body)
 	return nil
 }

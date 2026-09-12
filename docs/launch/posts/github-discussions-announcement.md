@@ -1,5 +1,8 @@
 # AegisFlow v0.9.0: tool boundaries, signed evidence, and verifiable releases
 
+> Archived launch draft for v0.9.0. Do not publish as the development candidate announcement. Runtime upstream credential issuance is disabled; verify release artifacts and version-specific claims before reuse.
+
+
 AegisFlow v0.9.0 is available.
 
 - Release: https://github.com/saivedant169/AegisFlow/releases/tag/v0.9.0
@@ -13,7 +16,7 @@ AegisFlow v0.9.0 is available.
 - Policy checks for tool definitions, arguments, and MCP tool lists.
 - Single-use approval resume based on stable action fields.
 - Signed evidence chain per session.
-- Task-specific GitHub App and AWS STS credential requests.
+- Upstream credential issuance is unavailable in the development candidate.
 - Streaming output checks before bytes reach client.
 - SHA-256 installer verification, Sigstore bundle, SPDX SBOM, and build provenance.
 

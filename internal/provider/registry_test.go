@@ -248,7 +248,7 @@ func TestMockProviderModelsContent(t *testing.T) {
 
 func TestMockProviderHealthyAlways(t *testing.T) {
 	m := NewMockProvider("mock", 0)
-	if !m.Healthy(nil) {
+	if !m.Healthy(context.Background()) {
 		t.Error("mock provider should always be healthy")
 	}
 }

@@ -34,7 +34,10 @@ func TokenRateLimit(limiter ratelimit.Limiter) func(http.Handler) http.Handler {
 				log.Printf("token rate limit: failed to read body: %v", err)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(400, "invalid_request", "failed to read request body"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(400, "invalid_request", "failed to read request body")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 			// Put the body back so downstream handlers can read it
@@ -51,7 +54,10 @@ func TokenRateLimit(limiter ratelimit.Limiter) func(http.Handler) http.Handler {
 				log.Printf("token rate limiter error (denying request): %v", err)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(503, "service_error", "rate limiter unavailable — try again later"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(503, "service_error", "rate limiter unavailable: try again later")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 
@@ -59,7 +65,10 @@ func TokenRateLimit(limiter ratelimit.Limiter) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", "60")
 				w.WriteHeader(http.StatusTooManyRequests)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(429, "rate_limit_error", "token rate limit exceeded — retry after 60 seconds"))
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(429, "rate_limit_error", "token rate limit exceeded: retry after 60 seconds")); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 				return
 			}
 

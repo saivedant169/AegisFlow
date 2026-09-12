@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"gopkg.in/yaml.v3"
 )
 
@@ -67,7 +70,7 @@ func fetchRegistry(url string) (*Registry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetching registry: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("registry returned %d", resp.StatusCode)
@@ -155,6 +158,11 @@ func pluginInstall(args []string) error {
 		}
 	}
 
+	cfg, err := readPluginsConfig(pluginsConfig)
+	if err != nil {
+		return err
+	}
+
 	reg, err := fetchRegistry("")
 	if err != nil {
 		return err
@@ -188,7 +196,7 @@ func pluginInstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("downloading plugin: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	const maxPluginSize = 50 * 1024 * 1024 // 50MB max plugin size
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxPluginSize))
@@ -205,15 +213,6 @@ func pluginInstall(args []string) error {
 
 	// Write file
 	wasmPath := filepath.Join(pluginsDir, plugin.Name+".wasm")
-	if err := os.WriteFile(wasmPath, data, 0644); err != nil {
-		return fmt.Errorf("writing plugin file: %w", err)
-	}
-
-	// Update plugins.yaml
-	var cfg PluginsConfig
-	if existingData, err := os.ReadFile(pluginsConfig); err == nil {
-		yaml.Unmarshal(existingData, &cfg)
-	}
 
 	entry := PluginPolicyEntry{
 		Name:    plugin.Name,
@@ -229,9 +228,8 @@ func pluginInstall(args []string) error {
 		cfg.Policies.Input = append(cfg.Policies.Input, entry)
 	}
 
-	yamlData, _ := yaml.Marshal(cfg)
-	if err := os.WriteFile(pluginsConfig, yamlData, 0644); err != nil {
-		return fmt.Errorf("writing plugins config: %w", err)
+	if err := persistPluginInstall(wasmPath, data, pluginsConfig, cfg); err != nil {
+		return err
 	}
 
 	fmt.Printf("Installed %s to %s\n", plugin.Name, wasmPath)
@@ -247,13 +245,10 @@ func pluginList(args []string) error {
 		}
 	}
 
-	var cfg PluginsConfig
-	data, err := os.ReadFile(pluginsConfig)
+	cfg, err := readPluginsConfig(pluginsConfig)
 	if err != nil {
-		fmt.Println("No plugins installed.")
-		return nil
+		return err
 	}
-	yaml.Unmarshal(data, &cfg)
 
 	all := append(cfg.Policies.Input, cfg.Policies.Output...)
 	if len(all) == 0 {
@@ -324,7 +319,9 @@ func pluginRemove(args []string) error {
 	if err != nil {
 		return fmt.Errorf("reading plugins config: %w", err)
 	}
-	yaml.Unmarshal(data, &cfg)
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parsing plugins config: %w", err)
+	}
 
 	var wasmPath string
 	// Remove from input
@@ -349,11 +346,13 @@ func pluginRemove(args []string) error {
 	}
 	cfg.Policies.Output = filteredOut
 
-	yamlData, _ := yaml.Marshal(cfg)
-	os.WriteFile(pluginsConfig, yamlData, 0644)
-
 	if wasmPath != "" {
-		os.Remove(wasmPath)
+		if err := writePluginsConfig(pluginsConfig, cfg); err != nil {
+			return err
+		}
+		if err := os.Remove(wasmPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("plugin removed from config but file removal failed: %w", err)
+		}
 		fmt.Printf("Removed %s and %s\n", name, wasmPath)
 	} else {
 		fmt.Printf("Plugin %s not found in config\n", name)
@@ -458,4 +457,80 @@ func compareVersion(a, b string) int {
 		}
 	}
 	return 0
+}
+
+func readPluginsConfig(path string) (PluginsConfig, error) {
+	var cfg PluginsConfig
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return cfg, nil
+	}
+	if err != nil {
+		return cfg, fmt.Errorf("reading plugins config: %w", err)
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return cfg, fmt.Errorf("parsing plugins config: %w", err)
+	}
+	return cfg, nil
+}
+
+func writePluginsConfig(path string, cfg PluginsConfig) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("encoding plugins config: %w", err)
+	}
+	if err := writePluginFile(path, data); err != nil {
+		return fmt.Errorf("writing plugins config: %w", err)
+	}
+	return nil
+}
+
+// writePluginFile replaces a complete file only after its new contents close successfully.
+func writePluginFile(path string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), ".plugin-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+			log.Print("plugin temporary file cleanup failed")
+		}
+	}()
+	if _, err := f.Write(data); err != nil {
+		cleanup.Close(f)
+		return err
+	}
+	if err := f.Chmod(0644); err != nil {
+		cleanup.Close(f)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		cleanup.Close(f)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
+}
+
+func persistPluginInstall(wasmPath string, data []byte, pluginsConfig string, cfg PluginsConfig) error {
+	previous, readErr := os.ReadFile(wasmPath)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("reading existing plugin: %w", readErr)
+	}
+	if err := writePluginFile(wasmPath, data); err != nil {
+		return fmt.Errorf("writing plugin file: %w", err)
+	}
+	if err := writePluginsConfig(pluginsConfig, cfg); err != nil {
+		var rollbackErr error
+		if readErr == nil {
+			rollbackErr = writePluginFile(wasmPath, previous)
+		} else {
+			rollbackErr = os.Remove(wasmPath)
+		}
+		return errors.Join(err, rollbackErr)
+	}
+
+	return nil
 }

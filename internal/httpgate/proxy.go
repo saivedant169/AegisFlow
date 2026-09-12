@@ -1,6 +1,8 @@
 package httpgate
 
 import (
+	"log"
+
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/toolpolicy"
@@ -18,8 +21,11 @@ import (
 // Proxy is an HTTP reverse proxy that intercepts agent API calls,
 // evaluates them against tool policies, and records actions in the evidence chain.
 type Proxy struct {
-	engine   *toolpolicy.Engine
-	chain    *evidence.SessionChain
+	engine *toolpolicy.Engine
+	chain  interface {
+		SessionID() string
+		Record(*envelope.ActionEnvelope) (*evidence.Record, error)
+	}
 	queue    *approval.Queue
 	services []ServiceConfig
 	client   *http.Client
@@ -27,19 +33,26 @@ type Proxy struct {
 
 // NewProxy creates a new HTTP API interceptor proxy.
 func NewProxy(engine *toolpolicy.Engine, chain *evidence.SessionChain, queue *approval.Queue, services []ServiceConfig) *Proxy {
-	return &Proxy{
+	p := &Proxy{
 		engine:   engine,
-		chain:    chain,
 		queue:    queue,
 		services: services,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
+	if chain != nil {
+		p.chain = chain
+	}
+	return p
 }
 
 // ServeHTTP implements http.Handler.
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if p.chain == nil {
+		http.Error(w, "evidence unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	// Match the request to a configured upstream service.
 	svc := MatchService(r.Host, r.URL.Path, p.services)
 	if svc == nil {
@@ -80,16 +93,23 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Evaluate against tool policy.
 	decision := p.engine.Evaluate(env)
 	env.PolicyDecision = decision
+	// Persist the decision before creating approvals or dispatching upstream.
+	if !p.record(w, env) {
+		return
+	}
 
 	switch decision {
 	case envelope.DecisionBlock:
-		p.chain.Record(env)
 		writeJSON(w, http.StatusForbidden, types.NewErrorResponse(
 			http.StatusForbidden, "policy_violation", "request blocked by policy: "+toolName,
 		))
 		return
 
 	case envelope.DecisionReview:
+		if p.queue == nil {
+			http.Error(w, "approval queue unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		approvalID, err := p.queue.Submit(env)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, types.NewErrorResponse(
@@ -97,7 +117,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			))
 			return
 		}
-		p.chain.Record(env)
 		writeJSON(w, http.StatusAccepted, map[string]string{
 			"status":      "pending_review",
 			"approval_id": approvalID,
@@ -113,20 +132,24 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Success: false,
 				Error:   err.Error(),
 			}
-			p.chain.Record(env)
+			if !p.record(w, env) {
+				return
+			}
 			writeJSON(w, http.StatusBadGateway, types.NewErrorResponse(
 				http.StatusBadGateway, "upstream_error", "upstream request failed: "+err.Error(),
 			))
 			return
 		}
-		defer resp.Body.Close()
+		defer cleanup.Close(resp.Body)
 
 		// Record success in evidence chain.
 		env.Result = &envelope.ActionResult{
 			Success:    resp.StatusCode >= 200 && resp.StatusCode < 400,
 			StatusCode: resp.StatusCode,
 		}
-		p.chain.Record(env)
+		if !p.record(w, env) {
+			return
+		}
 
 		// Copy upstream response to client.
 		for key, values := range resp.Header {
@@ -135,15 +158,27 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			log.Print("upstream response copy failed")
+			return
+		}
 		return
 	}
 
 	// Fallback: block unknown decisions.
-	p.chain.Record(env)
 	writeJSON(w, http.StatusForbidden, types.NewErrorResponse(
 		http.StatusForbidden, "policy_violation", "unknown policy decision",
 	))
+}
+
+// record returns false when evidence cannot be persisted. After dispatch, the
+// caller must treat this failure as an unknown recorded outcome, not a safe retry.
+func (p *Proxy) record(w http.ResponseWriter, env *envelope.ActionEnvelope) bool {
+	if _, err := p.chain.Record(env); err != nil {
+		http.Error(w, "evidence unavailable; upstream may have executed if dispatch started; do not retry automatically", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
 }
 
 // forwardRequest proxies the incoming request to the upstream service.
@@ -190,5 +225,8 @@ func methodToCapability(method string) envelope.Capability {
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }

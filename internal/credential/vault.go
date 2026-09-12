@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // VaultBroker issues short-lived database credentials via HashiCorp Vault's
@@ -80,7 +81,7 @@ func (b *VaultBroker) Issue(ctx context.Context, req CredentialRequest) (*Creden
 	if err != nil {
 		return nil, fmt.Errorf("vault: request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -161,7 +162,7 @@ func (b *VaultBroker) Revoke(ctx context.Context, credID string) error {
 	if err != nil {
 		return fmt.Errorf("vault: revoke request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)

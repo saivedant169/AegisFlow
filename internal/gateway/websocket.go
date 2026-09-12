@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/saivedant169/AegisFlow/internal/cache"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/middleware"
@@ -57,7 +58,7 @@ func (h *Handler) WebSocket(cfg *config.Config, wsCfg WebSocketConfig) http.Hand
 }
 
 func (h *Handler) handleWebSocket(conn *websocket.Conn, cfg *config.Config, pingInterval time.Duration) {
-	defer conn.Close()
+	defer cleanup.Close(conn)
 
 	// Attempt auth from query param.
 	var tenant *config.TenantConfig
@@ -331,7 +332,9 @@ func (h *Handler) wsSend(conn *websocket.Conn, env wsEnvelope) {
 	if err != nil {
 		return
 	}
-	websocket.Message.Send(conn, string(data))
+	if err := websocket.Message.Send(conn, string(data)); err != nil {
+		cleanup.Close(conn)
+	}
 }
 
 func (h *Handler) wsSendError(conn *websocket.Conn, id string, code int, errType, message string) {

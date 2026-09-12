@@ -5,7 +5,7 @@ description: Install and operate a local-first policy gateway for coding agents 
 
 # AegisFlow
 
-AegisFlow is a local-first policy gateway for coding agents. It allows, reviews, or blocks routed MCP, shell, SQL, GitHub, and HTTP actions. It can issue scoped credentials and write signed, hash-linked evidence for each session.
+AegisFlow is a local-first policy gateway for coding agents. It allows, reviews, or blocks routed MCP actions and writes signed, hash-linked session evidence. Standalone execution gates remain experimental libraries. Runtime upstream credential issuance is disabled. See [runtime support and verification](runtime-support.md).
 
 ![AegisFlow governed pull request workflow](assets/hero-pr-writer.gif)
 
@@ -28,7 +28,7 @@ Installer builds binaries, starts local services, loads PR-writer policy, then c
 | Claude Code | [Claude Code security](guides/claude-code-security.md) | Messages API and routed MCP calls |
 | Cursor | [Cursor policy gateway](guides/cursor-policy-gateway.md) | Routed MCP calls |
 | MCP client or server | [MCP gateway security](guides/mcp-gateway-security.md) | Tool discovery, calls, review resume |
-| Coding-agent workflow | [Coding-agent governance](guides/coding-agent-governance.md) | Policy decisions, credentials, evidence |
+| Coding-agent workflow | [Coding-agent governance](guides/coding-agent-governance.md) | Policy decisions, approvals, evidence |
 
 ## Know boundary
 

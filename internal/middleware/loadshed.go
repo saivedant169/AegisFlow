@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+
 	"encoding/json"
 	"net/http"
 
@@ -34,18 +36,24 @@ func LoadShed(shedder *loadshed.Shedder) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", "5")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(
 					503, "service_unavailable",
 					"server at capacity -- request shed, retry later",
-				))
+				)); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 			case loadshed.QueueTimeout:
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", "5")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				json.NewEncoder(w).Encode(types.NewErrorResponse(
+				if err := json.NewEncoder(w).Encode(types.NewErrorResponse(
 					503, "service_unavailable",
 					"request queued too long -- timed out, retry later",
-				))
+				)); err != nil {
+					log.Print("JSON response write failed")
+					return
+				}
 			}
 		})
 	}

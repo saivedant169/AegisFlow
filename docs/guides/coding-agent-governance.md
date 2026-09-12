@@ -1,6 +1,6 @@
 ---
 title: Coding-agent governance at runtime
-description: Apply runtime policy, scoped credentials, and signed evidence to coding-agent actions.
+description: Apply runtime policy, approvals, and signed evidence to coding-agent actions.
 ---
 
 # Coding-agent governance at runtime
@@ -23,13 +23,11 @@ Policy returns `allow`, `review`, or `block`.
 
 ## Credentials
 
-Credential brokers can issue short-lived access after policy and approval checks. GitHub broker can request installation token with selected repository and permissions. AWS broker can apply task-specific STS session policy.
-
-Broker support depends on deployment configuration. AegisFlow does not reduce scope of arbitrary static token automatically.
+Runtime upstream credential issuance is disabled. Authentication keys identify callers; they do not mint provider access. Broker libraries are experimental. See [candidate migration](../releases/corrective-candidate.md).
 
 ## Evidence
 
-Each governed session can record policy decision, approval event, credential issue, and upstream result. Records are hash-linked and signed with HMAC key. See [tamper-evident audit guide](tamper-evident-audit.md) for verification and key handling.
+Each governed session can record policy decisions and upstream results. Records are hash-linked and signed with HMAC key. See [tamper-evident audit guide](tamper-evident-audit.md) for verification and key handling.
 
 ## Start with narrow workflow
 

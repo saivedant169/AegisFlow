@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/rollout"
 )
 
@@ -179,7 +180,7 @@ LIMIT 50`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var rollouts []*rollout.Rollout
 	for rows.Next() {

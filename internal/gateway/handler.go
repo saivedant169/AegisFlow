@@ -19,6 +19,7 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/analytics"
 	"github.com/saivedant169/AegisFlow/internal/behavioral"
 	"github.com/saivedant169/AegisFlow/internal/cache"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/policy"
 	"github.com/saivedant169/AegisFlow/internal/provider"
@@ -210,7 +211,7 @@ func readRequestBody(r *http.Request, maxBodySize int64) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid gzip body: %w", err)
 		}
-		defer gr.Close()
+		defer cleanup.Close(gr)
 		bodyReader = gr
 	}
 
@@ -322,7 +323,9 @@ func (h *Handler) encodeResponse(w http.ResponseWriter, r *http.Request, resp an
 			log.Printf("encodeResponse: failed to close gzip writer: %v", err)
 		}
 	} else {
-		w.Write(respBytes)
+		if _, err := w.Write(respBytes); err != nil {
+			return
+		}
 	}
 }
 
@@ -341,7 +344,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, rc requestContext, req *ty
 		writeError(w, http.StatusBadGateway, "provider_error", "upstream provider error")
 		return
 	}
-	defer stream.Close()
+	defer cleanup.Close(stream)
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -370,11 +373,16 @@ func (h *Handler) handleStream(w http.ResponseWriter, rc requestContext, req *ty
 		for {
 			n, err := stream.Read(buf)
 			if n > 0 {
-				w.Write(buf[:n])
+				if _, err := w.Write(buf[:n]); err != nil {
+					return
+				}
 				flusher.Flush()
 				released += n
 			}
 			if err != nil {
+				if err != io.EOF {
+					return
+				}
 				break
 			}
 		}
@@ -388,18 +396,31 @@ func (h *Handler) handleStream(w http.ResponseWriter, rc requestContext, req *ty
 			"error":   "policy_violation",
 			"message": v.Message,
 		})
-		w.Write([]byte("data: "))
-		w.Write(errPayload)
-		w.Write([]byte("\n\n"))
+		if _, err := w.Write([]byte("data: ")); err != nil {
+			return
+		}
+		if _, err := w.Write(errPayload); err != nil {
+			return
+		}
+		if _, err := w.Write([]byte("\n\n")); err != nil {
+			return
+		}
 		flusher.Flush()
 		log.Printf("stream terminated: %s", policy.FormatViolation(v))
 	}
 
 	// Scan-before-release is enforced by the shared streamScanner; the sink
 	// passes scanned-clean bytes straight through as raw SSE.
+	outputFailed := false
 	scanner := newStreamScanner(h.policy, streamSink{
 		writeDelta: func(b []byte) {
-			w.Write(b)
+			if outputFailed {
+				return
+			}
+			if _, err := w.Write(b); err != nil {
+				outputFailed = true
+				return
+			}
 			flusher.Flush()
 			released += len(b)
 		},
@@ -409,15 +430,18 @@ func (h *Handler) handleStream(w http.ResponseWriter, rc requestContext, req *ty
 	for {
 		n, err := stream.Read(buf)
 		if n > 0 {
-			if !scanner.Feed(buf[:n]) {
+			if !scanner.Feed(buf[:n]) || outputFailed {
 				return
 			}
 		}
 		if err != nil {
+			if err != io.EOF {
+				return
+			}
 			break
 		}
 	}
-	if !scanner.Close() {
+	if !scanner.Close() || outputFailed {
 		return
 	}
 	finalize()
@@ -430,7 +454,10 @@ func (h *Handler) ListModels(w http.ResponseWriter, r *http.Request) {
 		Data:   models,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func (h *Handler) recordAnalytics(tenantID, model, providerName string, statusCode int, startTime time.Time, tokens int64, qualityScore ...int) {
@@ -497,7 +524,10 @@ func (h *Handler) logRequest(startTime time.Time, r *http.Request, tenantID, mod
 func writeError(w http.ResponseWriter, code int, errType, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message))
+	if err := json.NewEncoder(w).Encode(types.NewErrorResponse(code, errType, message)); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }
 
 func writeValidationError(w http.ResponseWriter, code, param, message string) {
@@ -512,5 +542,8 @@ func writeValidationError(w http.ResponseWriter, code, param, message string) {
 		errResp.Error.Param = param
 	}
 
-	json.NewEncoder(w).Encode(errResp)
+	if err := json.NewEncoder(w).Encode(errResp); err != nil {
+		log.Print("JSON response write failed")
+		return
+	}
 }

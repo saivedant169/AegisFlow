@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 // GitHubNotifier posts approval lifecycle comments on GitHub PRs/issues.
@@ -101,7 +102,7 @@ func (g *GitHubNotifier) postComment(item *approval.ApprovalItem, body string) e
 	if err != nil {
 		return fmt.Errorf("github: post comment: %w", err)
 	}
-	defer resp.Body.Close()
+	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("github: API returned status %d", resp.StatusCode)

@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 
 	"github.com/saivedant169/AegisFlow/internal/admin"
 	"github.com/saivedant169/AegisFlow/internal/analytics"
@@ -107,8 +108,8 @@ func main() {
 
 	// Config hot-reload (tpEngine and policyVersionStore are set below but
 	// captured by reference, so the callback sees the final values).
-	var tpEngineForWatcher **toolpolicy.Engine = new(*toolpolicy.Engine)
-	var pvStoreForWatcher **toolpolicy.PolicyVersionStore = new(*toolpolicy.PolicyVersionStore)
+	var tpEngineForWatcher = new(*toolpolicy.Engine)
+	var pvStoreForWatcher = new(*toolpolicy.PolicyVersionStore)
 	watcher := config.NewWatcher(*configPath, cfg, func(newCfg *config.Config) {
 		log.Printf("config reloaded — some changes require restart")
 
@@ -190,7 +191,7 @@ func main() {
 		if err != nil {
 			log.Printf("database connection failed (continuing without persistence): %v", err)
 		} else {
-			defer pgStore.Close()
+			defer cleanup.Close(pgStore)
 			if err := pgStore.MigrateAudit(); err != nil {
 				log.Printf("audit table migration failed: %v", err)
 			}
@@ -394,9 +395,7 @@ func main() {
 		})
 	})
 	r.Use(chimw.RequestID)
-	// RealIP trusts X-Forwarded-For/X-Real-IP headers.
-	// In production, ensure only your reverse proxy (nginx, ALB, etc.) sets these.
-	r.Use(chimw.RealIP)
+	// Preserve the transport peer address; forwarded headers are untrusted.
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS(cfg))
 	r.Use(middleware.Auth(cfg))
@@ -491,11 +490,12 @@ func main() {
 	// Federation
 	var federationProvider admin.FederationProvider
 	if cfg.Federation.Enabled {
-		if cfg.Federation.Mode == "control-plane" {
+		switch cfg.Federation.Mode {
+		case "control-plane":
 			cp := federation.NewControlPlane(cfg)
 			federationProvider = cp
 			log.Printf("federation control plane enabled (%d data planes)", len(cfg.Federation.DataPlanes))
-		} else if cfg.Federation.Mode == "data-plane" {
+		case "data-plane":
 			dp := federation.NewDataPlane(cfg.Federation.ControlPlane.Name, cfg.Federation.ControlPlane.URL, cfg.Federation.ControlPlane.Token, cfg.Federation.ControlPlane.SyncInterval)
 			dp.Start()
 			defer dp.Stop()
@@ -546,7 +546,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("open runtime state: %v", err)
 		}
-		defer sqliteState.Close()
+		defer cleanup.Close(sqliteState)
 		log.Printf("[init] runtime state enabled (sqlite=%s)", sqliteState.Path())
 	}
 
@@ -778,7 +778,11 @@ func main() {
 				log.Fatalf("MCP gateway server error: %v", err)
 			}
 		}()
-		defer mcpSrv.Shutdown(context.Background())
+		defer func() {
+			if err := mcpSrv.Shutdown(context.Background()); err != nil {
+				log.Print("MCP shutdown failed")
+			}
+		}()
 		defer mcpGateway.Close()
 		log.Printf("[init] MCP gateway enabled (%d upstreams, port %d)", len(upstreams), cfg.MCPGateway.Port)
 	}
@@ -810,8 +814,12 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdown)
 	defer cancel()
 
-	gatewaySrv.Shutdown(ctx)
-	adminSrv.Shutdown(ctx)
+	if err := gatewaySrv.Shutdown(ctx); err != nil {
+		log.Print("gatewaySrv shutdown failed")
+	}
+	if err := adminSrv.Shutdown(ctx); err != nil {
+		log.Print("adminSrv shutdown failed")
+	}
 	handler.Close()
 	log.Println("servers stopped")
 }
@@ -826,7 +834,9 @@ func defaultConfigPath() string {
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	n := atomic.LoadUint64(&totalRequests)
-	fmt.Fprintf(w, `{"status":"ok","requests":%d}`, n)
+	if _, err := fmt.Fprintf(w, `{"status":"ok","requests":%d}`, n); err != nil {
+		return
+	}
 }
 
 // buildKeyRotator constructs a KeyRotator from a provider config.
@@ -984,7 +994,7 @@ func loadEnvFile(path string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer cleanup.Close(f)
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -997,7 +1007,9 @@ func loadEnvFile(path string) {
 			key := strings.TrimSpace(parts[0])
 			val := strings.TrimSpace(parts[1])
 			if os.Getenv(key) == "" {
-				os.Setenv(key, val)
+				if err := os.Setenv(key, val); err != nil {
+					log.Print("could not set environment entry")
+				}
 			}
 		}
 	}

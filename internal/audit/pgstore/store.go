@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/audit"
+	"github.com/saivedant169/AegisFlow/internal/cleanup"
 )
 
 type PostgresStore struct {
@@ -120,7 +121,7 @@ func (s *PostgresStore) Query(filters audit.QueryFilters) ([]audit.Entry, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cleanup.Close(rows)
 
 	var entries []audit.Entry
 	for rows.Next() {

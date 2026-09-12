@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -49,7 +50,7 @@ func (r *Registry) AllModels() []types.Model {
 	defer r.mu.RUnlock()
 	var models []types.Model
 	for _, p := range r.providers {
-		m, err := p.Models(nil)
+		m, err := p.Models(context.Background())
 		if err == nil {
 			models = append(models, m...)
 		}

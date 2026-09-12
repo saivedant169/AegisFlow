@@ -3,6 +3,7 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -61,21 +62,29 @@ func NewWasmFilter(name string, action Action, wasmPath string, timeout time.Dur
 
 	compiled, err := rt.CompileModule(ctx, wasmBytes)
 	if err != nil {
-		rt.Close(ctx)
+		if err := rt.Close(ctx); err != nil {
+			log.Print("WASM cleanup failed")
+		}
 		return nil, fmt.Errorf("compiling wasm module %s: %w", wasmPath, err)
 	}
 
 	cfg := wasmModuleConfig(compiled)
 	module, err := rt.InstantiateModule(ctx, compiled, cfg)
 	if err != nil {
-		rt.Close(ctx)
+		if err := rt.Close(ctx); err != nil {
+			log.Print("WASM cleanup failed")
+		}
 		return nil, fmt.Errorf("instantiating wasm module %s: %w", wasmPath, err)
 	}
 
 	for _, fname := range []string{"check", "alloc", "get_result_ptr", "get_result_len"} {
 		if module.ExportedFunction(fname) == nil {
-			module.Close(ctx)
-			rt.Close(ctx)
+			if err := module.Close(ctx); err != nil {
+				log.Print("WASM cleanup failed")
+			}
+			if err := rt.Close(ctx); err != nil {
+				log.Print("WASM cleanup failed")
+			}
 			return nil, fmt.Errorf("wasm module %s missing required export: %s", wasmPath, fname)
 		}
 	}
@@ -105,21 +114,29 @@ func NewWasmFilterFromBytes(name string, action Action, wasmBytes []byte, timeou
 
 	compiled, err := rt.CompileModule(ctx, wasmBytes)
 	if err != nil {
-		rt.Close(ctx)
+		if err := rt.Close(ctx); err != nil {
+			log.Print("WASM cleanup failed")
+		}
 		return nil, fmt.Errorf("compiling wasm module: %w", err)
 	}
 
 	cfg := wasmModuleConfig(compiled)
 	module, err := rt.InstantiateModule(ctx, compiled, cfg)
 	if err != nil {
-		rt.Close(ctx)
+		if err := rt.Close(ctx); err != nil {
+			log.Print("WASM cleanup failed")
+		}
 		return nil, fmt.Errorf("instantiating wasm module: %w", err)
 	}
 
 	for _, fname := range []string{"check", "alloc", "get_result_ptr", "get_result_len"} {
 		if module.ExportedFunction(fname) == nil {
-			module.Close(ctx)
-			rt.Close(ctx)
+			if err := module.Close(ctx); err != nil {
+				log.Print("WASM cleanup failed")
+			}
+			if err := rt.Close(ctx); err != nil {
+				log.Print("WASM cleanup failed")
+			}
 			return nil, fmt.Errorf("wasm module missing required export: %s", fname)
 		}
 	}
@@ -265,6 +282,5 @@ func (f *WasmFilter) callCheck(ctx context.Context, content string, meta *WasmMe
 
 func (f *WasmFilter) Close() error {
 	ctx := context.Background()
-	f.module.Close(ctx)
-	return f.runtime.Close(ctx)
+	return errors.Join(f.module.Close(ctx), f.runtime.Close(ctx))
 }

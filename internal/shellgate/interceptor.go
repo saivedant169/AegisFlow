@@ -44,7 +44,9 @@ func (i *Interceptor) Evaluate(cmd string, args []string, workDir string) (*Resu
 		env := buildEnvelope(cmd, args, workDir)
 		env.PolicyDecision = envelope.DecisionBlock
 		if i.evidence != nil {
-			i.evidence.Record(env)
+			if _, err := i.evidence.Record(env); err != nil {
+				return nil, fmt.Errorf("recording shell evidence: %w", err)
+			}
 		}
 		return &Result{
 			Decision:   envelope.DecisionBlock,
@@ -61,12 +63,19 @@ func (i *Interceptor) Evaluate(cmd string, args []string, workDir string) (*Resu
 
 	// Record in evidence chain.
 	if i.evidence != nil {
-		i.evidence.Record(env)
+		if _, err := i.evidence.Record(env); err != nil {
+			return nil, fmt.Errorf("recording shell evidence: %w", err)
+		}
 	}
 
 	// If review is required, submit to approval queue.
-	if decision == envelope.DecisionReview && i.approvals != nil {
-		i.approvals.Submit(env)
+	if decision == envelope.DecisionReview {
+		if i.approvals == nil {
+			return nil, fmt.Errorf("approval queue unavailable")
+		}
+		if _, err := i.approvals.Submit(env); err != nil {
+			return nil, fmt.Errorf("submitting shell approval: %w", err)
+		}
 	}
 
 	msg := fmt.Sprintf("%s: %s %s", decision, cmd, strings.Join(args, " "))
