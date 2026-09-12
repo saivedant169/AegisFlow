@@ -18,9 +18,12 @@ import (
 
 func cmdSimulate(adminURL string, args []string) {
 	var protocol, tool, target, capability string
+	dryRun := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--dry-run":
+			dryRun = true
 		case "--protocol":
 			if i+1 < len(args) {
 				protocol = args[i+1]
@@ -45,15 +48,20 @@ func cmdSimulate(adminURL string, args []string) {
 	}
 
 	if protocol == "" || tool == "" || target == "" {
-		fmt.Println("Usage: aegisctl simulate --protocol <protocol> --tool <tool> --target <target> [--capability <cap>]")
+		fmt.Println("Usage: aegisctl simulate [--dry-run] --protocol <protocol> --tool <tool> --target <target> [--capability <cap>]")
 		os.Exit(1)
 	}
 
-	// Try remote first.
+	if dryRun {
+		fmt.Print(formatSimulateOutput(localSimulate(protocol, tool, target, capability)))
+		return
+	}
+
+	// Remote failures must not be replaced with example rules.
 	result, err := remoteSimulate(adminURL, protocol, tool, target, capability)
 	if err != nil {
-		// Fall back to local.
-		result = localSimulate(protocol, tool, target, capability)
+		fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Print(formatSimulateOutput(result))
@@ -89,7 +97,7 @@ func remoteSimulate(adminURL, protocol, tool, target, capability string) (*simul
 	}
 
 	var result simulateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := decodeJSON(resp, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -125,7 +133,7 @@ func formatSimulateOutput(r *simulateResponse) string {
 	var sb strings.Builder
 
 	if r.Local {
-		sb.WriteString("(local evaluation - admin server not reachable)\n\n")
+		sb.WriteString("(local evaluation - example rules only, nothing recorded)\n\n")
 	}
 
 	// Decision
@@ -205,7 +213,7 @@ func cmdWhy(adminURL string, args []string) {
 	}
 
 	var result simulateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := decodeJSON(resp, &result); err != nil {
 		fmt.Fprintf(os.Stderr, "Error decoding response: %v\n", err)
 		os.Exit(1)
 	}

@@ -92,11 +92,11 @@ func cmdTestAction(adminURL string, args []string) {
 		return
 	}
 
-	// Try remote evaluation first
+	// Remote failures must not be replaced with a local policy decision.
 	result, err := remoteTestAction(adminURL, protocol, tool, target, capability, params)
 	if err != nil {
-		// Fall back to local evaluation
-		result = localTestAction(protocol, tool, target, capability, params)
+		fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		os.Exit(1)
 	}
 
 	printTestActionResult(result)
@@ -126,7 +126,7 @@ func remoteTestAction(adminURL, protocol, tool, target, capability string, param
 	}
 
 	var result testActionResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := decodeJSON(resp, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

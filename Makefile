@@ -1,4 +1,4 @@
-.PHONY: build run test lint vuln fmt fmt-check docker-build docker-up demo-local smoke e2e-approval-security e2e-installer benchmark clean
+.PHONY: build run test lint vuln fmt fmt-check docker-build docker-up demo-local smoke e2e-approval-security e2e-installer e2e-cli benchmark clean
 
 BINARY=aegisflow
 CONFIG=configs/aegisflow.yaml
@@ -42,6 +42,9 @@ demo-local:
 
 smoke:
 	bash scripts/compose_smoke.sh
+
+e2e-cli:
+	python3 scripts/e2e_cli.py
 
 e2e-installer:
 	python3 scripts/e2e_installer.py

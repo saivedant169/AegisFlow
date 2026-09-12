@@ -1017,6 +1017,10 @@ func (c *Config) FindTenantByAPIKey(apiKey string) *TenantMatch {
 }
 
 func validateConfig(cfg *Config) error {
+	if cfg.Credentials.Enabled {
+		return fmt.Errorf("credentials.enabled is unavailable pending broker hardening; set it to false before startup")
+	}
+
 	// --- Server ---
 	if cfg.Server.MaxBodySize < 0 {
 		return fmt.Errorf("server.max_body_size must not be negative (got %d)", cfg.Server.MaxBodySize)

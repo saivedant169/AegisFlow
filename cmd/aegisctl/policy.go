@@ -25,7 +25,7 @@ func cmdPolicyHistory(adminURL string) {
 	}
 	if err := decodeJSON(resp, &versions); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	if len(versions) == 0 {
@@ -57,7 +57,7 @@ func cmdPolicyCurrent(adminURL string) {
 	var version map[string]interface{}
 	if err := decodeJSON(resp, &version); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	data, _ := json.MarshalIndent(version, "", "  ")

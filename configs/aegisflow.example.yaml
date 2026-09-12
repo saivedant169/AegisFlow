@@ -305,6 +305,7 @@ github_gate:
 # Task-scoped credential broker
 # Issues short-lived, task-scoped credentials instead of sharing full user tokens.
 credentials:
+  # Runtime issuance is unavailable until broker hardening passes. Keep disabled.
   enabled: false
   providers:
     - name: "fallback-static"

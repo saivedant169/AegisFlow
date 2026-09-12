@@ -260,3 +260,21 @@ tenants:
 		t.Fatal("expected non-nil config")
 	}
 }
+
+func TestRuntimeCredentialIssuanceUnavailable(t *testing.T) {
+	for _, kind := range []string{"static", "github_app", "vault", "aws_sts"} {
+		t.Run(kind, func(t *testing.T) {
+			_, err := loadFromYAML(t, "credentials:\n  enabled: true\n  providers:\n    - name: fixture\n      type: "+kind+"\n      token: private-fixture-value\n")
+			if err == nil || !strings.Contains(err.Error(), "credentials.enabled is unavailable") {
+				t.Fatalf("unexpected result: %v", err)
+			}
+			if strings.Contains(err.Error(), "private-fixture-value") {
+				t.Fatal("configuration error exposed credential")
+			}
+		})
+	}
+	_, err := loadFromYAML(t, "credentials:\n  enabled: false\n  providers:\n    - name: fixture\n      type: static\n      token: private-fixture-value\n")
+	if err != nil {
+		t.Fatalf("disabled credentials rejected: %v", err)
+	}
+}

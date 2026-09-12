@@ -8,12 +8,14 @@
 > defense-in-depth. The controls **wired into the runtime today** are: the MCP
 > gateway + `toolpolicy` engine (allow/review/block on tool calls), input/output
 > policy, behavioral session analysis + kill-switch, RBAC, the approval queue,
-> task-scoped credentials, and the signed evidence chain. The **execution-gate
+> and the signed evidence chain. The **execution-gate
 > sandboxes** (shell, SQL, Git, HTTP) and the **enterprise identity /
 > separation-of-duties hierarchy** are experimental libraries — unit-tested but
 > **not yet wired into the request path**. Where a mitigation below names a
 > shell/SQL/Git/HTTP sandbox or the identity hierarchy, treat it as planned, not
 > shipped.
+
+Runtime upstream credential issuance is disabled in the development candidate. Credential-related mitigations below describe intended behavior, not currently available runtime protection. See [candidate migration notes](../releases/corrective-candidate.md).
 
 ---
 

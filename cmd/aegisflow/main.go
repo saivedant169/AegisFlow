@@ -31,7 +31,6 @@ import (
 	"github.com/saivedant169/AegisFlow/internal/capability"
 	"github.com/saivedant169/AegisFlow/internal/config"
 	"github.com/saivedant169/AegisFlow/internal/costopt"
-	"github.com/saivedant169/AegisFlow/internal/credential"
 	"github.com/saivedant169/AegisFlow/internal/eval"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
 	"github.com/saivedant169/AegisFlow/internal/federation"
@@ -625,82 +624,8 @@ func main() {
 	}()
 	defer close(approvalCleanupStop)
 
-	// Credential broker
+	// Runtime credential issuance remains disconnected until broker hardening passes.
 	var credentialAdapter admin.CredentialProvider
-	if cfg.Credentials.Enabled {
-		credRegistry := credential.NewRegistry()
-		for _, pc := range cfg.Credentials.Providers {
-			switch pc.Type {
-			case "static":
-				ttl := pc.DefaultTTL
-				if ttl == 0 {
-					ttl = 1 * time.Hour
-				}
-				broker := credential.NewStaticBroker(pc.Name, pc.Token, ttl)
-				credRegistry.Register(pc.Name, broker)
-				log.Printf("[init] registered static credential broker: %s", pc.Name)
-			case "github_app":
-				ttl := pc.DefaultTTL
-				if ttl == 0 {
-					ttl = 1 * time.Hour
-				}
-				broker := credential.NewGitHubAppBroker(pc.Name, pc.GitHubAppID, pc.GitHubKeyPath, pc.GitHubInstallID, ttl)
-				credRegistry.Register(pc.Name, broker)
-				log.Printf("[init] registered GitHub App credential broker: %s (app_id: %d, install_id: %d)", pc.Name, pc.GitHubAppID, pc.GitHubInstallID)
-			case "vault":
-				ttl := pc.DefaultTTL
-				if ttl == 0 {
-					ttl = 30 * time.Minute
-				}
-				broker := credential.NewVaultBroker(pc.Name, pc.VaultAddr, pc.VaultToken, pc.VaultSecretPath, ttl, nil)
-				credRegistry.Register(pc.Name, broker)
-				log.Printf("[init] registered Vault credential broker: %s (addr: %s, path: %s)", pc.Name, pc.VaultAddr, pc.VaultSecretPath)
-			case "aws_sts":
-				ttl := pc.DefaultTTL
-				if ttl == 0 {
-					ttl = 1 * time.Hour
-				}
-				region := pc.AWSRegion
-				if region == "" {
-					region = "us-east-1"
-				}
-				stsClient := credential.NewHTTPSTSClient(
-					os.Getenv("AWS_ACCESS_KEY_ID"),
-					os.Getenv("AWS_SECRET_ACCESS_KEY"),
-					region,
-				)
-				broker := credential.NewAWSSTSBroker(pc.Name, credential.AWSSTSBrokerConfig{
-					RoleARN:           pc.AWSRoleARN,
-					Region:            region,
-					SessionNamePrefix: "aegisflow",
-					ExternalID:        pc.AWSExternalID,
-					SessionPolicy:     pc.AWSSessionPolicy,
-					DefaultTTL:        ttl,
-				}, stsClient)
-				credRegistry.Register(pc.Name, broker)
-				log.Printf("[init] registered AWS STS credential broker: %s (role: %s, region: %s)", pc.Name, pc.AWSRoleARN, region)
-			default:
-				log.Printf("[init] skipping unsupported credential provider type: %s", pc.Type)
-			}
-		}
-		credentialAdapter = credential.NewAdminAdapter(credRegistry)
-		// Start periodic cleanup of expired credentials.
-		credCleanupStop := make(chan struct{})
-		go func() {
-			ticker := time.NewTicker(1 * time.Minute)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-credCleanupStop:
-					return
-				case <-ticker.C:
-					credRegistry.CleanupExpired()
-				}
-			}
-		}()
-		defer close(credCleanupStop)
-		log.Printf("[init] credential broker enabled (%d providers)", len(cfg.Credentials.Providers))
-	}
 
 	// Tool policy engine for admin test-action endpoint
 	var toolPolicyOpt admin.ServerOption

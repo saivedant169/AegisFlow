@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Runtime credential issuance is unavailable pending broker hardening. Configurations with `credentials.enabled: true` now fail startup. See [candidate migration notes](docs/releases/corrective-candidate.md).
+- CLI requests use configured credentials consistently, reject redirects, and return nonzero on invalid evidence verification and failed remote reads. Local policy examples require explicit `--dry-run`.
+- Release builds validate tag, changelog, chart, and release notes together. The installer pins one stable tag, validates binary versions, and supports either gateway or CLI installation.
+
 ### Added
 
 - Bearer-token environment variables and Streamable HTTP SSE responses for MCP HTTP upstreams.

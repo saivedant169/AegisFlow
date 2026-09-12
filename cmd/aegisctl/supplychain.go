@@ -13,21 +13,21 @@ import (
 func cmdSupplyChainList(adminURL string) {
 	data := fetchJSON(adminURL + "/admin/v1/supply-chain")
 	if data == nil {
-		return
+		os.Exit(1)
 	}
 
 	raw, err := json.Marshal(data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	var resp struct {
 		Assets []supply.LoadedAsset `json:"assets"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
-		return
+		fmt.Fprintln(os.Stderr, "Error: invalid response")
+		os.Exit(1)
 	}
 
 	if len(resp.Assets) == 0 {

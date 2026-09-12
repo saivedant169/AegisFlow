@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -28,16 +29,19 @@ func TestAdminTransportScopesCredentialAndRejectsRedirect(t *testing.T) {
 	t.Setenv("AEGISFLOW_ADMIN_URL", admin.URL)
 	for _, route := range []string{"/admin/v1/evidence/sessions", "/admin/v1/redirect"} {
 		resp, err := client.Get(admin.URL + route)
-		if err != nil {
-			t.Fatal(err)
+		if route == "/admin/v1/redirect" {
+			if err == nil || !strings.Contains(err.Error(), "HTTP 302") {
+				t.Fatalf("expected redirect rejection, got %v", err)
+			}
+		} else {
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
 		}
-		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
 		if <-received != "reviewer-key" {
 			t.Fatal("admin credential missing")
-		}
-		if route == "/admin/v1/redirect" && resp.StatusCode != http.StatusFound {
-			t.Fatal("cross-origin redirect followed")
 		}
 	}
 	resp, err := client.Get(foreign.URL)

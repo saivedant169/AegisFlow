@@ -27,41 +27,36 @@ jobs:
           go-version-file: go.mod
 
       - name: Validate release metadata
-        run: |
-          test "${GITHUB_REF_NAME}" = "v0.9.0"
-          grep -q '^## \[0.9.0\] - 2026-08-18$' CHANGELOG.md
-          grep -q '^version: 0.9.0$' deployments/helm/aegisflow/Chart.yaml
+        id: metadata
+        run: python3 scripts/release_metadata.py "$GITHUB_REF_NAME" --github-output "$GITHUB_OUTPUT"
 
       - name: Test source
-        run: go test ./... -count=1
+        run: go test ./... -race -count=1
+
+      - name: Verify release tooling
+        run: |
+          python3 scripts/test_release_metadata.py
+          bash scripts/test_install.sh
+          python3 scripts/e2e_cli.py
 
       - name: Build release binaries
         env:
           VERSION: ${{ github.ref_name }}
-        run: |
-          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
-            os="${target%-*}"
-            arch="${target#*-}"
-            CGO_ENABLED=0 GOOS="${os}" GOARCH="${arch}" go build -trimpath \
-              -ldflags="-s -w -X main.version=${VERSION}" \
-              -o "aegisflow-${target}" ./cmd/aegisflow
-            CGO_ENABLED=0 GOOS="${os}" GOARCH="${arch}" go build -trimpath \
-              -ldflags="-s -w -X main.version=${VERSION}" \
-              -o "aegisctl-${target}" ./cmd/aegisctl
-          done
+        run: bash scripts/build_release.sh "$VERSION" .
 
       - name: Verify release binaries
         run: |
           test "$(./aegisflow-linux-amd64 --version)" = "aegisflow ${GITHUB_REF_NAME}"
           test "$(./aegisctl-linux-amd64 version)" = "aegisctl ${GITHUB_REF_NAME}"
+          python3 scripts/e2e_release_install.py "$GITHUB_REF_NAME" .
 
       - name: Generate source SBOM
         uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: .
           format: spdx-json
-          output-file: aegisflow-v0.9.0.spdx.json
-          artifact-name: aegisflow-v0.9.0.spdx.json
+          output-file: ${{ steps.metadata.outputs.sbom }}
+          artifact-name: ${{ steps.metadata.outputs.sbom }}
           upload-artifact: false
           upload-release-assets: false
           syft-version: v1.51.0
@@ -77,7 +72,7 @@ jobs:
             aegisctl-linux-arm64 \
             aegisctl-darwin-amd64 \
             aegisctl-darwin-arm64 \
-            aegisflow-v0.9.0.spdx.json > SHA256SUMS
+            ${{ steps.metadata.outputs.sbom }} > SHA256SUMS
           test "$(wc -l < SHA256SUMS)" -eq 9
 
       - name: Install Cosign
@@ -102,15 +97,15 @@ jobs:
             aegisctl-darwin-arm64
             SHA256SUMS
             SHA256SUMS.sigstore.json
-            aegisflow-v0.9.0.spdx.json
+            ${{ steps.metadata.outputs.sbom }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          name: "v0.9.0: tool boundary hardening"
-          body_path: docs/releases/v0.9.0.md
+          name: ${{ steps.metadata.outputs.tag }}
+          body_path: ${{ steps.metadata.outputs.notes }}
           fail_on_unmatched_files: true
-          overwrite_files: true
+          overwrite_files: false
           files: |
             aegisflow-linux-amd64
             aegisflow-linux-arm64
@@ -122,4 +117,4 @@ jobs:
             aegisctl-darwin-arm64
             SHA256SUMS
             SHA256SUMS.sigstore.json
-            aegisflow-v0.9.0.spdx.json
+            ${{ steps.metadata.outputs.sbom }}

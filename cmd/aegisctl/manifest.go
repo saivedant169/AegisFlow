@@ -131,7 +131,7 @@ func cmdManifestList(adminURL string) {
 	var manifests []map[string]interface{}
 	if err := decodeJSON(resp, &manifests); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	if len(manifests) == 0 {
@@ -168,7 +168,7 @@ func cmdManifestDrift(adminURL string, id string) {
 	var events []map[string]interface{}
 	if err := decodeJSON(resp, &events); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	if len(events) == 0 {

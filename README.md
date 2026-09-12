@@ -1,6 +1,6 @@
 # AegisFlow
 
-AegisFlow is a local-first policy gateway for coding agents. Allow, review, or block MCP, shell, SQL, GitHub, and HTTP actions, issue scoped credentials, and verify tamper-evident evidence.
+AegisFlow is a local-first policy gateway for coding agents. Allow, review, or block routed MCP actions and verify signed session evidence.
 
 [![CI](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml/badge.svg)](https://github.com/saivedant169/AegisFlow/actions/workflows/ci.yaml)
 [![CodeQL](https://github.com/saivedant169/AegisFlow/actions/workflows/codeql.yml/badge.svg)](https://github.com/saivedant169/AegisFlow/actions/workflows/codeql.yml)
@@ -48,7 +48,7 @@ Every action routed through AegisFlow becomes an `ActionEnvelope`. Policy evalua
 | Read database rows | `sql.select` | allow with `sql-explorer` |
 | Change database rows | `sql.update` | review with `sql-explorer` |
 
-Review decisions enter an approval queue. Approved actions receive task-specific credentials where a broker supports them. Every decision and approval enters signed session evidence.
+Review decisions enter an approval queue. Optional upstream credential issuance is disabled in the development candidate pending broker hardening. See [candidate behavior and migration](docs/releases/corrective-candidate.md); published v0.9.0 has a different persistence and credential contract.
 
 ```text
 Agent or client
@@ -60,7 +60,7 @@ MCP, OpenAI-compatible, or Messages API
 ActionEnvelope -> policy -> allow | review | block
                          |             |
                          v             v
-                 scoped credential   evidence chain
+                 permitted dispatch  evidence chain
                          |
                          v
                   external tool
@@ -84,7 +84,7 @@ ActionEnvelope -> policy -> allow | review | block
 ### Verified release binary
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/saivedant169/AegisFlow/v0.9.0/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/saivedant169/AegisFlow/v0.9.0/scripts/install.sh | AEGISFLOW_VERSION=v0.9.0 sh
 ```
 
 Installer downloads `SHA256SUMS` from same release and rejects mismatched binaries.

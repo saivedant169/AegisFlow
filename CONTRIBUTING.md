@@ -31,12 +31,21 @@ make test
 # Run vulnerability checks
 make vuln
 
+# Run CLI authentication and failure checks against a local gateway
+make e2e-cli
+
+# Validate release metadata and installer failure handling
+python3 scripts/test_release_metadata.py
+bash scripts/test_install.sh
+
 # Run the production-style smoke test
 make smoke
 
 # Run with Docker
 make docker-up
 ```
+
+CLI configuration and failure behavior: [CLI guide](docs/cli.md).
 
 ## Areas to Contribute
 

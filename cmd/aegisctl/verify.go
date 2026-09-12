@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 )
@@ -11,10 +9,12 @@ import (
 func cmdVerify(adminURL string, args []string) {
 	sessionID := ""
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--session" && i+1 < len(args) {
-			sessionID = args[i+1]
-			i++
+		if args[i] != "--session" || sessionID != "" || i+1 >= len(args) || args[i+1] == "" || strings.HasPrefix(args[i+1], "--") {
+			fmt.Fprintln(os.Stderr, "Usage: aegisctl verify [--session <id>]")
+			os.Exit(1)
 		}
+		sessionID = args[i+1]
+		i++
 	}
 
 	var url string
@@ -31,23 +31,19 @@ func cmdVerify(adminURL string, args []string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
-		os.Exit(1)
-	}
-	if resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
-		os.Exit(1)
-	}
-
 	var result VerifyResponse
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := decodeJSON(resp, &result); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
 		os.Exit(1)
 	}
+	if key := os.Getenv("AEGISFLOW_API_KEY"); key != "" {
+		result.Message = strings.ReplaceAll(result.Message, key, "[redacted]")
+	}
 
 	printVerifyResult(result)
+	if !result.Valid {
+		os.Exit(1)
+	}
 }
 
 // VerifyResponse matches the evidence.VerifyResult JSON structure.
