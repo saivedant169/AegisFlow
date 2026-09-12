@@ -1,6 +1,6 @@
 # Corrective candidate: development contract
 
-These changes are on the development branch. They are not a published release, and no new version number has been selected.
+These changes are prepared for v0.9.1. The candidate is not a published release. See [prepared release notes](v0.9.1.md); publication still requires matching hosted artifacts and release checks.
 
 ## Credential issuance is unavailable
 
