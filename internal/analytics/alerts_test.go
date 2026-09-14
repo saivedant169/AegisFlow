@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"strconv"
 	"testing"
 	"time"
 )
@@ -123,7 +124,7 @@ func TestAlertManagerRecentAlertsLimit(t *testing.T) {
 		am.ProcessAlerts(DetectionResult{
 			Alerts: []Alert{{
 				ID: "alert", Severity: SeverityCritical, Type: "static_threshold",
-				Dimension: "global", Metric: "metric_" + string('a'+i),
+				Dimension: "global", Metric: "metric_" + strconv.Itoa('a'+i),
 				Value: 50, Threshold: 20, Message: "alert", State: "active",
 				CreatedAt: time.Now(),
 			}},

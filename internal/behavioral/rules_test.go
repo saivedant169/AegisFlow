@@ -1,6 +1,7 @@
 package behavioral
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -163,8 +164,8 @@ func TestSuspiciousFanOut_BelowThreshold(t *testing.T) {
 	// Only 5 distinct targets -- below default threshold of 10.
 	var history []envelope.ActionEnvelope
 	for i := range 5 {
-		target := "host-" + string('a'+i) + ".example.com"
-		history = append(history, *makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+		target := "host-" + strconv.Itoa('a'+i) + ".example.com"
+		history = append(history, *makeEnv("e"+strconv.Itoa('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	if alert := rule.Detect(history); alert != nil {
@@ -178,8 +179,8 @@ func TestSuspiciousFanOut_Triggered(t *testing.T) {
 
 	var history []envelope.ActionEnvelope
 	for i := range 5 {
-		target := "host-" + string('a'+i) + ".example.com"
-		history = append(history, *makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+		target := "host-" + strconv.Itoa('a'+i) + ".example.com"
+		history = append(history, *makeEnv("e"+strconv.Itoa('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	alert := rule.Detect(history)

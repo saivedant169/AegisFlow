@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -201,7 +202,7 @@ func TestSignedChainVerifies(t *testing.T) {
 	key := []byte("test-evidence-key")
 	c := NewSignedSessionChain("s1", key)
 	for i := range 3 {
-		_, err := c.Record(sampleEnv2("e" + string('a'+i)))
+		_, err := c.Record(sampleEnv2("e" + strconv.Itoa('a'+i)))
 		if err != nil {
 			return
 		}

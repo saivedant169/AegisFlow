@@ -1,6 +1,7 @@
 package behavioral
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -96,8 +97,8 @@ func TestSuspiciousFanOut(t *testing.T) {
 
 	// 10 different targets in under 1 minute
 	for i := range 10 {
-		target := "host-" + string('a'+i) + ".example.com"
-		sa.RecordAction(makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+		target := "host-" + strconv.Itoa('a'+i) + ".example.com"
+		sa.RecordAction(makeEnv("e"+strconv.Itoa('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	alerts := sa.Analyze()

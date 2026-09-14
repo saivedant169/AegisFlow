@@ -1,6 +1,7 @@
 package behavioral
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func TestSuspiciousFanOut_SpreadBeyondWindowNoAlert(t *testing.T) {
 	// 12 distinct targets, each 30s apart => at most 1 per 10s window.
 	var history []envelope.ActionEnvelope
 	for i := range 12 {
-		target := "host-" + string('a'+i) + ".example.com"
+		target := "host-" + strconv.Itoa('a'+i) + ".example.com"
 		history = append(history, *makeEnv("e", "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*30*time.Second)))
 	}
 
@@ -79,7 +80,7 @@ func TestSuspiciousFanOut_BurstAfterQuietStillAlerts(t *testing.T) {
 	// Burst of 6 distinct targets within a 5s window, 5 minutes later.
 	burst := now.Add(5 * time.Minute)
 	for i := range 6 {
-		target := "burst-" + string('a'+i)
+		target := "burst-" + strconv.Itoa('a'+i)
 		history = append(history, *makeEnv("e", "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, burst.Add(time.Duration(i)*time.Second)))
 	}
 
