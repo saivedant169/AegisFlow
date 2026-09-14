@@ -1416,8 +1416,8 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 	}
 }
 
-func (s *stubApprovalProvider) ForTenant() any { return s }
-func (s *stubEvidenceProvider) ForTenant() any { return s }
+func (s *stubApprovalProvider) ForTenant(string) interface{} { return s }
+func (s *stubEvidenceProvider) ForTenant(string) interface{} { return s }
 
 func TestTestActionReviewSubmissionFailure(t *testing.T) {
 	for _, provider := range []ApprovalProvider{nil, &stubApprovalProvider{submitErr: errors.New("storage unavailable")}} {
