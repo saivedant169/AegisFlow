@@ -163,7 +163,7 @@ func TestEvaluateTruncatesContent(t *testing.T) {
 
 	var longPrompt strings.Builder
 	for range 600 {
-		longPrompt .WriteString("a")
+		longPrompt.WriteString("a")
 	}
 
 	we.Evaluate(WebhookRequest{

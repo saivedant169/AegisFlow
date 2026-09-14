@@ -188,7 +188,7 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 	scanner := bufio.NewScanner(stream.Body)
 	endpoint := ""
 	for scanner.Scan() {
-		if after, ok :=strings.CutPrefix(scanner.Text(), "data: "); ok  {
+		if after, ok := strings.CutPrefix(scanner.Text(), "data: "); ok {
 			endpoint = after
 			break
 		}
@@ -207,7 +207,7 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 		t.Fatalf("SSE owner: %d", status)
 	}
 	for scanner.Scan() {
-		if after, ok :=strings.CutPrefix(scanner.Text(), "data: "); ok  {
+		if after, ok := strings.CutPrefix(scanner.Text(), "data: "); ok {
 			id = pending([]byte(after))
 			break
 		}
