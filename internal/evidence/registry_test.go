@@ -34,9 +34,18 @@ func TestChainRegistry_SplitsBySession(t *testing.T) {
 	r := NewChainRegistry(nil)
 	defer r.Close()
 
-	r.Record(envForSession("s1", "e1"))
-	r.Record(envForSession("s1", "e2"))
-	r.Record(envForSession("s2", "e3"))
+	_, err := r.Record(envForSession("s1", "e1"))
+	if err != nil {
+		return
+	}
+	_, err = r.Record(envForSession("s1", "e2"))
+	if err != nil {
+		return
+	}
+	_, err = r.Record(envForSession("s2", "e3"))
+	if err != nil {
+		return
+	}
 
 	if got := len(mustGetChain(t, r, "s1").Records()); got != 2 {
 		t.Fatalf("session s1 should have 2 records, got %d", got)
@@ -53,7 +62,10 @@ func TestChainRegistry_SignsRecords(t *testing.T) {
 	key := []byte("reg-key")
 	r := NewChainRegistry(key)
 	defer r.Close()
-	r.Record(envForSession("s1", "e1"))
+	_, err := r.Record(envForSession("s1", "e1"))
+	if err != nil {
+		return
+	}
 
 	recs := mustGetChain(t, r, "s1").Records()
 	if recs[0].Signature == "" {
@@ -67,7 +79,10 @@ func TestChainRegistry_SignsRecords(t *testing.T) {
 func TestRegistryAdminAdapter(t *testing.T) {
 	r := NewChainRegistry([]byte("k"))
 	defer r.Close()
-	r.Record(envForSession("s1", "e1"))
+	_, err := r.Record(envForSession("s1", "e1"))
+	if err != nil {
+		return
+	}
 	a := NewRegistryAdminAdapter(r)
 
 	exported, err := a.ExportSession("s1")

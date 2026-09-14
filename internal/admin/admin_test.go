@@ -20,7 +20,7 @@ import (
 type stubRolloutManager struct{}
 
 func (s *stubRolloutManager) ListRollouts() (any, error) { return []any{}, nil }
-func (s *stubRolloutManager) CreateRollout(routeModel string, baselineProviders []string, canaryProvider string, stages []int, observationWindow time.Duration, errorThreshold float64, latencyP95Threshold int64) (any, error) {
+func (s *stubRolloutManager) CreateRollout(routeModel string, baselineProviders []string, canaryProvider string, stages []int, _ time.Duration, _ float64, _ int64) (any, error) {
 	return map[string]any{
 		"route_model":        routeModel,
 		"baseline_providers": baselineProviders,
@@ -31,21 +31,21 @@ func (s *stubRolloutManager) CreateRollout(routeModel string, baselineProviders 
 func (s *stubRolloutManager) GetRolloutWithMetrics(id string) (any, error) {
 	return map[string]any{"id": id}, nil
 }
-func (s *stubRolloutManager) PauseRollout(id string) error    { return nil }
-func (s *stubRolloutManager) ResumeRollout(id string) error   { return nil }
-func (s *stubRolloutManager) RollbackRollout(id string) error { return nil }
+func (s *stubRolloutManager) PauseRollout(string) error    { return nil }
+func (s *stubRolloutManager) ResumeRollout(string) error   { return nil }
+func (s *stubRolloutManager) RollbackRollout(string) error { return nil }
 
 type verifyOnlyAuditProvider struct{}
 
-func (s *verifyOnlyAuditProvider) Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error) {
+func (s *verifyOnlyAuditProvider) Query(string, string, string, string, int) (any, error) {
 	return []any{}, nil
 }
 
-func (s *verifyOnlyAuditProvider) Verify() (interface{}, error) {
+func (s *verifyOnlyAuditProvider) Verify() (any, error) {
 	return map[string]any{"valid": true, "message": "ok"}, nil
 }
 
-func (s *verifyOnlyAuditProvider) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
+func (s *verifyOnlyAuditProvider) Log(string, string, string, string, string, string, string) {
 }
 
 func (s *verifyOnlyAuditProvider) LatestTimestamp() (string, error) {
@@ -55,10 +55,10 @@ func (s *verifyOnlyAuditProvider) LatestTimestamp() (string, error) {
 func newFullAdminServer() *Server {
 	srv := newIntegrationAdminServer()
 	srv.approvalProvider = &stubApprovalProvider{
-		pendingItems: []map[string]interface{}{
+		pendingItems: []map[string]any{
 			{"id": "appr-1", "status": "pending", "tool": "github.push"},
 		},
-		historyItems: []map[string]interface{}{
+		historyItems: []map[string]any{
 			{"id": "appr-0", "status": "approved", "reviewer": "alice"},
 		},
 	}
@@ -113,16 +113,16 @@ func newIntegrationAdminServer() *Server {
 // --- Stub providers for testing ---
 
 type stubApprovalProvider struct {
-	pendingItems []map[string]interface{}
-	historyItems []map[string]interface{}
+	pendingItems []map[string]any
+	historyItems []map[string]any
 	approveErr   error
 	denyErr      error
 	submitErr    error
 }
 
-func (s *stubApprovalProvider) Pending() interface{}          { return s.pendingItems }
-func (s *stubApprovalProvider) History(limit int) interface{} { return s.historyItems }
-func (s *stubApprovalProvider) Get(id string) (interface{}, error) {
+func (s *stubApprovalProvider) Pending() any    { return s.pendingItems }
+func (s *stubApprovalProvider) History(int) any { return s.historyItems }
+func (s *stubApprovalProvider) Get(id string) (any, error) {
 	for _, item := range s.pendingItems {
 		if item["id"] == id {
 			return item, nil
@@ -135,33 +135,33 @@ func (s *stubApprovalProvider) Get(id string) (interface{}, error) {
 	}
 	return nil, errors.New("not found")
 }
-func (s *stubApprovalProvider) Approve(id, reviewer, comment string) (interface{}, error) {
+func (s *stubApprovalProvider) Approve(id, reviewer, _ string) (any, error) {
 	if s.approveErr != nil {
 		return nil, s.approveErr
 	}
-	return map[string]interface{}{"id": id, "status": "approved", "reviewer": reviewer}, nil
+	return map[string]any{"id": id, "status": "approved", "reviewer": reviewer}, nil
 }
-func (s *stubApprovalProvider) Deny(id, reviewer, comment string) (interface{}, error) {
+func (s *stubApprovalProvider) Deny(id, reviewer, _ string) (any, error) {
 	if s.denyErr != nil {
 		return nil, s.denyErr
 	}
-	return map[string]interface{}{"id": id, "status": "denied", "reviewer": reviewer}, nil
+	return map[string]any{"id": id, "status": "denied", "reviewer": reviewer}, nil
 }
-func (s *stubApprovalProvider) Submit(env interface{}) (string, error) { return "sub-1", s.submitErr }
+func (s *stubApprovalProvider) Submit(any) (string, error) { return "sub-1", s.submitErr }
 
 type stubEvidenceProvider struct{}
 
-func (s *stubEvidenceProvider) ExportSession(id string) (interface{}, error) {
+func (s *stubEvidenceProvider) ExportSession(id string) (any, error) {
 	if id == "missing" {
 		return nil, errors.New("session not found")
 	}
-	return map[string]interface{}{"session_id": id, "records": []interface{}{}}, nil
+	return map[string]any{"session_id": id, "records": []any{}}, nil
 }
-func (s *stubEvidenceProvider) VerifySession(id string) (interface{}, error) {
-	return map[string]interface{}{"valid": true, "total_records": 5}, nil
+func (s *stubEvidenceProvider) VerifySession(string) (any, error) {
+	return map[string]any{"valid": true, "total_records": 5}, nil
 }
-func (s *stubEvidenceProvider) ListSessions() (interface{}, error) {
-	return []map[string]interface{}{
+func (s *stubEvidenceProvider) ListSessions() (any, error) {
+	return []map[string]any{
 		{"session_id": "sess-1", "total_actions": 3},
 	}, nil
 }
@@ -180,23 +180,23 @@ func (s *stubEvidenceProvider) RenderHTMLReport(id string) (string, error) {
 
 type stubBudgetProvider struct{}
 
-func (s *stubBudgetProvider) AllStatuses() interface{} {
-	return []map[string]interface{}{{"tenant": "t1", "spent": 42.0}}
+func (s *stubBudgetProvider) AllStatuses() any {
+	return []map[string]any{{"tenant": "t1", "spent": 42.0}}
 }
-func (s *stubBudgetProvider) ForecastAll() interface{} {
-	return []map[string]interface{}{{"tenant": "t1", "projected": 100.0}}
+func (s *stubBudgetProvider) ForecastAll() any {
+	return []map[string]any{{"tenant": "t1", "projected": 100.0}}
 }
 
 type stubCostOptProvider struct{}
 
-func (s *stubCostOptProvider) Recommendations() interface{} {
-	return []map[string]interface{}{{"type": "downgrade", "savings": 30.0}}
+func (s *stubCostOptProvider) Recommendations() any {
+	return []map[string]any{{"type": "downgrade", "savings": 30.0}}
 }
 
 type stubCredentialProvider struct{}
 
-func (s *stubCredentialProvider) ActiveCredentials() interface{} {
-	return []map[string]interface{}{{"id": "cred-1", "type": "static"}}
+func (s *stubCredentialProvider) ActiveCredentials() any {
+	return []map[string]any{{"id": "cred-1", "type": "static"}}
 }
 func (s *stubCredentialProvider) RevokeCredential(id string) error {
 	if id == "cred-1" {
@@ -204,22 +204,22 @@ func (s *stubCredentialProvider) RevokeCredential(id string) error {
 	}
 	return errors.New("not found")
 }
-func (s *stubCredentialProvider) IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error) {
-	return map[string]interface{}{"id": "cred-new"}, nil
+func (s *stubCredentialProvider) IssueCredential(string, string, string, string, string) (any, error) {
+	return map[string]any{"id": "cred-new"}, nil
 }
 func (s *stubCredentialProvider) ActiveCredentialCount() int { return 0 }
 
 type stubManifestProvider struct{}
 
-func (s *stubManifestProvider) Register(m interface{}) error { return nil }
-func (s *stubManifestProvider) Get(id string) (interface{}, error) {
+func (s *stubManifestProvider) Register(any) error { return nil }
+func (s *stubManifestProvider) Get(id string) (any, error) {
 	if id == "m-1" {
-		return map[string]interface{}{"id": "m-1", "task_id": "task-1"}, nil
+		return map[string]any{"id": "m-1", "task_id": "task-1"}, nil
 	}
 	return nil, errors.New("not found")
 }
-func (s *stubManifestProvider) List() interface{} {
-	return []map[string]interface{}{{"id": "m-1"}}
+func (s *stubManifestProvider) List() any {
+	return []map[string]any{{"id": "m-1"}}
 }
 func (s *stubManifestProvider) Deactivate(id string) error {
 	if id == "m-1" {
@@ -227,15 +227,15 @@ func (s *stubManifestProvider) Deactivate(id string) error {
 	}
 	return errors.New("not found")
 }
-func (s *stubManifestProvider) GetDrift(id string) interface{} { return []interface{}{} }
-func (s *stubManifestProvider) CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{} {
+func (s *stubManifestProvider) GetDrift(string) any { return []any{} }
+func (s *stubManifestProvider) CheckDrift(string, *envelope.ActionEnvelope, int, float64) any {
 	return nil
 }
 
 type stubCapabilityProvider struct{}
 
-func (s *stubCapabilityProvider) ActiveTickets() interface{} {
-	return []map[string]interface{}{{"id": "tkt-1", "subject": "agent-1"}}
+func (s *stubCapabilityProvider) ActiveTickets() any {
+	return []map[string]any{{"id": "tkt-1", "subject": "agent-1"}}
 }
 func (s *stubCapabilityProvider) RevokeTicket(id string) error {
 	if id == "tkt-1" {
@@ -243,62 +243,62 @@ func (s *stubCapabilityProvider) RevokeTicket(id string) error {
 	}
 	return errors.New("not found")
 }
-func (s *stubCapabilityProvider) VerifyTicket(id string) (interface{}, error) {
+func (s *stubCapabilityProvider) VerifyTicket(id string) (any, error) {
 	if id == "tkt-1" {
-		return map[string]interface{}{"ticket_id": id, "valid": true}, nil
+		return map[string]any{"ticket_id": id, "valid": true}, nil
 	}
 	return nil, errors.New("not found")
 }
 
 type stubSupplyChainProvider struct{}
 
-func (s *stubSupplyChainProvider) ListAssets() interface{} {
-	return []map[string]interface{}{{"name": "plugin-1", "trust": "verified"}}
+func (s *stubSupplyChainProvider) ListAssets() any {
+	return []map[string]any{{"name": "plugin-1", "trust": "verified"}}
 }
 
 type stubBehavioralProvider struct{}
 
-func (s *stubBehavioralProvider) SessionRisk(sessionID string) (interface{}, error) {
+func (s *stubBehavioralProvider) SessionRisk(sessionID string) (any, error) {
 	if sessionID == "sess-1" {
-		return map[string]interface{}{"session_id": sessionID, "risk_score": 25}, nil
+		return map[string]any{"session_id": sessionID, "risk_score": 25}, nil
 	}
 	return nil, nil
 }
-func (s *stubBehavioralProvider) ListSessions() interface{} { return []interface{}{} }
+func (s *stubBehavioralProvider) ListSessions() any { return []any{} }
 
 type stubResilienceProvider struct{}
 
-func (s *stubResilienceProvider) DetailedHealth() interface{} {
-	return map[string]interface{}{"status": "healthy", "providers": 3}
+func (s *stubResilienceProvider) DetailedHealth() any {
+	return map[string]any{"status": "healthy", "providers": 3}
 }
-func (s *stubResilienceProvider) DegradationModes() interface{} {
-	return []map[string]interface{}{{"mode": "fallback", "active": false}}
+func (s *stubResilienceProvider) DegradationModes() any {
+	return []map[string]any{{"mode": "fallback", "active": false}}
 }
-func (s *stubResilienceProvider) CreateBackup() (interface{}, error) {
-	return map[string]interface{}{"id": "backup-1", "created": true}, nil
+func (s *stubResilienceProvider) CreateBackup() (any, error) {
+	return map[string]any{"id": "backup-1", "created": true}, nil
 }
-func (s *stubResilienceProvider) ListBackups() interface{} {
-	return []map[string]interface{}{{"id": "backup-1"}}
+func (s *stubResilienceProvider) ListBackups() any {
+	return []map[string]any{{"id": "backup-1"}}
 }
-func (s *stubResilienceProvider) RetentionStats() interface{} {
-	return map[string]interface{}{"audit_log_days": 90}
+func (s *stubResilienceProvider) RetentionStats() any {
+	return map[string]any{"audit_log_days": 90}
 }
 
 type stubPolicyVersionProvider struct {
 	rolledBackTo int
 }
 
-func (s *stubPolicyVersionProvider) ListVersions() interface{} {
-	return []map[string]interface{}{{"version": 1}}
+func (s *stubPolicyVersionProvider) ListVersions() any {
+	return []map[string]any{{"version": 1}}
 }
-func (s *stubPolicyVersionProvider) GetVersion(version int) (interface{}, error) {
+func (s *stubPolicyVersionProvider) GetVersion(version int) (any, error) {
 	if version == 1 {
-		return map[string]interface{}{"version": version}, nil
+		return map[string]any{"version": version}, nil
 	}
 	return nil, errors.New("not found")
 }
-func (s *stubPolicyVersionProvider) CurrentVersion() interface{} {
-	return map[string]interface{}{"version": 1}
+func (s *stubPolicyVersionProvider) CurrentVersion() any {
+	return map[string]any{"version": 1}
 }
 func (s *stubPolicyVersionProvider) Rollback(version int) error {
 	if version != 1 {
@@ -313,11 +313,11 @@ type stubToolPolicyProvider struct {
 	decision string
 }
 
-func (s *stubToolPolicyProvider) Evaluate(env *envelope.ActionEnvelope) string {
+func (s *stubToolPolicyProvider) Evaluate(*envelope.ActionEnvelope) string {
 	return s.decision
 }
 
-func (s *stubToolPolicyProvider) EvaluateWithTrace(env *envelope.ActionEnvelope) interface{} {
+func (s *stubToolPolicyProvider) EvaluateWithTrace(*envelope.ActionEnvelope) any {
 	return nil
 }
 
@@ -337,7 +337,7 @@ func TestHandleTestAction_Allow(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
 	}
-	var body map[string]interface{}
+	var body map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
@@ -368,8 +368,11 @@ func TestHandleTestAction_Block(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&body)
+	var body map[string]any
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["decision"] != "block" {
 		t.Fatalf("expected block decision, got %v", body["decision"])
 	}
@@ -392,8 +395,11 @@ func TestHandleTestAction_Review(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&body)
+	var body map[string]any
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["decision"] != "review" {
 		t.Fatalf("expected review decision, got %v", body["decision"])
 	}
@@ -555,7 +561,10 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var body map[string]string
-	json.NewDecoder(w.Body).Decode(&body)
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["status"] != "ok" {
 		t.Fatalf("expected status ok, got %v", body["status"])
 	}
@@ -576,8 +585,11 @@ func TestProvidersEndpoint(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body []map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&body)
+	var body []map[string]any
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if len(body) != 1 {
 		t.Fatalf("expected 1 provider, got %d", len(body))
 	}
@@ -597,8 +609,11 @@ func TestTenantsEndpoint(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body []map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&body)
+	var body []map[string]any
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if len(body) != 3 {
 		t.Fatalf("expected 3 tenants, got %d", len(body))
 	}
@@ -671,8 +686,11 @@ func TestSimulateEndpoint(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
 	}
-	var body map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&body)
+	var body map[string]any
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["decision"] != "allow" {
 		t.Fatalf("expected allow, got %v", body["decision"])
 	}
@@ -1050,7 +1068,10 @@ func TestWhoamiEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var body map[string]string
-	json.NewDecoder(w.Body).Decode(&body)
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["role"] != "operator" {
 		t.Fatalf("expected role=operator, got %s", body["role"])
 	}
@@ -1158,7 +1179,7 @@ func TestManifestCreateInvalidJSON(t *testing.T) {
 
 func TestActionWhyEndpoint(t *testing.T) {
 	server := newFullAdminServer()
-	RecordActionTrace("act-1", map[string]interface{}{"decision": "allow", "action": "test"})
+	RecordActionTrace("act-1", map[string]any{"decision": "allow", "action": "test"})
 	router := server.Router()
 	req := httptest.NewRequest(http.MethodGet, "/admin/v1/actions/act-1/why", nil)
 	w := httptest.NewRecorder()
@@ -1343,7 +1364,7 @@ func TestPolicyVersionRollbackEndpoint(t *testing.T) {
 	if provider.rolledBackTo != 1 {
 		t.Fatalf("expected rollback to version 1, got %d", provider.rolledBackTo)
 	}
-	var body map[string]interface{}
+	var body map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
@@ -1354,11 +1375,11 @@ func TestPolicyVersionRollbackEndpoint(t *testing.T) {
 
 type emptyAuditProvider struct{}
 
-func (e *emptyAuditProvider) Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error) {
+func (e *emptyAuditProvider) Query(string, string, string, string, int) (any, error) {
 	return []any{}, nil
 }
-func (e *emptyAuditProvider) Verify() (interface{}, error) { return nil, nil }
-func (e *emptyAuditProvider) Log(actor, actorRole, action, resource, detail, tenantID, model string) {
+func (e *emptyAuditProvider) Verify() (any, error) { return nil, nil }
+func (e *emptyAuditProvider) Log(string, string, string, string, string, string, string) {
 }
 func (e *emptyAuditProvider) LatestTimestamp() (string, error) { return "", nil }
 
@@ -1376,7 +1397,7 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body map[string]interface{}
+	var body map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
@@ -1395,8 +1416,8 @@ func TestHandleSystemStatus_UnavailableStates(t *testing.T) {
 	}
 }
 
-func (s *stubApprovalProvider) ForTenant(string) interface{} { return s }
-func (s *stubEvidenceProvider) ForTenant(string) interface{} { return s }
+func (s *stubApprovalProvider) ForTenant() any { return s }
+func (s *stubEvidenceProvider) ForTenant() any { return s }
 
 func TestTestActionReviewSubmissionFailure(t *testing.T) {
 	for _, provider := range []ApprovalProvider{nil, &stubApprovalProvider{submitErr: errors.New("storage unavailable")}} {

@@ -611,7 +611,7 @@ func (e *APIKeyEntry) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-func (e APIKeyEntry) resolvedKey() string {
+func (e *APIKeyEntry) resolvedKey() string {
 	if strings.TrimSpace(e.Key) != "" {
 		return strings.TrimSpace(e.Key)
 	}

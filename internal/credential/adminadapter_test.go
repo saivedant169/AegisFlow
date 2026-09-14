@@ -13,7 +13,7 @@ func TestAdminAdapterActiveCredentials_Empty(t *testing.T) {
 	adapter := NewAdminAdapter(reg)
 
 	result := adapter.ActiveCredentials()
-	creds, ok := result.([]interface{})
+	creds, ok := result.([]any)
 	if !ok {
 		t.Fatalf("expected []interface{}, got %T", result)
 	}
@@ -43,7 +43,7 @@ func TestAdminAdapterActiveCredentials_Redacted(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var creds []map[string]interface{}
+	var creds []map[string]any
 	if err := json.Unmarshal(data, &creds); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

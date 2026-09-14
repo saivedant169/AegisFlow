@@ -10,7 +10,7 @@ func TestStaticThresholdErrorRate(t *testing.T) {
 	now := time.Now().Truncate(time.Minute)
 
 	// Record 10 requests, 5 with 500 status -> 50% error rate
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		status := 200
 		if i < 5 {
 			status = 500
@@ -55,7 +55,7 @@ func TestStaticThresholdNoAlert(t *testing.T) {
 	now := time.Now().Truncate(time.Minute)
 
 	// Record 10 healthy requests
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		c.Record(DataPoint{
 			TenantID:      "t1",
 			Model:         "gpt-4",
@@ -86,7 +86,7 @@ func TestBaselineAnomalyDetected(t *testing.T) {
 	baseTime := time.Now().Add(-90 * time.Minute).Truncate(time.Minute)
 
 	// Record 80 minutes of steady traffic: ~10 requests per minute with slight variance
-	for m := 0; m < 80; m++ {
+	for m := range 80 {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
 		// Alternate between 9 and 11 requests to produce non-zero stddev
 		var count int
@@ -111,7 +111,7 @@ func TestBaselineAnomalyDetected(t *testing.T) {
 	// Spike: last 5 minutes at 100 requests per minute
 	for m := 80; m < 85; m++ {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
-		for r := 0; r < 100; r++ {
+		for range 100 {
 			c.Record(DataPoint{
 				TenantID:   "t1",
 				Model:      "gpt-4",
@@ -150,7 +150,7 @@ func TestBaselineInsufficientData(t *testing.T) {
 	baseTime := time.Now().Truncate(time.Minute)
 
 	// Only 30 minutes of data -- below the 60-bucket minimum
-	for m := 0; m < 30; m++ {
+	for m := range 30 {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
 		c.Record(DataPoint{
 			TenantID:   "t1",
@@ -186,7 +186,7 @@ func TestStaticThresholdAllFourMetrics(t *testing.T) {
 	// - high p95 latency (10000ms)
 	// - high request count (20 requests in 1 minute)
 	// - high cost ($5 per request)
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		c.Record(DataPoint{
 			TenantID:      "t1",
 			Model:         "gpt-4",
@@ -228,7 +228,7 @@ func TestBaselineExactly60Buckets(t *testing.T) {
 	baseTime := time.Now().Add(-70 * time.Minute).Truncate(time.Minute)
 
 	// Record exactly 60 minutes of steady traffic (boundary case for the >= 60 check).
-	for m := 0; m < 55; m++ {
+	for m := range 55 {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
 		var count int
 		if m%2 == 0 {
@@ -252,7 +252,7 @@ func TestBaselineExactly60Buckets(t *testing.T) {
 	// Spike in last 5 minutes
 	for m := 55; m < 60; m++ {
 		ts := baseTime.Add(time.Duration(m) * time.Minute)
-		for r := 0; r < 200; r++ {
+		for range 200 {
 			c.Record(DataPoint{
 				TenantID:   "t1",
 				Model:      "gpt-4",
@@ -288,7 +288,7 @@ func TestDetectorEvaluateMultipleDimensions(t *testing.T) {
 	now := time.Now().Truncate(time.Minute)
 
 	// Tenant A: high error rate
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		c.Record(DataPoint{
 			TenantID:   "tenantA",
 			Model:      "gpt-4",
@@ -301,7 +301,7 @@ func TestDetectorEvaluateMultipleDimensions(t *testing.T) {
 	}
 
 	// Tenant B: healthy
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		c.Record(DataPoint{
 			TenantID:   "tenantB",
 			Model:      "gpt-3.5",

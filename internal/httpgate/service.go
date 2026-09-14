@@ -14,7 +14,7 @@ type ServiceConfig struct {
 
 // MatchService finds the first service whose PathPrefix matches the request path.
 // Returns nil if no service matches.
-func MatchService(host string, path string, services []ServiceConfig) *ServiceConfig {
+func MatchService(path string, services []ServiceConfig) *ServiceConfig {
 	for i := range services {
 		prefix := services[i].PathPrefix
 		if prefix == "" {

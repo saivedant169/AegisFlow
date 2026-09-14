@@ -40,12 +40,20 @@ tenants:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 
 	if _, err := f.WriteString(yaml); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -111,9 +119,20 @@ tenants:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -147,9 +166,20 @@ tenants:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -181,9 +211,20 @@ tenants:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -213,9 +254,20 @@ tenants:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -492,9 +544,20 @@ func TestLoadInvalidYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("{{{{invalid yaml content")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("{{{{invalid yaml content")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	_, err = Load(f.Name())
 	if err == nil {
@@ -527,9 +590,20 @@ routes:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -582,9 +656,20 @@ routes:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -626,9 +711,20 @@ budgets:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -684,9 +780,20 @@ eval:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -724,9 +831,20 @@ func TestNewWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg := &Config{}
 	w := NewWatcher(f.Name(), cfg, nil)
@@ -758,9 +876,20 @@ func TestWatcherStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg := &Config{Server: ServerConfig{Port: 8080}}
 	w := NewWatcher(f.Name(), cfg, nil)
@@ -774,9 +903,20 @@ func TestWatcherDetectsChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -811,9 +951,20 @@ func TestWatcherCheckNoChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -837,8 +988,14 @@ func TestWatcherCheckFileDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -847,7 +1004,10 @@ func TestWatcherCheckFileDeleted(t *testing.T) {
 	w := NewWatcher(f.Name(), cfg, nil)
 
 	// Delete the file, then check should not panic
-	os.Remove(f.Name())
+	err = os.Remove(f.Name())
+	if err != nil {
+		return
+	}
 	w.check() // should return silently
 	if w.GetConfig().Server.Port != 8080 {
 		t.Error("config should remain unchanged after file deletion")
@@ -859,9 +1019,20 @@ func TestWatcherCheckInvalidYAMLAfterChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString("server:\n  port: 8080\n")
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString("server:\n  port: 8080\n")
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -871,7 +1042,10 @@ func TestWatcherCheckInvalidYAMLAfterChange(t *testing.T) {
 
 	// Write invalid YAML
 	time.Sleep(50 * time.Millisecond)
-	os.WriteFile(f.Name(), []byte("{{invalid"), 0644)
+	err = os.WriteFile(f.Name(), []byte("{{invalid"), 0644)
+	if err != nil {
+		return
+	}
 
 	w.check()
 	// Config should remain unchanged
@@ -898,9 +1072,20 @@ federation:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(yamlData)
-	f.Close()
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
+	_, err = f.WriteString(yamlData)
+	if err != nil {
+		return
+	}
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -934,11 +1119,19 @@ providers:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(yamlData); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -966,11 +1159,19 @@ providers:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(yamlData); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	if _, err := Load(f.Name()); err == nil {
 		t.Fatal("expected invalid retry config to be rejected")
@@ -1056,11 +1257,19 @@ mcp_gateway:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(yamlData); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return
+	}
 
 	cfg, err := Load(f.Name())
 	if err != nil {
@@ -1087,7 +1296,12 @@ state:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(yamlData); err != nil {
 		t.Fatal(err)
 	}
@@ -1139,17 +1353,15 @@ func TestFindTenantByAPIKey_ConcurrentSafe(t *testing.T) {
 		Tenants: []TenantConfig{{ID: "a", APIKeys: []APIKeyEntry{{Key: "key-a", Role: "operator"}}}},
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 500; j++ {
+	for range 16 {
+		wg.Go(func() {
+			for range 500 {
 				if m := cfg.FindTenantByAPIKey("key-a"); m == nil {
 					t.Error("expected match under concurrency")
 					return
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

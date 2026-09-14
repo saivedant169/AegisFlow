@@ -55,7 +55,12 @@ func TestPersistentChainRegistryRestoresAndAppends(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(secondState)
 	second, err := NewPersistentChainRegistry(key, secondState.DB())
 	if err != nil {
 		t.Fatalf("restore registry: %v", err)
@@ -97,7 +102,12 @@ func TestPersistentChainRegistryRejectsWrongKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(secondState)
 	if _, err := NewPersistentChainRegistry([]byte("different-key"), secondState.DB()); err == nil {
 		t.Fatal("expected restored evidence to reject a different signing key")
 	}
@@ -108,7 +118,12 @@ func TestPersistentChainRegistryRequiresSigningKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func(store *state.SQLite) {
+		err := store.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(store)
 	if _, err := NewPersistentChainRegistry(nil, store.DB()); err == nil {
 		t.Fatal("persistent evidence accepted an empty signing key")
 	}
@@ -160,7 +175,12 @@ func TestPersistentChainRegistryRejectsTamperedRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
+	defer func(reopened *state.SQLite) {
+		err := reopened.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(reopened)
 	if _, err := NewPersistentChainRegistry(key, reopened.DB()); err == nil {
 		t.Fatal("expected tampered evidence to stop registry restoration")
 	}
@@ -217,7 +237,12 @@ func TestPersistentChainRegistryAuthenticatesFullStoredRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
+	defer func(reopened *state.SQLite) {
+		err := reopened.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(reopened)
 	if _, err := NewPersistentChainRegistry(key, reopened.DB()); err == nil {
 		t.Fatal("unsigned resource edit passed storage signature check")
 	}
@@ -252,7 +277,12 @@ func TestPersistentChainRegistryRejectsSessionRelocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
+	defer func(reopened *state.SQLite) {
+		err := reopened.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(reopened)
 	if _, err := NewPersistentChainRegistry(key, reopened.DB()); err == nil {
 		t.Fatal("evidence row moved to another session without detection")
 	}

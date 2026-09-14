@@ -64,7 +64,7 @@ func TestTimeSeriesRingBuffer(t *testing.T) {
 	ts := NewTimeSeries(3) // only 3 buckets
 	base := time.Now().Truncate(time.Minute)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		ts.Record(DataPoint{
 			StatusCode: 200, LatencyMs: 100,
 			Timestamp: base.Add(time.Duration(i) * time.Minute),

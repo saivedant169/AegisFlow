@@ -7,7 +7,10 @@ import (
 
 func checkOutput(_ int, err error) {
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not write output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not write output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }

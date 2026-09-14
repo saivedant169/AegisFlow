@@ -55,7 +55,7 @@ func wsDial(t *testing.T, url string) *websocket.Conn {
 	return ws
 }
 
-func wsSendJSON(t *testing.T, ws *websocket.Conn, v interface{}) {
+func wsSendJSON(t *testing.T, ws *websocket.Conn, v any) {
 	t.Helper()
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -68,7 +68,10 @@ func wsSendJSON(t *testing.T, ws *websocket.Conn, v interface{}) {
 
 func wsRecvJSON(t *testing.T, ws *websocket.Conn) wsEnvelope {
 	t.Helper()
-	ws.SetReadDeadline(time.Now().Add(5 * time.Second))
+	err := ws.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err != nil {
+		return wsEnvelope{}
+	}
 	var raw string
 	if err := websocket.Message.Receive(ws, &raw); err != nil {
 		t.Fatalf("receive failed: %v", err)
@@ -85,7 +88,12 @@ func TestWebSocketUpgradeSucceeds(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Connection established successfully. Send a ping and expect a pong or
 	// just close gracefully.
@@ -104,7 +112,12 @@ func TestWebSocketRequestResponse(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Send a chat completion request.
 	reqPayload := types.ChatCompletionRequest{
@@ -149,9 +162,14 @@ func TestWebSocketMultipleRequests(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		reqPayload := types.ChatCompletionRequest{
 			Model:    "mock",
 			Messages: []types.Message{{Role: "user", Content: "request"}},
@@ -180,7 +198,10 @@ func TestWebSocketConnectionCloseHandling(t *testing.T) {
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
 
 	// Close the client side. The server should handle this gracefully.
-	ws.Close()
+	err := ws.Close()
+	if err != nil {
+		return
+	}
 
 	// If the server panicked or leaked, the test would fail with a timeout
 	// or panic. Simply reaching here means the close was handled.
@@ -191,7 +212,12 @@ func TestWebSocketInvalidMessageFormat(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Send invalid JSON.
 	if err := websocket.Message.Send(ws, "not valid json{{{"); err != nil {
@@ -216,7 +242,12 @@ func TestWebSocketInvalidAPIKey(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=bad-key"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// The server should send an error and close.
 	env := wsRecvJSON(t, ws)
@@ -231,7 +262,12 @@ func TestWebSocketAuthViaFirstMessage(t *testing.T) {
 
 	// Connect without api_key query param.
 	ws := wsDial(t, wsURL(ts, ""))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Send auth message.
 	authPayload, _ := json.Marshal(map[string]string{"api_key": "ws-test-key-001"})
@@ -268,7 +304,12 @@ func TestWebSocketMissingModel(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Request with no model.
 	reqPayload := types.ChatCompletionRequest{
@@ -295,7 +336,12 @@ func TestWebSocketServerPing(t *testing.T) {
 	defer ts.Close()
 
 	ws := wsDial(t, wsURL(ts, "api_key=ws-test-key-001"))
-	defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(ws)
 
 	// Wait for server to send a ping (ping interval is 500ms in test config).
 	env := wsRecvJSON(t, ws)

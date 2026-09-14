@@ -68,7 +68,7 @@ func TestAlertManagerAutoResolve(t *testing.T) {
 	am.ProcessAlerts(DetectionResult{Alerts: []Alert{alert}})
 
 	// Send 5 empty evaluations to trigger auto-resolve (resolveAfter=5).
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		am.ProcessAlerts(DetectionResult{Alerts: []Alert{}})
 	}
 
@@ -119,11 +119,11 @@ func TestAlertManagerRecentAlertsLimit(t *testing.T) {
 	am := NewAlertManager(nil)
 
 	// Create multiple distinct alerts.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		am.ProcessAlerts(DetectionResult{
 			Alerts: []Alert{{
 				ID: "alert", Severity: SeverityCritical, Type: "static_threshold",
-				Dimension: "global", Metric: "metric_" + string(rune('a'+i)),
+				Dimension: "global", Metric: "metric_" + string('a'+i),
 				Value: 50, Threshold: 20, Message: "alert", State: "active",
 				CreatedAt: time.Now(),
 			}},

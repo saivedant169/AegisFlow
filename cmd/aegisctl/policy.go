@@ -13,7 +13,10 @@ import (
 func cmdPolicyHistory(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/policy-versions")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -26,7 +29,10 @@ func cmdPolicyHistory(adminURL string) {
 		Source          string `json:"source"`
 	}
 	if err := decodeJSON(resp, &versions); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -46,7 +52,10 @@ func cmdPolicyHistory(adminURL string) {
 			v.Version, ts, v.RuleCount, v.DefaultDecision, v.Source))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -54,14 +63,20 @@ func cmdPolicyHistory(adminURL string) {
 func cmdPolicyCurrent(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/policy-versions/current")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
-	var version map[string]interface{}
+	var version map[string]any
 	if err := decodeJSON(resp, &version); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -74,18 +89,27 @@ func cmdPolicyRollback(adminURL string, versionStr string) {
 	req, _ := http.NewRequest("POST", url, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 200 {
-		var result map[string]interface{}
+		var result map[string]any
 		if err := decodeJSON(resp, &result); err != nil {
-			fmt.Fprintln(os.Stderr, "Error: invalid rollback response")
+			_, err := fmt.Fprintln(os.Stderr, "Error: invalid rollback response")
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "Error (%d): %v\n", resp.StatusCode, result)
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %v\n", resp.StatusCode, result)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	fmt.Printf("Rolled back to version %s\n", versionStr)

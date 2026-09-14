@@ -12,7 +12,10 @@ func cmdVerify(adminURL string, args []string) {
 	sessionID := ""
 	for i := 0; i < len(args); i++ {
 		if args[i] != "--session" || sessionID != "" || i+1 >= len(args) || args[i+1] == "" || strings.HasPrefix(args[i+1], "--") {
-			fmt.Fprintln(os.Stderr, "Usage: aegisctl verify [--session <id>]")
+			_, err := fmt.Fprintln(os.Stderr, "Usage: aegisctl verify [--session <id>]")
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
 		sessionID = args[i+1]
@@ -28,14 +31,20 @@ func cmdVerify(adminURL string, args []string) {
 
 	resp, err := client.Post(url, "application/json", nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	var result VerifyResponse
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	if key := os.Getenv("AEGISFLOW_API_KEY"); key != "" {
@@ -79,12 +88,21 @@ func formatVerifyResult(r VerifyResponse) string {
 	} else {
 		sb.WriteString("FAIL  Evidence chain verification failed\n")
 	}
-	fmt.Fprintf(&sb, "  Total entries: %d\n", r.TotalRecords)
+	_, err := fmt.Fprintf(&sb, "  Total entries: %d\n", r.TotalRecords)
+	if err != nil {
+		return ""
+	}
 	if !r.Valid && r.ErrorAtIndex > 0 {
-		fmt.Fprintf(&sb, "  Error at index: %d\n", r.ErrorAtIndex)
+		_, err := fmt.Fprintf(&sb, "  Error at index: %d\n", r.ErrorAtIndex)
+		if err != nil {
+			return ""
+		}
 	}
 	if r.Message != "" {
-		fmt.Fprintf(&sb, "  Message: %s\n", r.Message)
+		_, err := fmt.Fprintf(&sb, "  Message: %s\n", r.Message)
+		if err != nil {
+			return ""
+		}
 	}
 	return sb.String()
 }

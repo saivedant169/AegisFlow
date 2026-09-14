@@ -18,7 +18,10 @@ func cmdSupplyChainList(adminURL string) {
 
 	raw, err := json.Marshal(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -26,7 +29,10 @@ func cmdSupplyChainList(adminURL string) {
 		Assets []supply.LoadedAsset `json:"assets"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: invalid response")
+		_, err := fmt.Fprintln(os.Stderr, "Error: invalid response")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -48,7 +54,10 @@ func cmdSupplyChainList(adminURL string) {
 			a.LoadedAt.Format("2006-01-02 15:04:05")))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -90,19 +99,28 @@ func cmdSupplyChainSign(args []string) {
 	}
 
 	if keyHex == "" {
-		fmt.Fprintln(os.Stderr, "Error: --key is required")
+		_, err := fmt.Fprintln(os.Stderr, "Error: --key is required")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	key, err := hex.DecodeString(keyHex)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: invalid hex key: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: invalid hex key: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -113,18 +131,27 @@ func cmdSupplyChainSign(args []string) {
 	signer := supply.NewSigner(key)
 	bundle, err := signer.Sign(name, version, bundleType, content)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error signing: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error signing: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	sigFile := filePath + ".sig"
 	sigData, err := json.MarshalIndent(bundle, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error encoding signature: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error encoding signature: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	if err := os.WriteFile(sigFile, sigData, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing signature: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error writing signature: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -162,37 +189,55 @@ func cmdSupplyChainVerify(args []string) {
 		sigFile = filePath + ".sig"
 	}
 	if keyHex == "" {
-		fmt.Fprintln(os.Stderr, "Error: --key is required")
+		_, err := fmt.Fprintln(os.Stderr, "Error: --key is required")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	key, err := hex.DecodeString(keyHex)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: invalid hex key: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: invalid hex key: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	sigData, err := os.ReadFile(sigFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading signature file: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading signature file: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	var bundle supply.SignedBundle
 	if err := json.Unmarshal(sigData, &bundle); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing signature file: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error parsing signature file: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	signer := supply.NewSigner(key)
 	if err := signer.Verify(&bundle, content); err != nil {
-		fmt.Fprintf(os.Stderr, "FAILED: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "FAILED: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 

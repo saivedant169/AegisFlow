@@ -4,26 +4,27 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestNewWebhookEvaluatorNegativeSampleRate(t *testing.T) {
-	we := NewWebhookEvaluator("http://example.com", -1, 5*time.Second, false)
+	we := NewWebhookEvaluator("https://example.com", -1, 5*time.Second, false)
 	if we.sampleRate != 0.1 {
 		t.Errorf("expected default sample rate 0.1 for negative input, got %f", we.sampleRate)
 	}
 }
 
 func TestNewWebhookEvaluatorZeroSampleRate(t *testing.T) {
-	we := NewWebhookEvaluator("http://example.com", 0, 5*time.Second, false)
+	we := NewWebhookEvaluator("https://example.com", 0, 5*time.Second, false)
 	if we.sampleRate != 0.1 {
 		t.Errorf("expected default sample rate 0.1 for zero input, got %f", we.sampleRate)
 	}
 }
 
 func TestNewWebhookEvaluatorValidSampleRate(t *testing.T) {
-	we := NewWebhookEvaluator("http://example.com", 0.5, 5*time.Second, true)
+	we := NewWebhookEvaluator("https://example.com", 0.5, 5*time.Second, true)
 	if we.sampleRate != 0.5 {
 		t.Errorf("expected sample rate 0.5, got %f", we.sampleRate)
 	}
@@ -38,7 +39,7 @@ func TestShouldEvaluateRate0(t *testing.T) {
 	// we construct manually.
 	we := &WebhookEvaluator{sampleRate: 0}
 	// With sampleRate 0, rand.Float64() is always >= 0, so ShouldEvaluate should be false
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		if we.ShouldEvaluate() {
 			t.Fatal("ShouldEvaluate should always return false when sampleRate is 0")
 		}
@@ -48,7 +49,7 @@ func TestShouldEvaluateRate0(t *testing.T) {
 func TestShouldEvaluateRate1(t *testing.T) {
 	we := &WebhookEvaluator{sampleRate: 1.0}
 	// With sampleRate 1.0, rand.Float64() is always < 1.0, so ShouldEvaluate should be true
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		if !we.ShouldEvaluate() {
 			t.Fatal("ShouldEvaluate should always return true when sampleRate is 1.0")
 		}
@@ -109,9 +110,15 @@ func TestEvaluateSendsRequest(t *testing.T) {
 	received := make(chan WebhookRequest, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req WebhookRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			return
+		}
 		received <- req
-		json.NewEncoder(w).Encode(WebhookResponse{Score: 90, Labels: []string{"good"}})
+		err = json.NewEncoder(w).Encode(WebhookResponse{Score: 90, Labels: []string{"good"}})
+		if err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -143,7 +150,10 @@ func TestEvaluateTruncatesContent(t *testing.T) {
 	received := make(chan WebhookRequest, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req WebhookRequest
-		json.NewDecoder(r.Body).Decode(&req)
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			return
+		}
 		received <- req
 		w.WriteHeader(200)
 	}))
@@ -151,14 +161,14 @@ func TestEvaluateTruncatesContent(t *testing.T) {
 
 	we := NewWebhookEvaluator(server.URL, 1.0, 5*time.Second, false) // sendFullContent=false
 
-	longPrompt := ""
-	for i := 0; i < 600; i++ {
-		longPrompt += "a"
+	var longPrompt strings.Builder
+	for range 600 {
+		longPrompt .WriteString("a")
 	}
 
 	we.Evaluate(WebhookRequest{
-		Prompt:   longPrompt,
-		Response: longPrompt,
+		Prompt:   longPrompt.String(),
+		Response: longPrompt.String(),
 	})
 
 	select {

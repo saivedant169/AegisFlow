@@ -9,9 +9,18 @@ import (
 
 func TestRenderMarkdownReport(t *testing.T) {
 	chain := NewSessionChain("report-test")
-	chain.Record(testEnv("github.list_repos", envelope.DecisionAllow))
-	chain.Record(testEnv("github.create_pr", envelope.DecisionAllow))
-	chain.Record(testEnv("shell.rm", envelope.DecisionBlock))
+	_, err := chain.Record(testEnv("github.list_repos", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("github.create_pr", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("shell.rm", envelope.DecisionBlock))
+	if err != nil {
+		return
+	}
 
 	report, err := RenderMarkdownReport(chain)
 	if err != nil {
@@ -48,7 +57,10 @@ func TestRenderMarkdownReportEmpty(t *testing.T) {
 
 func TestRenderHTMLReport(t *testing.T) {
 	chain := NewSessionChain("html-test")
-	chain.Record(testEnv("github.list_repos", envelope.DecisionAllow))
+	_, err := chain.Record(testEnv("github.list_repos", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
 
 	report, err := RenderHTMLReport(chain)
 	if err != nil {

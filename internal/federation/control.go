@@ -104,7 +104,7 @@ func (cp *ControlPlane) StatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // PlanesHandler returns the list of known data planes and their status.
-func (cp *ControlPlane) PlanesHandler(w http.ResponseWriter, r *http.Request) {
+func (cp *ControlPlane) PlanesHandler(w http.ResponseWriter, _ *http.Request) {
 	cp.mu.RLock()
 	defer cp.mu.RUnlock()
 	planes := make([]PlaneStatus, 0, len(cp.planes))

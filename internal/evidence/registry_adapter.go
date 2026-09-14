@@ -18,7 +18,7 @@ func NewRegistryAdminAdapter(reg *ChainRegistry) *RegistryAdminAdapter {
 	return &RegistryAdminAdapter{reg: reg}
 }
 
-func (a *RegistryAdminAdapter) ExportSession(sessionID string) (interface{}, error) {
+func (a *RegistryAdminAdapter) ExportSession(sessionID string) (any, error) {
 	chain, err := a.reg.get(sessionID)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (a *RegistryAdminAdapter) ExportSession(sessionID string) (interface{}, err
 	return json.RawMessage(bundle), nil
 }
 
-func (a *RegistryAdminAdapter) VerifySession(sessionID string) (interface{}, error) {
+func (a *RegistryAdminAdapter) VerifySession(sessionID string) (any, error) {
 	chain, err := a.reg.get(sessionID)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (a *RegistryAdminAdapter) VerifySession(sessionID string) (interface{}, err
 	return Verify(chain.Records()), nil
 }
 
-func (a *RegistryAdminAdapter) ListSessions() (interface{}, error) {
+func (a *RegistryAdminAdapter) ListSessions() (any, error) {
 	chains, err := a.reg.all()
 	if err != nil {
 		return nil, err
@@ -85,6 +85,6 @@ func (a *RegistryAdminAdapter) RenderHTMLReport(sessionID string) (string, error
 }
 
 // ForTenant returns a view limited to evidence owned by one tenant.
-func (a *RegistryAdminAdapter) ForTenant(tenant string) interface{} {
+func (a *RegistryAdminAdapter) ForTenant(tenant string) any {
 	return &RegistryAdminAdapter{reg: a.reg, tenant: tenant, scoped: true}
 }

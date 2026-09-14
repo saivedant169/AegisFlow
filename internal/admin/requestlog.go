@@ -99,7 +99,7 @@ func (rl *RequestLog) Count() int {
 	return rl.count
 }
 
-func (rl *RequestLog) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (rl *RequestLog) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(rl.Recent(50)); err != nil {
 		log.Print("JSON response write failed")

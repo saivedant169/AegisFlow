@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/graphql-go/graphql"
-	gqlerrors "github.com/graphql-go/graphql/gqlerrors"
+	"github.com/graphql-go/graphql/gqlerrors"
 	"github.com/graphql-go/graphql/language/ast"
 
 	"github.com/saivedant169/AegisFlow/internal/cache"
@@ -33,21 +33,21 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"tenantId": &graphql.ArgumentConfig{Type: graphql.String},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				all := s.tracker.GetAllUsage()
 				if tid, ok := p.Args["tenantId"].(string); ok && tid != "" {
 					if tu := all[tid]; tu != nil {
-						return map[string]interface{}{"raw": tu}, nil
+						return map[string]any{"raw": tu}, nil
 					}
-					return map[string]interface{}{"raw": nil}, nil
+					return map[string]any{"raw": nil}, nil
 				}
-				return map[string]interface{}{"raw": all}, nil
+				return map[string]any{"raw": all}, nil
 			},
 		},
 
 		"providers": &graphql.Field{
 			Type: graphql.NewList(JSONScalar),
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				type providerInfo struct {
 					Name    string   `json:"name"`
 					Type    string   `json:"type"`
@@ -57,7 +57,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					Healthy bool     `json:"healthy"`
 					Region  string   `json:"region,omitempty"`
 				}
-				var out []interface{}
+				var out []any
 				for _, pc := range s.cfg.Providers {
 					healthy := false
 					if pc.Enabled {
@@ -76,7 +76,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					})
 				}
 				if out == nil {
-					out = []interface{}{}
+					out = []any{}
 				}
 				return out, nil
 			},
@@ -84,7 +84,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"tenants": &graphql.Field{
 			Type: graphql.NewList(JSONScalar),
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				type tenantInfo struct {
 					ID                string   `json:"id"`
 					Name              string   `json:"name"`
@@ -93,7 +93,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					TokensPerMinute   int      `json:"tokens_per_minute"`
 					AllowedModels     []string `json:"allowed_models"`
 				}
-				var out []interface{}
+				var out []any
 				for _, t := range s.cfg.Tenants {
 					out = append(out, tenantInfo{
 						ID:                t.ID,
@@ -105,7 +105,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					})
 				}
 				if out == nil {
-					out = []interface{}{}
+					out = []any{}
 				}
 				return out, nil
 			},
@@ -113,7 +113,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"policies": &graphql.Field{
 			Type: graphql.NewList(JSONScalar),
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				type policyInfo struct {
 					Name     string   `json:"name"`
 					Type     string   `json:"type"`
@@ -122,7 +122,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					Keywords []string `json:"keywords,omitempty"`
 					Patterns []string `json:"patterns,omitempty"`
 				}
-				var out []interface{}
+				var out []any
 				for _, pol := range s.cfg.Policies.Input {
 					out = append(out, policyInfo{
 						Name: pol.Name, Type: pol.Type, Action: pol.Action, Phase: "input",
@@ -136,7 +136,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					})
 				}
 				if out == nil {
-					out = []interface{}{}
+					out = []any{}
 				}
 				return out, nil
 			},
@@ -144,7 +144,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"cache": &graphql.Field{
 			Type: JSONScalar,
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				if s.cache != nil {
 					return s.cache.Stats(), nil
 				}
@@ -154,18 +154,18 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"violations": &graphql.Field{
 			Type: graphql.NewList(JSONScalar),
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				return s.requestLog.RecentViolations(100), nil
 			},
 		},
 
 		"analytics": &graphql.Field{
 			Type: JSONScalar,
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				if s.analyticsProvider == nil {
-					return map[string]interface{}{"error": "analytics not enabled"}, nil
+					return map[string]any{"error": "analytics not enabled"}, nil
 				}
-				return map[string]interface{}{
+				return map[string]any{
 					"dimensions": s.analyticsProvider.Dimensions(),
 					"summary":    s.analyticsProvider.RealtimeSummary(),
 				}, nil
@@ -177,9 +177,9 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"limit": &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 100},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.analyticsProvider == nil {
-					return []interface{}{}, nil
+					return []any{}, nil
 				}
 				limit := 100
 				if v, ok := p.Args["limit"].(int); ok && v > 0 {
@@ -191,14 +191,14 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"budgets": &graphql.Field{
 			Type: JSONScalar,
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				if s.budgetProvider == nil {
-					return map[string]interface{}{
-						"statuses":  []interface{}{},
-						"forecasts": []interface{}{},
+					return map[string]any{
+						"statuses":  []any{},
+						"forecasts": []any{},
 					}, nil
 				}
-				return map[string]interface{}{
+				return map[string]any{
 					"statuses":  s.budgetProvider.AllStatuses(),
 					"forecasts": s.budgetProvider.ForecastAll(),
 				}, nil
@@ -207,16 +207,16 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"rollouts": &graphql.Field{
 			Type: graphql.NewList(JSONScalar),
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				if s.rolloutMgr == nil {
-					return []interface{}{}, nil
+					return []any{}, nil
 				}
 				result, err := s.rolloutMgr.ListRollouts()
 				if err != nil {
 					return nil, err
 				}
 				if result == nil {
-					return []interface{}{}, nil
+					return []any{}, nil
 				}
 				return result, nil
 			},
@@ -227,9 +227,9 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"limit": &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 100},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.auditProvider == nil {
-					return []interface{}{}, nil
+					return []any{}, nil
 				}
 				limit := 100
 				if v, ok := p.Args["limit"].(int); ok && v > 0 {
@@ -241,11 +241,11 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"costRecommendations": &graphql.Field{
 			Type: JSONScalar,
-			Resolve: func(_ graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(_ graphql.ResolveParams) (any, error) {
 				if s.costOptProvider == nil {
-					return map[string]interface{}{"recommendations": []interface{}{}}, nil
+					return map[string]any{"recommendations": []any{}}, nil
 				}
-				return map[string]interface{}{
+				return map[string]any{
 					"recommendations": s.costOptProvider.Recommendations(),
 				}, nil
 			},
@@ -253,7 +253,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 
 		"whoami": &graphql.Field{
 			Type: JSONScalar,
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				role := middleware.RoleFromContext(p.Context)
 				tenant := middleware.TenantFromContext(p.Context)
 				resp := map[string]string{"role": role}
@@ -274,7 +274,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.analyticsProvider == nil {
 					return false, nil
 				}
@@ -300,11 +300,11 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 					})),
 				},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.rolloutMgr == nil {
 					return nil, errRolloutUnavailable
 				}
-				input := p.Args["input"].(map[string]interface{})
+				input := p.Args["input"].(map[string]any)
 
 				routeModel := input["routeModel"].(string)
 				canaryProvider := input["canaryProvider"].(string)
@@ -312,7 +312,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 				errorThreshold := input["errorThreshold"].(float64)
 				latencyP95 := int64(input["latencyP95Threshold"].(int))
 
-				stagesRaw := input["stages"].([]interface{})
+				stagesRaw := input["stages"].([]any)
 				stages := make([]int, len(stagesRaw))
 				for i, v := range stagesRaw {
 					stages[i] = v.(int)
@@ -343,7 +343,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.rolloutMgr == nil {
 					return false, errRolloutUnavailable
 				}
@@ -359,7 +359,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.rolloutMgr == nil {
 					return false, errRolloutUnavailable
 				}
@@ -375,7 +375,7 @@ func (s *Server) buildSchema() (graphql.Schema, error) {
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				if s.rolloutMgr == nil {
 					return false, errRolloutUnavailable
 				}
@@ -410,22 +410,22 @@ func (e *gqlError) Error() string { return e.msg }
 var JSONScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSON",
 	Description: "Arbitrary JSON value",
-	Serialize: func(value interface{}) interface{} {
+	Serialize: func(value any) any {
 		return value
 	},
-	ParseValue: func(value interface{}) interface{} {
+	ParseValue: func(value any) any {
 		return value
 	},
-	ParseLiteral: func(valueAST ast.Value) interface{} {
+	ParseLiteral: func(valueAST ast.Value) any {
 		return nil
 	},
 })
 
 // graphqlRequest is the expected JSON body for POST /admin/v1/graphql.
 type graphqlRequest struct {
-	Query         string                 `json:"query"`
-	OperationName string                 `json:"operationName"`
-	Variables     map[string]interface{} `json:"variables"`
+	Query         string         `json:"query"`
+	OperationName string         `json:"operationName"`
+	Variables     map[string]any `json:"variables"`
 }
 
 // graphqlHandler returns an http.HandlerFunc that executes GraphQL queries.
@@ -454,7 +454,7 @@ func (s *Server) graphqlHandler(schema graphql.Schema) http.HandlerFunc {
 }
 
 // ExecuteGraphQL runs a GraphQL query directly (useful for testing).
-func (s *Server) ExecuteGraphQL(ctx context.Context, query string, variables map[string]interface{}) *graphql.Result {
+func (s *Server) ExecuteGraphQL(ctx context.Context, query string, variables map[string]any) *graphql.Result {
 	schema, err := s.buildSchema()
 	if err != nil {
 		return &graphql.Result{Errors: []gqlerrors.FormattedError{

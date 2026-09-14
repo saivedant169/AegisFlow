@@ -95,9 +95,9 @@ func TestSuspiciousFanOut(t *testing.T) {
 	now := time.Now().UTC()
 
 	// 10 different targets in under 1 minute
-	for i := 0; i < 10; i++ {
-		target := "host-" + string(rune('a'+i)) + ".example.com"
-		sa.RecordAction(makeEnv("e"+string(rune('0'+i)), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+	for i := range 10 {
+		target := "host-" + string('a'+i) + ".example.com"
+		sa.RecordAction(makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	alerts := sa.Analyze()

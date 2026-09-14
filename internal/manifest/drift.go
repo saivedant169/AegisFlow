@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 	"path"
+	"slices"
 	"time"
 
 	"github.com/saivedant169/AegisFlow/internal/envelope"
@@ -201,10 +202,5 @@ func globMatchAny(patterns []string, value string) bool {
 
 // stringInSlice returns true if s is found in the slice.
 func stringInSlice(s string, slice []string) bool {
-	for _, v := range slice {
-		if v == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, s)
 }

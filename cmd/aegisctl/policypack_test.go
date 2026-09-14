@@ -53,9 +53,12 @@ rules:
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.yaml")
-	os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		return
+	}
 
-	_, err := LoadPolicyPack(path)
+	_, err = LoadPolicyPack(path)
 	if err == nil {
 		t.Fatal("expected error for missing name")
 	}
@@ -72,9 +75,12 @@ rules:
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.yaml")
-	os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		return
+	}
 
-	_, err := LoadPolicyPack(path)
+	_, err = LoadPolicyPack(path)
 	if err == nil {
 		t.Fatal("expected error for invalid decision")
 	}
@@ -88,9 +94,12 @@ rules: []
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.yaml")
-	os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		return
+	}
 
-	_, err := LoadPolicyPack(path)
+	_, err = LoadPolicyPack(path)
 	if err == nil {
 		t.Fatal("expected error for empty rules")
 	}
@@ -117,9 +126,18 @@ rules:
     tool: "get_*"
     decision: allow
 `
-	os.WriteFile(filepath.Join(dir, "pack1.yaml"), []byte(pack1), 0644)
-	os.WriteFile(filepath.Join(dir, "pack2.yaml"), []byte(pack2), 0644)
-	os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("not a yaml"), 0644)
+	err := os.WriteFile(filepath.Join(dir, "pack1.yaml"), []byte(pack1), 0644)
+	if err != nil {
+		return
+	}
+	err = os.WriteFile(filepath.Join(dir, "pack2.yaml"), []byte(pack2), 0644)
+	if err != nil {
+		return
+	}
+	err = os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("not a yaml"), 0644)
+	if err != nil {
+		return
+	}
 
 	packs, err := ListPolicyPacks(dir)
 	if err != nil {

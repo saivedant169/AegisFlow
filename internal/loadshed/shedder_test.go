@@ -32,7 +32,7 @@ func TestQueueingAtCapacity(t *testing.T) {
 
 	// Fill to capacity.
 	var releases []func()
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		result, rel := s.Acquire(context.Background(), PriorityNormal)
 		if result != Admitted {
 			t.Fatalf("fill: expected Admitted, got %d", result)
@@ -76,7 +76,7 @@ func TestShedLowPriorityAt80Percent(t *testing.T) {
 
 	// Fill to 80% capacity (8 of 10).
 	var releases []func()
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		result, rel := s.Acquire(context.Background(), PriorityNormal)
 		if result != Admitted {
 			t.Fatalf("fill: expected Admitted, got %d at i=%d", result, i)
@@ -110,7 +110,7 @@ func TestHighPriorityBypass(t *testing.T) {
 
 	// Fill to capacity.
 	var releases []func()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		result, rel := s.Acquire(context.Background(), PriorityNormal)
 		if result != Admitted {
 			t.Fatalf("fill: expected Admitted at i=%d", i)
@@ -144,7 +144,7 @@ func TestHighPriorityNeverQueues(t *testing.T) {
 
 	// Fill capacity.
 	var releases []func()
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		_, rel := s.Acquire(context.Background(), PriorityNormal)
 		releases = append(releases, rel)
 	}
@@ -229,7 +229,7 @@ func TestConcurrentSafety(t *testing.T) {
 	var admitted atomic.Int64
 	var shed atomic.Int64
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

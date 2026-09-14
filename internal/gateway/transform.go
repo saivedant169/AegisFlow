@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 
@@ -75,12 +76,8 @@ func mergeTransformConfig(global, tenant *TransformConfig) *TransformConfig {
 	}
 
 	merged.HeaderInjections = make(map[string]string)
-	for k, v := range global.HeaderInjections {
-		merged.HeaderInjections[k] = v
-	}
-	for k, v := range tenant.HeaderInjections {
-		merged.HeaderInjections[k] = v
-	}
+	maps.Copy(merged.HeaderInjections, global.HeaderInjections)
+	maps.Copy(merged.HeaderInjections, tenant.HeaderInjections)
 
 	return merged
 }

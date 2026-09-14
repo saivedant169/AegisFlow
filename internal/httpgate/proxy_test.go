@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/saivedant169/AegisFlow/internal/envelope"
 
 	"github.com/saivedant169/AegisFlow/internal/approval"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
@@ -40,7 +41,10 @@ func setupProxy(t *testing.T, rules []toolpolicy.ToolRule, defaultDecision strin
 func TestAllowGetRequest(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, err := w.Write([]byte(`{"ok":true}`))
+		if err != nil {
+			return
+		}
 	}))
 	defer upstream.Close()
 
@@ -77,7 +81,10 @@ func TestBlockDeleteRequest(t *testing.T) {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	json.NewDecoder(rec.Body).Decode(&body)
+	err := json.NewDecoder(rec.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if !strings.Contains(body.Error.Message, "blocked by policy") {
 		t.Errorf("unexpected error message: %s", body.Error.Message)
 	}
@@ -98,7 +105,10 @@ func TestReviewPostRequest(t *testing.T) {
 	}
 
 	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
+	err := json.NewDecoder(rec.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if body["status"] != "pending_review" {
 		t.Errorf("expected pending_review status, got %s", body["status"])
 	}
@@ -114,7 +124,10 @@ func TestProxyForwardsToUpstream(t *testing.T) {
 		receivedPath = r.URL.Path
 		w.Header().Set("X-Custom", "upstream-header")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"from": "upstream"})
+		err := json.NewEncoder(w).Encode(map[string]string{"from": "upstream"})
+		if err != nil {
+			return
+		}
 	}))
 	defer upstream.Close()
 
@@ -158,7 +171,10 @@ func TestProxyReturns403OnBlock(t *testing.T) {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	json.NewDecoder(rec.Body).Decode(&body)
+	err := json.NewDecoder(rec.Body).Decode(&body)
+	if err != nil {
+		return
+	}
 	if !strings.Contains(body.Error.Message, "blocked") {
 		t.Errorf("expected blocked error, got: %s", body.Error.Message)
 	}

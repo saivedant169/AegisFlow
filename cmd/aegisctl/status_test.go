@@ -14,21 +14,33 @@ func TestCmdStatus_Healthy(t *testing.T) {
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("/admin/v1/system/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"active_credentials": 2, "latest_audit_timestamp": "2026-01-01T00:00:00Z", "loaded_policy_pack": "default", "mcp_gateway": "reachable"}`))
+		_, err := w.Write([]byte(`{"active_credentials": 2, "latest_audit_timestamp": "2026-01-01T00:00:00Z", "loaded_policy_pack": "default", "mcp_gateway": "reachable"}`))
+		if err != nil {
+			return
+		}
 	})
 	adminMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(r.URL.Path, "providers") || strings.Contains(r.URL.Path, "sessions") || strings.Contains(r.URL.Path, "violations") {
-			w.Write([]byte(`[]`))
+			_, err := w.Write([]byte(`[]`))
+			if err != nil {
+				return
+			}
 		} else {
-			w.Write([]byte(`{}`))
+			_, err := w.Write([]byte(`{}`))
+			if err != nil {
+				return
+			}
 		}
 	})
 
 	gwMux := http.NewServeMux()
 	gwMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, err := w.Write([]byte(`{"status":"ok"}`))
+		if err != nil {
+			return
+		}
 	})
 
 	adminSrv := httptest.NewServer(adminMux)
@@ -42,13 +54,16 @@ func TestCmdStatus_Healthy(t *testing.T) {
 
 	emitStatusJSON(gwSrv.URL, adminSrv.URL, true, true)
 
-	wOut.Close()
+	err := wOut.Close()
+	if err != nil {
+		return
+	}
 	os.Stdout = oldStdout
 
 	outBytes, _ := io.ReadAll(rOut)
 	out := string(outBytes)
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v, output: %s", err, out)
 	}
@@ -57,7 +72,7 @@ func TestCmdStatus_Healthy(t *testing.T) {
 		t.Errorf("Expected healthy to be true, got %v", result["healthy"])
 	}
 
-	sys, ok := result["system"].(map[string]interface{})
+	sys, ok := result["system"].(map[string]any)
 	if !ok {
 		t.Fatalf("Expected system object in output")
 	}
@@ -70,21 +85,33 @@ func TestCmdStatus_Unhealthy(t *testing.T) {
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("/admin/v1/system/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"active_credentials": 2, "latest_audit_timestamp": "2026-01-01T00:00:00Z", "loaded_policy_pack": "default", "mcp_gateway": "unreachable"}`))
+		_, err := w.Write([]byte(`{"active_credentials": 2, "latest_audit_timestamp": "2026-01-01T00:00:00Z", "loaded_policy_pack": "default", "mcp_gateway": "unreachable"}`))
+		if err != nil {
+			return
+		}
 	})
 	adminMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(r.URL.Path, "providers") || strings.Contains(r.URL.Path, "sessions") || strings.Contains(r.URL.Path, "violations") {
-			w.Write([]byte(`[]`))
+			_, err := w.Write([]byte(`[]`))
+			if err != nil {
+				return
+			}
 		} else {
-			w.Write([]byte(`{}`))
+			_, err := w.Write([]byte(`{}`))
+			if err != nil {
+				return
+			}
 		}
 	})
 
 	gwMux := http.NewServeMux()
 	gwMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, err := w.Write([]byte(`{"status":"ok"}`))
+		if err != nil {
+			return
+		}
 	})
 
 	adminSrv := httptest.NewServer(adminMux)
@@ -98,13 +125,16 @@ func TestCmdStatus_Unhealthy(t *testing.T) {
 
 	emitStatusJSON(gwSrv.URL, adminSrv.URL, true, true)
 
-	wOut.Close()
+	err := wOut.Close()
+	if err != nil {
+		return
+	}
 	os.Stdout = oldStdout
 
 	outBytes, _ := io.ReadAll(rOut)
 	out := string(outBytes)
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v, output: %s", err, out)
 	}
@@ -113,7 +143,7 @@ func TestCmdStatus_Unhealthy(t *testing.T) {
 		t.Errorf("Expected healthy to be false, got %v", result["healthy"])
 	}
 
-	sys, ok := result["system"].(map[string]interface{})
+	sys, ok := result["system"].(map[string]any)
 	if !ok {
 		t.Fatalf("Expected system object in output")
 	}

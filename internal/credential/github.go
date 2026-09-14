@@ -220,7 +220,7 @@ func parseRSAPrivateKeyFromPEM(pemData []byte) (*rsa.PrivateKey, error) {
 func buildRS256JWT(key *rsa.PrivateKey, appID int64, iat, exp time.Time) (string, error) {
 	header := base64URLEncode([]byte(`{"alg":"RS256","typ":"JWT"}`))
 
-	payload, err := json.Marshal(map[string]interface{}{
+	payload, err := json.Marshal(map[string]any{
 		"iss": fmt.Sprintf("%d", appID),
 		"iat": iat.Unix(),
 		"exp": exp.Unix(),
@@ -248,7 +248,7 @@ func base64URLEncode(data []byte) string {
 
 // VerifyRS256JWT is exported for testing: it verifies an RS256 JWT signature
 // and returns the decoded claims. Not intended for production use.
-func VerifyRS256JWT(token string, pub *rsa.PublicKey) (map[string]interface{}, error) {
+func VerifyRS256JWT(token string, pub *rsa.PublicKey) (map[string]any, error) {
 	parts := splitJWT(token)
 	if parts == nil {
 		return nil, fmt.Errorf("malformed JWT: expected 3 parts")
@@ -270,7 +270,7 @@ func VerifyRS256JWT(token string, pub *rsa.PublicKey) (map[string]interface{}, e
 		return nil, fmt.Errorf("decoding payload: %w", err)
 	}
 
-	var claims map[string]interface{}
+	var claims map[string]any
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return nil, fmt.Errorf("parsing claims: %w", err)
 	}

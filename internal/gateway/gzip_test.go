@@ -25,8 +25,14 @@ func TestGzipDecodingValid(t *testing.T) {
 
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	w.Write(body)
-	w.Close()
+	_, err := w.Write(body)
+	if err != nil {
+		return
+	}
+	err = w.Close()
+	if err != nil {
+		return
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", &b)
 	req.Header.Set("Content-Type", "application/json")
@@ -69,8 +75,14 @@ func TestGzipDecodingZipBomb(t *testing.T) {
 
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	w.Write(body)
-	w.Close()
+	_, err := w.Write(body)
+	if err != nil {
+		return
+	}
+	err = w.Close()
+	if err != nil {
+		return
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", &b)
 	req.Header.Set("Content-Type", "application/json")
@@ -120,7 +132,12 @@ func TestGzipEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read gzip response: %v", err)
 	}
-	defer gr.Close()
+	defer func(gr *gzip.Reader) {
+		err := gr.Close()
+		if err != nil {
+			t.Fatalf("failed to close gzip reader: %v", err)
+		}
+	}(gr)
 	decompressed, _ := io.ReadAll(gr)
 
 	var resp types.ChatCompletionResponse
@@ -230,8 +247,14 @@ func BenchmarkGzipDecoding(b *testing.B) {
 	body, _ := json.Marshal(reqBody)
 	var buf bytes.Buffer
 	w := gzip.NewWriter(&buf)
-	w.Write(body)
-	w.Close()
+	_, err := w.Write(body)
+	if err != nil {
+		return
+	}
+	err = w.Close()
+	if err != nil {
+		return
+	}
 	gzBody := buf.Bytes()
 
 	b.ResetTimer()

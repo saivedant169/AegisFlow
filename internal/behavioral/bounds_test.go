@@ -14,7 +14,7 @@ func TestRecordActionPrunesExpiredHistory(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Three stale actions (10 minutes old) and two fresh ones.
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		sa.RecordAction(makeEnv("old", "shell.ls", "/tmp", envelope.CapRead, envelope.ProtocolMCP, now.Add(-10*time.Minute)))
 	}
 	sa.RecordAction(makeEnv("fresh-1", "shell.ls", "/a", envelope.CapRead, envelope.ProtocolMCP, now))
@@ -38,7 +38,7 @@ func TestRecordActionEnforcesHardCap(t *testing.T) {
 	now := time.Now().UTC()
 
 	total := maxSessionHistory + 250
-	for i := 0; i < total; i++ {
+	for i := range total {
 		sa.RecordAction(makeEnv("e", "shell.ls", "/x", envelope.CapRead, envelope.ProtocolMCP, now.Add(time.Duration(i)*time.Millisecond)))
 	}
 
@@ -56,8 +56,8 @@ func TestSuspiciousFanOut_SpreadBeyondWindowNoAlert(t *testing.T) {
 
 	// 12 distinct targets, each 30s apart => at most 1 per 10s window.
 	var history []envelope.ActionEnvelope
-	for i := 0; i < 12; i++ {
-		target := "host-" + string(rune('a'+i)) + ".example.com"
+	for i := range 12 {
+		target := "host-" + string('a'+i) + ".example.com"
 		history = append(history, *makeEnv("e", "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*30*time.Second)))
 	}
 
@@ -78,8 +78,8 @@ func TestSuspiciousFanOut_BurstAfterQuietStillAlerts(t *testing.T) {
 	history = append(history, *makeEnv("old2", "http.get", "old-b", envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Second)))
 	// Burst of 6 distinct targets within a 5s window, 5 minutes later.
 	burst := now.Add(5 * time.Minute)
-	for i := 0; i < 6; i++ {
-		target := "burst-" + string(rune('a'+i))
+	for i := range 6 {
+		target := "burst-" + string('a'+i)
 		history = append(history, *makeEnv("e", "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, burst.Add(time.Duration(i)*time.Second)))
 	}
 

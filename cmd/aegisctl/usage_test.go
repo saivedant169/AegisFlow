@@ -12,13 +12,16 @@ func TestCmdUsage_JSON(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/v1/usage", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{
+		_, err := w.Write([]byte(`{
 			"tenant-a": {
 				"by_model": {
 					"gpt-4": {"requests": 3, "total_tokens": 120, "estimated_cost_usd": 0.045}
 				}
 			}
 		}`))
+		if err != nil {
+			return
+		}
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -68,13 +71,16 @@ func TestCmdUsage_JSON_Empty(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/v1/usage", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{}`))
+		_, err := w.Write([]byte(`{}`))
+		if err != nil {
+			return
+		}
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	got := captureStdout(t, func() { cmdUsage(srv.URL, true) })
 	var out struct {
-		Tenants []interface{} `json:"tenants"`
+		Tenants []any `json:"tenants"`
 	}
 	if err := json.Unmarshal([]byte(got), &out); err != nil {
 		t.Fatalf("JSON output is not valid JSON: %v (got %q)", err, got)
@@ -87,13 +93,16 @@ func TestCmdUsage_Human(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/v1/usage", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{
+		_, err := w.Write([]byte(`{
 			"tenant-a": {
 				"by_model": {
 					"gpt-4": {"requests": 3, "total_tokens": 120, "estimated_cost_usd": 0.045}
 				}
 			}
 		}`))
+		if err != nil {
+			return
+		}
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()

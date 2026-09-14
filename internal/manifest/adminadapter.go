@@ -20,11 +20,11 @@ func NewAdminAdapter(store *Store, detector *DriftDetector) *AdminAdapter {
 }
 
 // Register registers a new manifest. Accepts either *TaskManifest or map[string]interface{}.
-func (a *AdminAdapter) Register(m interface{}) error {
+func (a *AdminAdapter) Register(m any) error {
 	switch v := m.(type) {
 	case *TaskManifest:
 		return a.store.Register(v)
-	case map[string]interface{}:
+	case map[string]any:
 		manifest := &TaskManifest{}
 		if id, ok := v["id"].(string); ok {
 			manifest.ID = id
@@ -69,12 +69,12 @@ func (a *AdminAdapter) Register(m interface{}) error {
 }
 
 // Get returns a manifest by ID.
-func (a *AdminAdapter) Get(id string) (interface{}, error) {
+func (a *AdminAdapter) Get(id string) (any, error) {
 	return a.store.Get(id)
 }
 
 // List returns all active manifests.
-func (a *AdminAdapter) List() interface{} {
+func (a *AdminAdapter) List() any {
 	return a.store.ListActive()
 }
 
@@ -84,12 +84,12 @@ func (a *AdminAdapter) Deactivate(id string) error {
 }
 
 // GetDrift returns drift events for a manifest.
-func (a *AdminAdapter) GetDrift(id string) interface{} {
+func (a *AdminAdapter) GetDrift(id string) any {
 	return a.store.GetDrift(id)
 }
 
 // CheckDrift checks an envelope against the manifest for a given task and records any drift.
-func (a *AdminAdapter) CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{} {
+func (a *AdminAdapter) CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) any {
 	m, err := a.store.GetByTaskID(taskID)
 	if err != nil {
 		return nil

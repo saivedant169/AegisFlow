@@ -141,7 +141,7 @@ func NewHandler(registry *provider.Registry, rt *router.Router, pe *policy.Engin
 	h := &Handler{registry: registry, router: rt, policy: pe, usage: ut, cache: c, webhook: wh, store: store, analytics: ac, maxBodySize: maxBodySize, recordSpend: recordSpend, budgetCheck: budgetCheck}
 	if store != nil {
 		h.dbQueue = make(chan storage.UsageEvent, dbQueueSize)
-		for i := 0; i < dbWorkerCount; i++ {
+		for range dbWorkerCount {
 			h.dbWG.Add(1)
 			go h.dbWorker()
 		}

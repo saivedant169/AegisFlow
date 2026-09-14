@@ -3,6 +3,7 @@ package pgstore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,7 +56,7 @@ func (s *PostgresStore) LastHash() (string, error) {
 	var hash string
 	err := s.db.QueryRowContext(context.Background(),
 		`SELECT entry_hash FROM audit_log_v2 ORDER BY id DESC LIMIT 1`).Scan(&hash)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return hash, err
@@ -65,7 +66,7 @@ func (s *PostgresStore) LatestTimestamp() (string, error) {
 	var ts time.Time
 	err := s.db.QueryRowContext(context.Background(),
 		`SELECT timestamp FROM audit_log_v2 ORDER BY id DESC LIMIT 1`).Scan(&ts)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -77,7 +78,7 @@ func (s *PostgresStore) LatestTimestamp() (string, error) {
 func (s *PostgresStore) Query(filters audit.QueryFilters) ([]audit.Entry, error) {
 	query := `SELECT id, timestamp, actor, actor_role, action, resource, detail, tenant_id, model, previous_hash, entry_hash
 		FROM audit_log_v2 WHERE 1=1`
-	args := []interface{}{}
+	var args []any
 	argIdx := 1
 
 	if filters.Actor != "" {

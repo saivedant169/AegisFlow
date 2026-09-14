@@ -10,7 +10,7 @@ func NewAdminAdapter(engine *Engine, usageFn func() []UsageSnapshot) *AdminAdapt
 	return &AdminAdapter{engine: engine, usageFn: usageFn}
 }
 
-func (a *AdminAdapter) Recommendations() interface{} {
+func (a *AdminAdapter) Recommendations() any {
 	snapshots := a.usageFn()
 	return a.engine.Analyze(snapshots)
 }

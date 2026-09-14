@@ -76,7 +76,7 @@ func cmdTestAction(adminURL string, args []string) {
 	// Parse params
 	params := make(map[string]string)
 	if paramsStr != "" {
-		for _, pair := range strings.Split(paramsStr, ",") {
+		for pair := range strings.SplitSeq(paramsStr, ",") {
 			kv := strings.SplitN(pair, "=", 2)
 			if len(kv) == 2 {
 				params[kv[0]] = kv[1]
@@ -96,7 +96,10 @@ func cmdTestAction(adminURL string, args []string) {
 	// Remote failures must not be replaced with a local policy decision.
 	result, err := remoteTestAction(adminURL, protocol, tool, target, capability, params)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -104,7 +107,7 @@ func cmdTestAction(adminURL string, args []string) {
 }
 
 func remoteTestAction(adminURL, protocol, tool, target, capability string, params map[string]string) (*testActionResult, error) {
-	body := map[string]interface{}{
+	body := map[string]any{
 		"protocol":   protocol,
 		"tool":       tool,
 		"target":     target,
@@ -208,21 +211,45 @@ func formatTestActionOutput(result *testActionResult) string {
 	// Decision with color
 	switch result.Decision {
 	case "allow":
-		fmt.Fprintf(&sb, "Decision:      %sALLOWED%s\n", colorGreen, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:      %sALLOWED%s\n", colorGreen, colorReset)
+		if err != nil {
+			return ""
+		}
 	case "review":
-		fmt.Fprintf(&sb, "Decision:      %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:      %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
+		if err != nil {
+			return ""
+		}
 	case "block":
-		fmt.Fprintf(&sb, "Decision:      %sBLOCKED%s\n", colorRed, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:      %sBLOCKED%s\n", colorRed, colorReset)
+		if err != nil {
+			return ""
+		}
 	default:
-		fmt.Fprintf(&sb, "Decision:      %s\n", result.Decision)
+		_, err := fmt.Fprintf(&sb, "Decision:      %s\n", result.Decision)
+		if err != nil {
+			return ""
+		}
 	}
 
-	fmt.Fprintf(&sb, "Envelope ID:   %s\n", result.EnvelopeID)
-	fmt.Fprintf(&sb, "Evidence Hash: %s\n", result.EvidenceHash)
-	fmt.Fprintf(&sb, "Message:       %s\n", result.Message)
+	_, err := fmt.Fprintf(&sb, "Envelope ID:   %s\n", result.EnvelopeID)
+	if err != nil {
+		return ""
+	}
+	_, err = fmt.Fprintf(&sb, "Evidence Hash: %s\n", result.EvidenceHash)
+	if err != nil {
+		return ""
+	}
+	_, err = fmt.Fprintf(&sb, "Message:       %s\n", result.Message)
+	if err != nil {
+		return ""
+	}
 
 	if result.ApprovalID != "" {
-		fmt.Fprintf(&sb, "Approval ID:   %s\n", result.ApprovalID)
+		_, err := fmt.Fprintf(&sb, "Approval ID:   %s\n", result.ApprovalID)
+		if err != nil {
+			return ""
+		}
 	}
 
 	return sb.String()

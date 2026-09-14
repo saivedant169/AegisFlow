@@ -13,11 +13,19 @@ func loadFromYAML(t *testing.T, yamlContent string) (*Config, error) {
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(yamlContent); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return nil, err
+	}
 	return Load(f.Name())
 }
 

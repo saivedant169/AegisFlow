@@ -21,7 +21,7 @@ func TestVaultBrokerIssue(t *testing.T) {
 		if !strings.HasSuffix(r.URL.Path, "/creds/my-role") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"request_id":     "req-123",
 			"lease_id":       "database/creds/my-role/abc123",
 			"renewable":      true,
@@ -31,6 +31,9 @@ func TestVaultBrokerIssue(t *testing.T) {
 				"password": "s3cret-pw",
 			},
 		})
+		if err != nil {
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -64,7 +67,7 @@ func TestVaultBrokerRevoke(t *testing.T) {
 	var revokedLeaseID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/creds/my-role") {
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			err := json.NewEncoder(w).Encode(map[string]any{
 				"lease_id":       "database/creds/my-role/abc123",
 				"lease_duration": 3600,
 				"data": map[string]string{
@@ -72,11 +75,17 @@ func TestVaultBrokerRevoke(t *testing.T) {
 					"password": "p",
 				},
 			})
+			if err != nil {
+				return
+			}
 			return
 		}
 		if r.URL.Path == "/v1/sys/leases/revoke" && r.Method == http.MethodPut {
 			var body map[string]string
-			json.NewDecoder(r.Body).Decode(&body)
+			err := json.NewDecoder(r.Body).Decode(&body)
+			if err != nil {
+				return
+			}
 			revokedLeaseID = body["lease_id"]
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -107,7 +116,10 @@ func TestVaultBrokerRevoke(t *testing.T) {
 func TestVaultBrokerAuthError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"errors":["permission denied"]}`))
+		_, err := w.Write([]byte(`{"errors":["permission denied"]}`))
+		if err != nil {
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -128,7 +140,10 @@ func TestVaultBrokerAuthError(t *testing.T) {
 func TestVaultBrokerNotFound(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"errors":["no handler for route"]}`))
+		_, err := w.Write([]byte(`{"errors":["no handler for route"]}`))
+		if err != nil {
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -148,7 +163,7 @@ func TestVaultBrokerNotFound(t *testing.T) {
 
 func TestVaultBrokerTTL(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"lease_id":       "database/creds/my-role/ttl-test",
 			"lease_duration": 300, // 5 minutes from Vault
 			"data": map[string]string{
@@ -156,6 +171,9 @@ func TestVaultBrokerTTL(t *testing.T) {
 				"password": "p",
 			},
 		})
+		if err != nil {
+			return
+		}
 	}))
 	defer ts.Close()
 

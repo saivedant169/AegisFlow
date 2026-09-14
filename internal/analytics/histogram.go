@@ -46,10 +46,7 @@ func (h *latencyHistogram) percentile(p int) int64 {
 	if h.total == 0 {
 		return 0
 	}
-	target := int64(math.Ceil(float64(p) / 100 * float64(h.total)))
-	if target < 1 {
-		target = 1
-	}
+	target := max(int64(math.Ceil(float64(p)/100*float64(h.total))), 1)
 	var cum int64
 	for i, c := range h.counts {
 		cum += c

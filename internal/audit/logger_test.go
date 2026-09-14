@@ -99,7 +99,7 @@ func TestMultipleSequentialEntriesChain(t *testing.T) {
 	}
 	defer logger.Stop()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		logger.Log("actor", "admin", "action", "resource", "{}", "t1", "")
 		time.Sleep(30 * time.Millisecond)
 	}
@@ -194,7 +194,7 @@ func TestLogQueueFullBehavior(t *testing.T) {
 
 	// The queue has capacity 1024. Send 1100 entries rapidly.
 	// Some should be dropped (no panic, no blocking).
-	for i := 0; i < 1100; i++ {
+	for range 1100 {
 		logger.Log("actor", "admin", "action", "resource", "{}", "t1", "")
 	}
 
@@ -218,7 +218,7 @@ func TestLogQueueFullBehavior(t *testing.T) {
 func TestMemoryStoreQueryReturnsAllInOrder(t *testing.T) {
 	store := NewMemoryStore()
 	// Directly insert entries to test the store independently.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_ = store.Insert(Entry{
 			Actor:  "actor",
 			Action: "action",

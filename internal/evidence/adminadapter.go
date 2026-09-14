@@ -13,14 +13,14 @@ func NewAdminAdapter(chain *SessionChain) *AdminAdapter {
 	return &AdminAdapter{chain: chain}
 }
 
-func (a *AdminAdapter) ExportSession(sessionID string) (interface{}, error) {
+func (a *AdminAdapter) ExportSession(sessionID string) (any, error) {
 	if a.chain.SessionID() != sessionID || (a.scoped && !chainOwnedBy(a.chain, a.tenant)) {
 		return nil, fmt.Errorf("session %q not found", sessionID)
 	}
 	return a.chain.Export()
 }
 
-func (a *AdminAdapter) VerifySession(sessionID string) (interface{}, error) {
+func (a *AdminAdapter) VerifySession(sessionID string) (any, error) {
 	if a.chain.SessionID() != sessionID || (a.scoped && !chainOwnedBy(a.chain, a.tenant)) {
 		return nil, fmt.Errorf("session %q not found", sessionID)
 	}
@@ -28,7 +28,7 @@ func (a *AdminAdapter) VerifySession(sessionID string) (interface{}, error) {
 	return Verify(records), nil
 }
 
-func (a *AdminAdapter) ListSessions() (interface{}, error) {
+func (a *AdminAdapter) ListSessions() (any, error) {
 	if a.scoped && !chainOwnedBy(a.chain, a.tenant) {
 		return []SessionManifest{}, nil
 	}
@@ -51,7 +51,7 @@ func (a *AdminAdapter) RenderHTMLReport(sessionID string) (string, error) {
 }
 
 // ForTenant returns a view limited to evidence owned by one tenant.
-func (a *AdminAdapter) ForTenant(tenant string) interface{} {
+func (a *AdminAdapter) ForTenant(tenant string) any {
 	return &AdminAdapter{chain: a.chain, tenant: tenant, scoped: true}
 }
 

@@ -58,10 +58,13 @@ func TestGitHubBrokerIssueSendsScopedBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"token":      "ghs_faketoken",
 			"expires_at": time.Now().Add(time.Hour).UTC(),
 		})
+		if err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 

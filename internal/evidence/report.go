@@ -16,20 +16,47 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 
 	var sb strings.Builder
 
-	fmt.Fprintf(&sb, "# Evidence Report: %s\n\n", manifest.SessionID)
-	fmt.Fprintf(&sb, "**Generated:** %s\n\n", time.Now().UTC().Format(time.RFC3339))
+	_, err := fmt.Fprintf(&sb, "# Evidence Report: %s\n\n", manifest.SessionID)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "**Generated:** %s\n\n", time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		return "", err
+	}
 
 	// Summary table
 	sb.WriteString("## Summary\n\n")
 	sb.WriteString("| Metric | Value |\n")
 	sb.WriteString("|--------|-------|\n")
-	fmt.Fprintf(&sb, "| Total Actions | %d |\n", manifest.TotalActions)
-	fmt.Fprintf(&sb, "| Allowed | %d |\n", manifest.Allowed)
-	fmt.Fprintf(&sb, "| Reviewed | %d |\n", manifest.Reviewed)
-	fmt.Fprintf(&sb, "| Blocked | %d |\n", manifest.Blocked)
-	fmt.Fprintf(&sb, "| Chain Valid | %v |\n", verify.Valid)
-	fmt.Fprintf(&sb, "| First Hash | `%s` |\n", truncHash(manifest.FirstHash))
-	fmt.Fprintf(&sb, "| Last Hash | `%s` |\n", truncHash(manifest.LastHash))
+	_, err = fmt.Fprintf(&sb, "| Total Actions | %d |\n", manifest.TotalActions)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| Allowed | %d |\n", manifest.Allowed)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| Reviewed | %d |\n", manifest.Reviewed)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| Blocked | %d |\n", manifest.Blocked)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| Chain Valid | %v |\n", verify.Valid)
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| First Hash | `%s` |\n", truncHash(manifest.FirstHash))
+	if err != nil {
+		return "", err
+	}
+	_, err = fmt.Fprintf(&sb, "| Last Hash | `%s` |\n", truncHash(manifest.LastHash))
+	if err != nil {
+		return "", err
+	}
 	sb.WriteString("\n")
 
 	if manifest.TotalActions == 0 {
@@ -42,8 +69,11 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 	if verify.Valid {
 		sb.WriteString("All record hashes verified. Chain is intact.\n\n")
 	} else {
-		fmt.Fprintf(&sb, "**INTEGRITY FAILURE** at record %d: %s\n\n",
+		_, err := fmt.Fprintf(&sb, "**INTEGRITY FAILURE** at record %d: %s\n\n",
 			verify.ErrorAtIndex, verify.Message)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Action timeline
@@ -52,13 +82,16 @@ func RenderMarkdownReport(chain *SessionChain) (string, error) {
 	sb.WriteString("|---|------|------|--------|----------|------|\n")
 	for _, r := range records {
 		decision := strings.ToUpper(string(r.Envelope.PolicyDecision))
-		fmt.Fprintf(&sb, "| %d | %s | %s | %s | %s | `%s` |\n",
+		_, err := fmt.Fprintf(&sb, "| %d | %s | %s | %s | %s | `%s` |\n",
 			r.Index,
 			r.Timestamp.Format("15:04:05"),
 			r.Envelope.Tool,
 			truncTarget(r.Envelope.Target),
 			decision,
 			truncHash(r.Hash))
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return sb.String(), nil
@@ -94,7 +127,7 @@ pre { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; 
 	}
 
 	var buf bytes.Buffer
-	if err := t.Execute(&buf, map[string]interface{}{
+	if err := t.Execute(&buf, map[string]any{
 		"SessionID": manifest.SessionID,
 		"Content":   md,
 	}); err != nil {

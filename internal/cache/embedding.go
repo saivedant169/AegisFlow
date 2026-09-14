@@ -9,9 +9,10 @@ import (
 	"math"
 	"net/http"
 
+	"time"
+
 	"github.com/saivedant169/AegisFlow/internal/cleanup"
 	"github.com/saivedant169/AegisFlow/internal/httpx"
-	"time"
 )
 
 // Embedder converts text into a vector embedding.

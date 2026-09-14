@@ -162,9 +162,9 @@ func TestSuspiciousFanOut_BelowThreshold(t *testing.T) {
 
 	// Only 5 distinct targets -- below default threshold of 10.
 	var history []envelope.ActionEnvelope
-	for i := 0; i < 5; i++ {
-		target := "host-" + string(rune('a'+i)) + ".example.com"
-		history = append(history, *makeEnv("e"+string(rune('0'+i)), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+	for i := range 5 {
+		target := "host-" + string('a'+i) + ".example.com"
+		history = append(history, *makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	if alert := rule.Detect(history); alert != nil {
@@ -177,9 +177,9 @@ func TestSuspiciousFanOut_Triggered(t *testing.T) {
 	now := time.Now().UTC()
 
 	var history []envelope.ActionEnvelope
-	for i := 0; i < 5; i++ {
-		target := "host-" + string(rune('a'+i)) + ".example.com"
-		history = append(history, *makeEnv("e"+string(rune('0'+i)), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
+	for i := range 5 {
+		target := "host-" + string('a'+i) + ".example.com"
+		history = append(history, *makeEnv("e"+string('0'+i), "http.get", target, envelope.CapRead, envelope.ProtocolHTTP, now.Add(time.Duration(i)*time.Second)))
 	}
 
 	alert := rule.Detect(history)

@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,11 +85,11 @@ func (sc *SemanticCache) Close() {
 }
 
 func (sc *SemanticCache) buildText(req *types.ChatCompletionRequest) string {
-	var text string
+	var text strings.Builder
 	for _, m := range req.Messages {
-		text += m.Role + ": " + m.Content + "\n"
+		text.WriteString(m.Role + ": " + m.Content + "\n")
 	}
-	return text
+	return text.String()
 }
 
 // GetSemantic searches for a semantically similar cached response.
@@ -192,7 +193,7 @@ func (sc *SemanticCache) insert(tenantID, model string, vec []float64, resp *typ
 
 // Get implements the Cache interface using semantic matching.
 // Key is ignored -- matching is done by embedding similarity.
-func (sc *SemanticCache) Get(key string) (*types.ChatCompletionResponse, bool) {
+func (sc *SemanticCache) Get(string) (*types.ChatCompletionResponse, bool) {
 	// Semantic cache doesn't support key-based lookup.
 	// Use GetSemantic directly for semantic matching.
 	return nil, false
@@ -200,7 +201,7 @@ func (sc *SemanticCache) Get(key string) (*types.ChatCompletionResponse, bool) {
 
 // Set implements the Cache interface. No-op for semantic cache.
 // Use SetSemantic directly.
-func (sc *SemanticCache) Set(key string, resp *types.ChatCompletionResponse) {
+func (sc *SemanticCache) Set(string, *types.ChatCompletionResponse) {
 	// No-op: semantic cache requires the full request for embedding.
 }
 

@@ -61,7 +61,10 @@ func cmdSimulate(adminURL string, args []string) {
 	// Remote failures must not be replaced with example rules.
 	result, err := remoteSimulate(adminURL, protocol, tool, target, capability)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v; use --dry-run for local example rules\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -140,30 +143,51 @@ func formatSimulateOutput(r *simulateResponse) string {
 	// Decision
 	switch r.Decision {
 	case "allow":
-		fmt.Fprintf(&sb, "Decision:       %sALLOWED%s\n", colorGreen, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:       %sALLOWED%s\n", colorGreen, colorReset)
+		if err != nil {
+			return ""
+		}
 	case "review":
-		fmt.Fprintf(&sb, "Decision:       %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:       %sREVIEW REQUIRED%s\n", colorYellow, colorReset)
+		if err != nil {
+			return ""
+		}
 	case "block":
-		fmt.Fprintf(&sb, "Decision:       %sBLOCKED%s\n", colorRed, colorReset)
+		_, err := fmt.Fprintf(&sb, "Decision:       %sBLOCKED%s\n", colorRed, colorReset)
+		if err != nil {
+			return ""
+		}
 	default:
-		fmt.Fprintf(&sb, "Decision:       %s\n", r.Decision)
+		_, err := fmt.Fprintf(&sb, "Decision:       %s\n", r.Decision)
+		if err != nil {
+			return ""
+		}
 	}
 
-	fmt.Fprintf(&sb, "Action:         %s\n", r.Action)
+	_, err := fmt.Fprintf(&sb, "Action:         %s\n", r.Action)
+	if err != nil {
+		return ""
+	}
 
 	if r.Trace != nil {
 		if r.Trace.DefaultUsed {
 			sb.WriteString("Matched rule:   (default)\n")
 		} else if r.Trace.MatchedRule != nil {
-			fmt.Fprintf(&sb, "Matched rule:   #%d [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+			_, err := fmt.Fprintf(&sb, "Matched rule:   #%d [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
 				r.Trace.MatchedIndex,
 				r.Trace.MatchedRule.Protocol,
 				r.Trace.MatchedRule.Tool,
 				r.Trace.MatchedRule.Target,
 				r.Trace.MatchedRule.Capability,
 				r.Trace.MatchedRule.Decision)
+			if err != nil {
+				return ""
+			}
 		}
-		fmt.Fprintf(&sb, "Rules checked:  %d\n", r.Trace.RulesChecked)
+		_, err := fmt.Fprintf(&sb, "Rules checked:  %d\n", r.Trace.RulesChecked)
+		if err != nil {
+			return ""
+		}
 
 		sb.WriteString("\nTrace:\n")
 		for _, step := range r.Trace.CheckTrace {
@@ -175,10 +199,13 @@ func formatSimulateOutput(r *simulateResponse) string {
 			if step.FailReason != "" {
 				reason = " (" + step.FailReason + ")"
 			}
-			fmt.Fprintf(&sb, "  [%d] %s  protocol=%s tool=%s target=%s cap=%s -> %s%s\n",
+			_, err := fmt.Fprintf(&sb, "  [%d] %s  protocol=%s tool=%s target=%s cap=%s -> %s%s\n",
 				step.RuleIndex, status,
 				step.Rule.Protocol, step.Rule.Tool, step.Rule.Target,
 				step.Rule.Capability, step.Rule.Decision, reason)
+			if err != nil {
+				return ""
+			}
 		}
 	}
 
@@ -196,7 +223,10 @@ func cmdWhy(adminURL string, args []string) {
 
 	resp, err := client.Get(adminURL + "/admin/v1/actions/" + id + "/why")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -204,16 +234,25 @@ func cmdWhy(adminURL string, args []string) {
 	if resp.StatusCode != 200 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error (%d): could not read response body\n", resp.StatusCode)
+			_, err := fmt.Fprintf(os.Stderr, "Error (%d): could not read response body\n", resp.StatusCode)
+			if err != nil {
+				return
+			}
 		} else {
-			fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+			_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+			if err != nil {
+				return
+			}
 		}
 		os.Exit(1)
 	}
 
 	var result simulateResponse
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error decoding response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error decoding response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -235,12 +274,18 @@ func cmdDiffPolicy(args []string) {
 
 	oldPolicy, err := loadPolicyFile(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading %s: %v\n", args[0], err)
+		_, err := fmt.Fprintf(os.Stderr, "Error loading %s: %v\n", args[0], err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	newPolicy, err := loadPolicyFile(args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading %s: %v\n", args[1], err)
+		_, err := fmt.Fprintf(os.Stderr, "Error loading %s: %v\n", args[1], err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -264,7 +309,7 @@ func loadPolicyFile(path string) (*policyFile, error) {
 }
 
 // buildTestActions creates synthetic envelopes from all rules in both sets so
-// the diff can detect impact on representative actions.
+// the diff can detect the impact on representative actions.
 func buildTestActions(oldRules, newRules []toolpolicy.ToolRule) []*envelope.ActionEnvelope {
 	seen := make(map[string]bool)
 	var actions []*envelope.ActionEnvelope
@@ -316,37 +361,67 @@ func formatDiffOutput(diff *toolpolicy.DiffResult) string {
 	sb.WriteString(strings.Repeat("-", 60) + "\n")
 
 	if len(diff.Added) > 0 {
-		fmt.Fprintf(&sb, "\n%sAdded rules:%s\n", colorGreen, colorReset)
+		_, err := fmt.Fprintf(&sb, "\n%sAdded rules:%s\n", colorGreen, colorReset)
+		if err != nil {
+			return ""
+		}
 		for _, r := range diff.Added {
-			fmt.Fprintf(&sb, "  + [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+			_, err := fmt.Fprintf(&sb, "  + [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
 				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision)
+			if err != nil {
+				return ""
+			}
 		}
 	}
 
 	if len(diff.Removed) > 0 {
-		fmt.Fprintf(&sb, "\n%sRemoved rules:%s\n", colorRed, colorReset)
+		_, err := fmt.Fprintf(&sb, "\n%sRemoved rules:%s\n", colorRed, colorReset)
+		if err != nil {
+			return ""
+		}
 		for _, r := range diff.Removed {
-			fmt.Fprintf(&sb, "  - [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
+			_, err := fmt.Fprintf(&sb, "  - [protocol=%s tool=%s target=%s cap=%s -> %s]\n",
 				r.Protocol, r.Tool, r.Target, r.Capability, r.Decision)
+			if err != nil {
+				return ""
+			}
 		}
 	}
 
 	if len(diff.Changed) > 0 {
-		fmt.Fprintf(&sb, "\n%sChanged rules:%s\n", colorYellow, colorReset)
+		_, err := fmt.Fprintf(&sb, "\n%sChanged rules:%s\n", colorYellow, colorReset)
+		if err != nil {
+			return ""
+		}
 		for _, c := range diff.Changed {
-			fmt.Fprintf(&sb, "  ~ [%d] %s -> %s\n", c.Index, c.Before.Decision, c.After.Decision)
-			fmt.Fprintf(&sb, "    before: protocol=%s tool=%s target=%s cap=%s\n",
+			_, err := fmt.Fprintf(&sb, "  ~ [%d] %s -> %s\n", c.Index, c.Before.Decision, c.After.Decision)
+			if err != nil {
+				return ""
+			}
+			_, err = fmt.Fprintf(&sb, "    before: protocol=%s tool=%s target=%s cap=%s\n",
 				c.Before.Protocol, c.Before.Tool, c.Before.Target, c.Before.Capability)
-			fmt.Fprintf(&sb, "    after:  protocol=%s tool=%s target=%s cap=%s\n",
+			if err != nil {
+				return ""
+			}
+			_, err = fmt.Fprintf(&sb, "    after:  protocol=%s tool=%s target=%s cap=%s\n",
 				c.After.Protocol, c.After.Tool, c.After.Target, c.After.Capability)
+			if err != nil {
+				return ""
+			}
 		}
 	}
 
 	if len(diff.Impact) > 0 {
-		fmt.Fprintf(&sb, "\n%sImpacted actions:%s\n", colorRed, colorReset)
+		_, err := fmt.Fprintf(&sb, "\n%sImpacted actions:%s\n", colorRed, colorReset)
+		if err != nil {
+			return ""
+		}
 		for _, ia := range diff.Impact {
-			fmt.Fprintf(&sb, "  ! %s (%s): %s -> %s\n",
+			_, err := fmt.Fprintf(&sb, "  ! %s (%s): %s -> %s\n",
 				ia.Tool, ia.Protocol, ia.OldDecision, ia.NewDecision)
+			if err != nil {
+				return ""
+			}
 		}
 	}
 

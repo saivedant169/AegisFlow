@@ -8,9 +8,18 @@ import (
 
 func TestVerifyValidChain(t *testing.T) {
 	chain := NewSessionChain("s1")
-	chain.Record(testEnv("t1", envelope.DecisionAllow))
-	chain.Record(testEnv("t2", envelope.DecisionReview))
-	chain.Record(testEnv("t3", envelope.DecisionBlock))
+	_, err := chain.Record(testEnv("t1", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t2", envelope.DecisionReview))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t3", envelope.DecisionBlock))
+	if err != nil {
+		return
+	}
 
 	result := Verify(chain.Records())
 	if !result.Valid {
@@ -56,8 +65,14 @@ func TestVerifyRejectsChangedRecordIndex(t *testing.T) {
 
 func TestVerifyDetectsTamperedHash(t *testing.T) {
 	chain := NewSessionChain("s1")
-	chain.Record(testEnv("t1", envelope.DecisionAllow))
-	chain.Record(testEnv("t2", envelope.DecisionAllow))
+	_, err := chain.Record(testEnv("t1", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t2", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
 
 	records := chain.Records()
 	records[0].Hash = "tampered"
@@ -73,8 +88,14 @@ func TestVerifyDetectsTamperedHash(t *testing.T) {
 
 func TestVerifyDetectsBrokenLink(t *testing.T) {
 	chain := NewSessionChain("s1")
-	chain.Record(testEnv("t1", envelope.DecisionAllow))
-	chain.Record(testEnv("t2", envelope.DecisionAllow))
+	_, err := chain.Record(testEnv("t1", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t2", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
 
 	records := chain.Records()
 	records[1].PreviousHash = "wrong"

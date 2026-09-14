@@ -1,5 +1,7 @@
 package v1alpha1
 
+import "maps"
+
 import "k8s.io/apimachinery/pkg/runtime"
 
 // --- AegisFlowGateway ---
@@ -193,9 +195,7 @@ func (in *TenantBudgetSpec) DeepCopyInto(out *TenantBudgetSpec) {
 	*out = *in
 	if in.Models != nil {
 		out.Models = make(map[string]ModelBudgetSpec, len(in.Models))
-		for k, v := range in.Models {
-			out.Models[k] = v
-		}
+		maps.Copy(out.Models, in.Models)
 	}
 }
 

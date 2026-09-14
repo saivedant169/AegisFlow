@@ -78,7 +78,10 @@ func TestHandler_RequestValidation(t *testing.T) {
 	}
 
 	var errResp types.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&errResp)
+	err := json.NewDecoder(res.Body).Decode(&errResp)
+	if err != nil {
+		return
+	}
 
 	if errResp.Error.Param != "messages" {
 		t.Errorf("expected param 'messages', got '%s'", errResp.Error.Param)

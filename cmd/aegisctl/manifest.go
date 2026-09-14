@@ -55,7 +55,10 @@ func cmdManifestCreate(adminURL string, args []string) {
 		case "--max-actions":
 			if i+1 < len(args) {
 				if _, err := fmt.Sscanf(args[i+1], "%d", &maxActions); err != nil {
-					fmt.Fprintln(os.Stderr, "Error: invalid max-actions")
+					_, err := fmt.Fprintln(os.Stderr, "Error: invalid max-actions")
+					if err != nil {
+						return
+					}
 					os.Exit(1)
 				}
 				i++
@@ -73,7 +76,7 @@ func cmdManifestCreate(adminURL string, args []string) {
 		os.Exit(1)
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"task_id":     taskID,
 		"description": description,
 		"owner":       owner,
@@ -95,25 +98,37 @@ func cmdManifestCreate(adminURL string, args []string) {
 
 	data, err := marshalJSON(body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	resp, err := client.Post(adminURL+"/admin/v1/manifests", "application/json", bytes.NewReader(data))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	if resp.StatusCode != 201 {
 		respData, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(respData))
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(respData))
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -128,14 +143,20 @@ func cmdManifestCreate(adminURL string, args []string) {
 func cmdManifestList(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/manifests")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
-	var manifests []map[string]interface{}
+	var manifests []map[string]any
 	if err := decodeJSON(resp, &manifests); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -160,7 +181,10 @@ func cmdManifestList(adminURL string) {
 			id, m["task_id"], m["owner"], m["risk_tier"], m["active"], hash))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -168,14 +192,20 @@ func cmdManifestList(adminURL string) {
 func cmdManifestDrift(adminURL string, id string) {
 	resp, err := client.Get(adminURL + "/admin/v1/manifests/" + id + "/drift")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
-	var events []map[string]interface{}
+	var events []map[string]any
 	if err := decodeJSON(resp, &events); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -196,7 +226,10 @@ func cmdManifestDrift(adminURL string, id string) {
 			e["type"], e["tool"], e["protocol"], e["severity"], msg))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }

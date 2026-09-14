@@ -175,10 +175,13 @@ func TestGitHubAppBrokerIssue(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"token":      "ghs_test_installation_token",
 			"expires_at": expiresAt.Format(time.RFC3339),
 		})
+		if err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -288,10 +291,13 @@ func TestGitHubAppBrokerRealJWT(t *testing.T) {
 		capturedAuth = r.Header.Get("Authorization")
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		err := json.NewEncoder(w).Encode(map[string]any{
 			"token":      "ghs_real_jwt_token",
 			"expires_at": expiresAt.Format(time.RFC3339),
 		})
+		if err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -383,7 +389,10 @@ func TestGitHubAppBrokerAPIError(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message":"Bad credentials"}`))
+		_, err := w.Write([]byte(`{"message":"Bad credentials"}`))
+		if err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 

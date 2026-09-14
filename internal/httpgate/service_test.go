@@ -22,7 +22,7 @@ func TestMatchServiceByPathPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := MatchService("localhost", tt.path, services)
+			svc := MatchService(tt.path, services)
 			if svc == nil {
 				t.Fatalf("expected service %s, got nil", tt.wantName)
 			}
@@ -38,7 +38,7 @@ func TestMatchServiceNoMatch(t *testing.T) {
 		{Name: "stripe", UpstreamURL: "https://api.stripe.com", PathPrefix: "/stripe"},
 	}
 
-	svc := MatchService("localhost", "/github/repos", services)
+	svc := MatchService("/github/repos", services)
 	if svc != nil {
 		t.Errorf("expected nil, got service %s", svc.Name)
 	}

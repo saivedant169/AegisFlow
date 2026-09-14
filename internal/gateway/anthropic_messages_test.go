@@ -137,7 +137,10 @@ func TestMessages_ToolUseRejected(t *testing.T) {
 		t.Fatalf("expected 400 for tools, got %d: %s", w.Code, w.Body.String())
 	}
 	var env anthropicErrorEnvelope
-	json.Unmarshal(w.Body.Bytes(), &env)
+	err := json.Unmarshal(w.Body.Bytes(), &env)
+	if err != nil {
+		return
+	}
 	if env.Error.Type != "invalid_request_error" || !strings.Contains(env.Error.Message, "tool use") {
 		t.Fatalf("expected invalid_request_error about tool use, got %+v", env)
 	}

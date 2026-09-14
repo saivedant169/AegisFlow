@@ -74,17 +74,17 @@ func TestSlackNotifyReview(t *testing.T) {
 		t.Fatalf("expected at least 4 fields, got %d", len(fields.Fields))
 	}
 
-	fieldTexts := ""
+	var fieldTexts strings.Builder
 	for _, f := range fields.Fields {
-		fieldTexts += f.Text + " "
+		fieldTexts.WriteString(f.Text + " ")
 	}
-	if !strings.Contains(fieldTexts, "psql") {
+	if !strings.Contains(fieldTexts.String(), "psql") {
 		t.Error("fields should contain tool name")
 	}
-	if !strings.Contains(fieldTexts, "users_table") {
+	if !strings.Contains(fieldTexts.String(), "users_table") {
 		t.Error("fields should contain target")
 	}
-	if !strings.Contains(fieldTexts, "deadbeef") {
+	if !strings.Contains(fieldTexts.String(), "deadbeef") {
 		t.Error("fields should contain evidence hash")
 	}
 

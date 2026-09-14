@@ -58,7 +58,10 @@ func TestChatCompletionSuccess(t *testing.T) {
 	}
 
 	var resp types.ChatCompletionResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	if err != nil {
+		return
+	}
 
 	if len(resp.Choices) != 1 {
 		t.Fatalf("expected 1 choice, got %d", len(resp.Choices))
@@ -143,7 +146,10 @@ func TestListModels(t *testing.T) {
 	}
 
 	var resp types.ModelList
-	json.NewDecoder(w.Body).Decode(&resp)
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	if err != nil {
+		return
+	}
 
 	if resp.Object != "list" {
 		t.Errorf("expected object 'list', got '%s'", resp.Object)
@@ -404,7 +410,10 @@ func TestListModelsReturnsModels(t *testing.T) {
 	}
 
 	var resp types.ModelList
-	json.NewDecoder(w.Body).Decode(&resp)
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	if err != nil {
+		return
+	}
 
 	if resp.Object != "list" {
 		t.Errorf("expected 'list', got %q", resp.Object)

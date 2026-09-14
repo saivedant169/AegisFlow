@@ -10,9 +10,9 @@ import (
 )
 
 func TestEvidenceExportToFile(t *testing.T) {
-	exportData := map[string]interface{}{
+	exportData := map[string]any{
 		"session_id": "test-session-1",
-		"records":    []interface{}{},
+		"records":    []any{},
 		"count":      0,
 		"last_hash":  "",
 	}
@@ -21,7 +21,10 @@ func TestEvidenceExportToFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/admin/v1/evidence/sessions/test-session-1/export" {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write(payload)
+			_, err := w.Write(payload)
+			if err != nil {
+				return
+			}
 			return
 		}
 		w.WriteHeader(404)
@@ -43,7 +46,7 @@ func TestEvidenceExportToFile(t *testing.T) {
 		t.Fatalf("failed to read export file: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
 		t.Fatalf("exported file is not valid JSON: %v", err)
 	}

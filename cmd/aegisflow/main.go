@@ -5,6 +5,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -594,7 +595,7 @@ func main() {
 		log.Printf("[init] GitHub approval notifier enabled (repo: %s)", cfg.ApprovalIntegrations.GitHub.Repo)
 	}
 	if cfg.ApprovalIntegrations.Slack.Enabled {
-		adminURL := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
+		adminURL := fmt.Sprintf("https://%s:%d", cfg.Server.Host, cfg.Server.AdminPort)
 		slackNotifier := approvalint.NewSlackNotifier(
 			cfg.ApprovalIntegrations.Slack.WebhookURL,
 			adminURL,
@@ -774,7 +775,7 @@ func main() {
 		}
 		go func() {
 			log.Printf("MCP gateway listening on %s", mcpAddr)
-			if err := mcpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := mcpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Fatalf("MCP gateway server error: %v", err)
 			}
 		}()
@@ -793,14 +794,14 @@ func main() {
 	// Start servers
 	go func() {
 		log.Printf("AegisFlow gateway listening on %s", gatewayAddr)
-		if err := gatewaySrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := gatewaySrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("gateway server error: %v", err)
 		}
 	}()
 
 	go func() {
 		log.Printf("AegisFlow admin API listening on %s", adminAddr)
-		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := adminSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("admin server error: %v", err)
 		}
 	}()
@@ -831,7 +832,7 @@ func defaultConfigPath() string {
 	return defaultConfigFile
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	n := atomic.LoadUint64(&totalRequests)
 	if _, err := fmt.Fprintf(w, `{"status":"ok","requests":%d}`, n); err != nil {

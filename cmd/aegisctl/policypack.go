@@ -76,7 +76,10 @@ func ListPolicyPacks(dir string) ([]PolicyPack, error) {
 		}
 		pack, err := LoadPolicyPack(filepath.Join(dir, e.Name()))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: skipping %s: %v\n", e.Name(), err)
+			_, err := fmt.Fprintf(os.Stderr, "Warning: skipping %s: %v\n", e.Name(), err)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 		packs = append(packs, *pack)
@@ -95,7 +98,10 @@ func cmdPolicyPackList(args []string) {
 
 	packs, err := ListPolicyPacks(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -115,7 +121,10 @@ func cmdPolicyPackList(args []string) {
 		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", p.Name, p.DefaultDecision, len(p.Rules), desc))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -131,7 +140,10 @@ func cmdPolicyPackShow(name string, args []string) {
 
 	packs, err := ListPolicyPacks(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -144,7 +156,10 @@ func cmdPolicyPackShow(name string, args []string) {
 	}
 
 	if found == nil {
-		fmt.Fprintf(os.Stderr, "Policy pack %q not found\n", name)
+		_, err := fmt.Fprintf(os.Stderr, "Policy pack %q not found\n", name)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -169,7 +184,10 @@ func cmdPolicyPackShow(name string, args []string) {
 		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.Protocol, r.Tool, target, cap, strings.ToUpper(r.Decision)))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }

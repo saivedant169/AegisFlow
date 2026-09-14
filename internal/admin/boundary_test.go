@@ -29,7 +29,10 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		io.WriteString(w, `{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
+		_, err := io.WriteString(w, `{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
+		if err != nil {
+			return
+		}
 	}))
 	defer upstream.Close()
 	queue := approval.NewQueue(1000)
@@ -60,7 +63,12 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}(resp.Body)
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
@@ -76,7 +84,7 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 		if rpc.Error == nil || rpc.Error.Code != -32002 {
 			t.Fatalf("expected review, got %s", data)
 		}
-		return rpc.Error.Data.(map[string]interface{})["approval_id"].(string)
+		return rpc.Error.Data.(map[string]any)["approval_id"].(string)
 	}
 	for _, route := range []string{"/mcp", "/health", "/unknown", "/mcp/session/unknown"} {
 		for _, key := range []string{"", "invalid"} {
@@ -131,9 +139,8 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 		t.Fatal("approval escaped caller or argument scope")
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < 12; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); request("POST", mcp.URL+"/mcp", "agent-a", "session-1", callBody) }()
+	for range 12 {
+		wg.Go(func() { request("POST", mcp.URL+"/mcp", "agent-a", "session-1", callBody) })
 	}
 	wg.Wait()
 	if calls.Load() != 1 {
@@ -172,12 +179,17 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(stream.Body)
 	scanner := bufio.NewScanner(stream.Body)
 	endpoint := ""
 	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "data: ") {
-			endpoint = strings.TrimPrefix(scanner.Text(), "data: ")
+		if after, ok :=strings.CutPrefix(scanner.Text(), "data: "); ok  {
+			endpoint = after
 			break
 		}
 	}
@@ -195,8 +207,8 @@ func TestMCPAuthenticatedBoundary(t *testing.T) {
 		t.Fatalf("SSE owner: %d", status)
 	}
 	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "data: ") {
-			id = pending([]byte(strings.TrimPrefix(scanner.Text(), "data: ")))
+		if after, ok :=strings.CutPrefix(scanner.Text(), "data: "); ok  {
+			id = pending([]byte(after))
 			break
 		}
 	}

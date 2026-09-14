@@ -54,13 +54,19 @@ func main() {
 			os.Exit(1)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
 	case "status":
 		for _, entry := range [][2]string{{"AEGISFLOW_ADMIN_URL", defaultAdminURL}, {"AEGISFLOW_GATEWAY_URL", defaultGatewayURL}} {
 			if _, err := apiBase(entry[0], entry[1]); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				_, err := fmt.Fprintln(os.Stderr, err)
+				if err != nil {
+					return
+				}
 				os.Exit(1)
 			}
 		}
@@ -235,7 +241,10 @@ func main() {
 	case "version":
 		cmdVersion(os.Args[2:])
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		_, err := fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		if err != nil {
+			return
+		}
 		printUsage()
 		os.Exit(1)
 	}
@@ -258,7 +267,10 @@ func cmdVersion(args []string) {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(out); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
 		return
@@ -329,7 +341,7 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if sysStatus == nil {
 		os.Exit(1)
 	}
-	if sysMap, ok := sysStatus.(map[string]interface{}); ok {
+	if sysMap, ok := sysStatus.(map[string]any); ok {
 		fmt.Println("\nSystem")
 		fmt.Println("────────────────────────────────────────────────────")
 		fmt.Printf("  Active Credentials: %.0f\n", toFloat(sysMap["active_credentials"]))
@@ -353,9 +365,9 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if providers == nil {
 		os.Exit(1)
 	}
-	if provList, ok := providers.([]interface{}); ok && len(provList) > 0 {
+	if provList, ok := providers.([]any); ok && len(provList) > 0 {
 		for _, p := range provList {
-			prov, ok := p.(map[string]interface{})
+			prov, ok := p.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -381,11 +393,11 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 		os.Exit(1)
 	}
 	pendingCount := 0
-	if appData, ok := approvals.(map[string]interface{}); ok {
-		if pending, ok := appData["pending"].([]interface{}); ok {
+	if appData, ok := approvals.(map[string]any); ok {
+		if pending, ok := appData["pending"].([]any); ok {
 			pendingCount = len(pending)
 		}
-	} else if appList, ok := approvals.([]interface{}); ok {
+	} else if appList, ok := approvals.([]any); ok {
 		pendingCount = len(appList)
 	}
 	if pendingCount > 0 {
@@ -401,10 +413,10 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if sessions == nil {
 		os.Exit(1)
 	}
-	if sessList, ok := sessions.([]interface{}); ok && len(sessList) > 0 {
+	if sessList, ok := sessions.([]any); ok && len(sessList) > 0 {
 		fmt.Printf("  %d active session(s)\n", len(sessList))
 		for _, s := range sessList {
-			sess, ok := s.(map[string]interface{})
+			sess, ok := s.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -426,10 +438,10 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if budgets == nil {
 		os.Exit(1)
 	}
-	if budgetData, ok := budgets.(map[string]interface{}); ok {
-		if statuses, ok := budgetData["statuses"].([]interface{}); ok && len(statuses) > 0 {
+	if budgetData, ok := budgets.(map[string]any); ok {
+		if statuses, ok := budgetData["statuses"].([]any); ok && len(statuses) > 0 {
 			for _, st := range statuses {
-				s, ok := st.(map[string]interface{})
+				s, ok := st.(map[string]any)
 				if !ok {
 					continue
 				}
@@ -450,14 +462,11 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 	if violations == nil {
 		os.Exit(1)
 	}
-	if violList, ok := violations.([]interface{}); ok && len(violList) > 0 {
-		shown := len(violList)
-		if shown > 5 {
-			shown = 5
-		}
+	if violList, ok := violations.([]any); ok && len(violList) > 0 {
+		shown := min(len(violList), 5)
 		fmt.Printf("  %d total (showing last %d)\n", len(violList), shown)
-		for i := 0; i < shown; i++ {
-			v, ok := violList[i].(map[string]interface{})
+		for i := range shown {
+			v, ok := violList[i].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -482,9 +491,9 @@ func cmdStatus(gatewayURL, adminURL string, jsonOut bool) {
 // emitStatusJSON prints a machine-readable snapshot of the same checks
 // cmdStatus surfaces in human mode. Used by `aegisctl status --json`.
 func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) bool {
-	out := map[string]interface{}{
-		"gateway":     map[string]interface{}{"url": gatewayURL, "healthy": gwOK},
-		"admin":       map[string]interface{}{"url": adminURL, "healthy": adOK},
+	out := map[string]any{
+		"gateway":     map[string]any{"url": gatewayURL, "healthy": gwOK},
+		"admin":       map[string]any{"url": adminURL, "healthy": adOK},
 		"pending":     0,
 		"sessions":    0,
 		"chain_valid": true,
@@ -492,7 +501,7 @@ func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) bool {
 	}
 
 	if adOK {
-		if sysMap, ok := fetchJSON(adminURL + "/admin/v1/system/status").(map[string]interface{}); ok {
+		if sysMap, ok := fetchJSON(adminURL + "/admin/v1/system/status").(map[string]any); ok {
 			out["system"] = sysMap
 			if sysMap["mcp_gateway"] == "unreachable" {
 				out["healthy"] = false
@@ -500,17 +509,17 @@ func emitStatusJSON(gatewayURL, adminURL string, gwOK, adOK bool) bool {
 		} else {
 			out["healthy"] = false
 		}
-		if approvals, ok := fetchJSON(adminURL + "/admin/v1/approvals").(map[string]interface{}); ok {
-			if pending, ok := approvals["pending"].([]interface{}); ok {
+		if approvals, ok := fetchJSON(adminURL + "/admin/v1/approvals").(map[string]any); ok {
+			if pending, ok := approvals["pending"].([]any); ok {
 				out["pending"] = len(pending)
 			}
 		} else {
 			out["healthy"] = false
 		}
-		if sess, ok := fetchJSON(adminURL + "/admin/v1/evidence/sessions").([]interface{}); ok {
+		if sess, ok := fetchJSON(adminURL + "/admin/v1/evidence/sessions").([]any); ok {
 			out["sessions"] = len(sess)
 			for _, s := range sess {
-				if m, ok := s.(map[string]interface{}); ok {
+				if m, ok := s.(map[string]any); ok {
 					if v, ok := m["chain_valid"].(bool); ok && !v {
 						out["chain_valid"] = false
 						out["healthy"] = false
@@ -550,7 +559,7 @@ func cmdUsage(adminURL string, jsonOut bool) {
 		os.Exit(1)
 	}
 
-	usageMap, ok := data.(map[string]interface{})
+	usageMap, ok := data.(map[string]any)
 	if !ok {
 		if jsonOut {
 			out := struct {
@@ -575,12 +584,12 @@ func cmdUsage(adminURL string, jsonOut bool) {
 	if jsonOut {
 		tenants := make([]usageTenantSummary, 0, len(tenantIDs))
 		for _, tenantID := range tenantIDs {
-			tenant, ok := usageMap[tenantID].(map[string]interface{})
+			tenant, ok := usageMap[tenantID].(map[string]any)
 			if !ok {
 				continue
 			}
 
-			byModel, ok := tenant["by_model"].(map[string]interface{})
+			byModel, ok := tenant["by_model"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -593,7 +602,7 @@ func cmdUsage(adminURL string, jsonOut bool) {
 
 			summary := usageTenantSummary{Tenant: tenantID, Models: []usageModelSummary{}}
 			for _, model := range models {
-				m, ok := byModel[model].(map[string]interface{})
+				m, ok := byModel[model].(map[string]any)
 				if !ok {
 					continue
 				}
@@ -623,16 +632,16 @@ func cmdUsage(adminURL string, jsonOut bool) {
 	checkOutput(fmt.Fprintln(w, "──────\t─────\t────────\t──────\t────"))
 
 	for tenantID, v := range usageMap {
-		tenant, ok := v.(map[string]interface{})
+		tenant, ok := v.(map[string]any)
 		if !ok {
 			continue
 		}
-		byModel, ok := tenant["by_model"].(map[string]interface{})
+		byModel, ok := tenant["by_model"].(map[string]any)
 		if !ok {
 			continue
 		}
 		for model, mv := range byModel {
-			m, ok := mv.(map[string]interface{})
+			m, ok := mv.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -645,7 +654,10 @@ func cmdUsage(adminURL string, jsonOut bool) {
 		}
 	}
 	if err := w.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -653,7 +665,10 @@ func cmdUsage(adminURL string, jsonOut bool) {
 func cmdModels(gatewayURL string) {
 	resp, err := client.Get(gatewayURL + "/v1/models")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -665,7 +680,10 @@ func cmdModels(gatewayURL string) {
 		} `json:"data"`
 	}
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -676,7 +694,10 @@ func cmdModels(gatewayURL string) {
 		checkOutput(fmt.Fprintf(w, "%s\t%s\n", m.ID, m.Provider))
 	}
 	if err := w.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -684,7 +705,10 @@ func cmdModels(gatewayURL string) {
 func cmdProviders(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/providers")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -697,7 +721,10 @@ func cmdProviders(adminURL string) {
 		Models  []string `json:"models"`
 	}
 	if err := decodeJSON(resp, &providers); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -720,7 +747,10 @@ func cmdProviders(adminURL string) {
 		checkOutput(fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, status, health, models))
 	}
 	if err := w.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -728,7 +758,10 @@ func cmdProviders(adminURL string) {
 func cmdPolicies(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/policies")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -742,7 +775,10 @@ func cmdPolicies(adminURL string) {
 		Patterns []string `json:"patterns"`
 	}
 	if err := decodeJSON(resp, &policies); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -761,7 +797,10 @@ func cmdPolicies(adminURL string) {
 		checkOutput(fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Type, p.Phase, strings.ToUpper(p.Action), ruleStr))
 	}
 	if err := w.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -769,7 +808,10 @@ func cmdPolicies(adminURL string) {
 func cmdTenants(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/tenants")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -782,7 +824,10 @@ func cmdTenants(adminURL string) {
 		TokensPerMinute   int    `json:"tokens_per_minute"`
 	}
 	if err := decodeJSON(resp, &tenants); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -793,15 +838,21 @@ func cmdTenants(adminURL string) {
 		checkOutput(fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\n", t.ID, t.Name, t.KeyCount, t.RequestsPerMinute, t.TokensPerMinute))
 	}
 	if err := w.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
 
 func cmdTest(gatewayURL, model, message string) {
-	body, err := marshalJSON(map[string]interface{}{"model": model, "messages": []map[string]string{{"role": "user", "content": message}}})
+	body, err := marshalJSON(map[string]any{"model": model, "messages": []map[string]string{{"role": "user", "content": message}}})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not encode chat request")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not encode chat request")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -810,7 +861,10 @@ func cmdTest(gatewayURL, model, message string) {
 	latency := time.Since(start)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -829,7 +883,10 @@ func cmdTest(gatewayURL, model, message string) {
 		} `json:"error"`
 	}
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -838,7 +895,10 @@ func cmdTest(gatewayURL, model, message string) {
 		if result.Error != nil {
 			errMsg = result.Error.Message
 		}
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, errMsg)
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, errMsg)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -846,7 +906,10 @@ func cmdTest(gatewayURL, model, message string) {
 	fmt.Printf("Latency:  %s\n", latency.Round(time.Millisecond))
 	fmt.Printf("Tokens:   %d\n", result.Usage.TotalTokens)
 	if len(result.Choices) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: chat response contains no choices")
+		_, err := fmt.Fprintln(os.Stderr, "Error: chat response contains no choices")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	fmt.Printf("Response: %s\n", result.Choices[0].Message.Content)
@@ -861,17 +924,23 @@ func checkHealth(url string) bool {
 	return resp.StatusCode == 200
 }
 
-func fetchJSON(url string) interface{} {
+func fetchJSON(url string) any {
 	resp, err := client.Get(url)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return nil
+		}
 		return nil
 	}
 	defer cleanup.Close(resp.Body)
 
-	var result interface{}
+	var result any
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return nil
+		}
 		return nil
 	}
 	return result
@@ -884,7 +953,7 @@ func statusIcon(ok bool) string {
 	return "DOWN"
 }
 
-func toFloat(v interface{}) float64 {
+func toFloat(v any) float64 {
 	switch n := v.(type) {
 	case float64:
 		return n
@@ -905,22 +974,28 @@ func getEnv(key, fallback string) string {
 func cmdPending(adminURL string, jsonOut bool) {
 	resp, err := client.Get(adminURL + "/admin/v1/approvals")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
-	var result map[string]interface{}
+	var result map[string]any
 	if err := decodeJSON(resp, &result); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
-	pending, _ := result["pending"].([]interface{})
+	pending, _ := result["pending"].([]any)
 
 	// Machine-readable: emit the raw pending array (empty array if none).
 	if jsonOut {
 		if pending == nil {
-			pending = []interface{}{}
+			pending = []any{}
 		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -935,14 +1010,17 @@ func cmdPending(adminURL string, jsonOut bool) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	checkOutput(fmt.Fprintf(tw, "ID\tTOOL\tPROTOCOL\tACTOR\tSUBMITTED\n"))
 	for _, p := range pending {
-		item, _ := p.(map[string]interface{})
-		env, _ := item["envelope"].(map[string]interface{})
-		actor, _ := env["actor"].(map[string]interface{})
+		item, _ := p.(map[string]any)
+		env, _ := item["envelope"].(map[string]any)
+		actor, _ := env["actor"].(map[string]any)
 		checkOutput(fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			item["id"], env["tool"], env["protocol"], actor["id"], item["submitted_at"]))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -951,7 +1029,10 @@ func cmdApprove(adminURL, id, comment string) {
 	body, _ := marshalJSON(map[string]string{"comment": comment})
 	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/approve", "application/json", bytes.NewReader(body))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -962,9 +1043,15 @@ func cmdApprove(adminURL, id, comment string) {
 			} `json:"error"`
 		}
 		if err := decodeJSON(resp, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
+			_, err := fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
+			if err != nil {
+				return
+			}
 		} else {
-			fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
+			_, err := fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
+			if err != nil {
+				return
+			}
 		}
 		os.Exit(1)
 	}
@@ -975,7 +1062,10 @@ func cmdDeny(adminURL, id, comment string) {
 	body, _ := marshalJSON(map[string]string{"comment": comment})
 	resp, err := client.Post(adminURL+"/admin/v1/approvals/"+id+"/deny", "application/json", bytes.NewReader(body))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
@@ -986,9 +1076,15 @@ func cmdDeny(adminURL, id, comment string) {
 			} `json:"error"`
 		}
 		if err := decodeJSON(resp, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
+			_, err := fmt.Fprintf(os.Stderr, "Error (%d): could not decode response: %v\n", resp.StatusCode, err)
+			if err != nil {
+				return
+			}
 		} else {
-			fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
+			_, err := fmt.Fprintf(os.Stderr, "Failed (%d): %s\n", resp.StatusCode, result.Error.Message)
+			if err != nil {
+				return
+			}
 		}
 		os.Exit(1)
 	}

@@ -27,10 +27,7 @@ func (m *Manager) Forecast(scopeID string, limit float64) Forecast {
 	daysInMonth := float64(daysInCurrentMonth(now))
 	dailyRate := tracker.accumulated / daysElapsed
 	projected := dailyRate * daysInMonth
-	remaining := int(daysInMonth - daysElapsed)
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := max(int(daysInMonth-daysElapsed), 0)
 
 	return Forecast{
 		ScopeID:        scopeID,

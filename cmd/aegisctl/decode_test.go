@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +13,10 @@ import (
 func TestDecodeJSONValidResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		if err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 
@@ -20,7 +24,12 @@ func TestDecodeJSONValidResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			t.Fatal("failed to close response body")
+		}
+	}(resp.Body)
 
 	var result map[string]string
 	if err := decodeJSON(resp, &result); err != nil {
@@ -36,7 +45,10 @@ func TestDecodeJSONValidResponse(t *testing.T) {
 func TestDecodeJSONMalformedResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"broken: json`))
+		_, err := w.Write([]byte(`{"broken: json`))
+		if err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 
@@ -44,7 +56,12 @@ func TestDecodeJSONMalformedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			t.Fatal("failed to close response body")
+		}
+	}(resp.Body)
 
 	var result map[string]string
 	if err := decodeJSON(resp, &result); err == nil {
@@ -64,7 +81,12 @@ func TestDecodeJSONEmptyBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			t.Fatal("failed to close response body")
+		}
+	}(resp.Body)
 
 	var result map[string]string
 	if err := decodeJSON(resp, &result); err == nil {
@@ -76,7 +98,10 @@ func TestDecodeJSONEmptyBody(t *testing.T) {
 // message when the server returns invalid JSON.
 func TestFetchJSONMalformed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`not json`))
+		_, err := w.Write([]byte(`not json`))
+		if err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 

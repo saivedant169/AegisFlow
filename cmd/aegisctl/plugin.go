@@ -239,7 +239,7 @@ func pluginInstall(args []string) error {
 
 func pluginList(args []string) error {
 	pluginsConfig := "plugins.yaml"
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		if args[i] == "--plugins-config" && i+1 < len(args) {
 			pluginsConfig = args[i+1]
 		}
@@ -269,7 +269,7 @@ func pluginList(args []string) error {
 
 func pluginOutdated(args []string) error {
 	pluginsConfig := "plugins.yaml"
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		if args[i] == "--plugins-config" && i+1 < len(args) {
 			pluginsConfig = args[i+1]
 		}
@@ -437,11 +437,8 @@ func compareVersion(a, b string) int {
 
 	aa := parse(a)
 	bb := parse(b)
-	maxLen := len(aa)
-	if len(bb) > maxLen {
-		maxLen = len(bb)
-	}
-	for i := 0; i < maxLen; i++ {
+	maxLen := max(len(bb), len(aa))
+	for i := range maxLen {
 		var av, bv int
 		if i < len(aa) {
 			av = aa[i]

@@ -31,10 +31,10 @@ func NewAdminAdapter(registry *Registry) *AdminAdapter {
 
 // ActiveCredentials returns all non-expired credentials as a generic interface
 // suitable for JSON serialization.
-func (a *AdminAdapter) ActiveCredentials() interface{} {
+func (a *AdminAdapter) ActiveCredentials() any {
 	creds := a.registry.ActiveCredentials()
 	if creds == nil {
-		return []interface{}{}
+		return []any{}
 	}
 
 	// Redact tokens in the response — only show first 8 chars.
@@ -80,7 +80,7 @@ func (a *AdminAdapter) RevokeCredential(id string) error {
 // IssueCredential issues a credential via the named provider and returns
 // the provenance metadata (never the secret). The provenance links the
 // credential to the given envelope ID for evidence chain traceability.
-func (a *AdminAdapter) IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error) {
+func (a *AdminAdapter) IssueCredential(providerName, taskID, target, capability, envelopeID string) (any, error) {
 	req := CredentialRequest{
 		TaskID:     taskID,
 		Target:     target,

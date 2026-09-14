@@ -118,7 +118,7 @@ func TestMessages_KillSwitchBlocks(t *testing.T) {
 	// Pre-block the tenant's session: three consecutive deletes => destructive
 	// sequence (risk 25) >= threshold.
 	sa := reg.GetOrCreate("t1")
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		sa.RecordAction(&envelope.ActionEnvelope{
 			Timestamp:           time.Now().UTC(),
 			RequestedCapability: envelope.CapDelete,

@@ -15,7 +15,7 @@ func TestHistogramEmpty(t *testing.T) {
 // (HDR conservative tail), and must be capped at the largest value observed.
 func TestHistogramConservativeTail(t *testing.T) {
 	var h latencyHistogram
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		h.observe(50)
 	}
 	h.observe(10000) // a single outlier
@@ -49,7 +49,7 @@ func TestHistogramMonotonic(t *testing.T) {
 // Memory stays bounded no matter how many samples are recorded.
 func TestHistogramBoundedMemory(t *testing.T) {
 	var h latencyHistogram
-	for i := 0; i < 100000; i++ {
+	for i := range 100000 {
 		h.observe(int64(i % 5000))
 	}
 	if want := len(latencyBounds) + 1; len(h.counts) != want {

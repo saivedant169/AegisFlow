@@ -99,9 +99,18 @@ func TestSessionID(t *testing.T) {
 
 func TestRecordCount(t *testing.T) {
 	chain := NewSessionChain("s1")
-	chain.Record(testEnv("t1", envelope.DecisionAllow))
-	chain.Record(testEnv("t2", envelope.DecisionAllow))
-	chain.Record(testEnv("t3", envelope.DecisionBlock))
+	_, err := chain.Record(testEnv("t1", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t2", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("t3", envelope.DecisionBlock))
+	if err != nil {
+		return
+	}
 
 	if chain.Count() != 3 {
 		t.Fatalf("expected 3 records, got %d", chain.Count())
@@ -115,7 +124,7 @@ func TestExportEmptyChain(t *testing.T) {
 		t.Fatalf("export failed: %v", err)
 	}
 
-	var bundle map[string]interface{}
+	var bundle map[string]any
 	if err := json.Unmarshal(data, &bundle); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -129,15 +138,21 @@ func TestExportEmptyChain(t *testing.T) {
 
 func TestExportWithRecords(t *testing.T) {
 	chain := NewSessionChain("export-test")
-	chain.Record(testEnv("tool1", envelope.DecisionAllow))
-	chain.Record(testEnv("tool2", envelope.DecisionBlock))
+	_, err := chain.Record(testEnv("tool1", envelope.DecisionAllow))
+	if err != nil {
+		return
+	}
+	_, err = chain.Record(testEnv("tool2", envelope.DecisionBlock))
+	if err != nil {
+		return
+	}
 
 	data, err := chain.Export()
 	if err != nil {
 		t.Fatalf("export failed: %v", err)
 	}
 
-	var bundle map[string]interface{}
+	var bundle map[string]any
 	if err := json.Unmarshal(data, &bundle); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -154,7 +169,7 @@ func TestExportWithRecords(t *testing.T) {
 		t.Fatal("expected exported_at timestamp")
 	}
 
-	records, ok := bundle["records"].([]interface{})
+	records, ok := bundle["records"].([]any)
 	if !ok {
 		t.Fatalf("expected records array, got %T", bundle["records"])
 	}
@@ -185,8 +200,11 @@ func sampleEnv2(id string) *envelope.ActionEnvelope {
 func TestSignedChainVerifies(t *testing.T) {
 	key := []byte("test-evidence-key")
 	c := NewSignedSessionChain("s1", key)
-	for i := 0; i < 3; i++ {
-		c.Record(sampleEnv2("e" + string(rune('a'+i))))
+	for i := range 3 {
+		_, err := c.Record(sampleEnv2("e" + string('a'+i)))
+		if err != nil {
+			return
+		}
 	}
 	recs := c.Records()
 	for _, r := range recs {
@@ -201,7 +219,10 @@ func TestSignedChainVerifies(t *testing.T) {
 
 func TestSignedChainRejectsWrongKey(t *testing.T) {
 	c := NewSignedSessionChain("s1", []byte("real-key"))
-	c.Record(sampleEnv2("e1"))
+	_, err := c.Record(sampleEnv2("e1"))
+	if err != nil {
+		return
+	}
 	if res := VerifySignatures(c.Records(), []byte("attacker-key")); res.Valid {
 		t.Fatal("verification passed with the wrong key")
 	}
@@ -210,8 +231,14 @@ func TestSignedChainRejectsWrongKey(t *testing.T) {
 func TestSignedChainDetectsTamper(t *testing.T) {
 	key := []byte("k")
 	c := NewSignedSessionChain("s1", key)
-	c.Record(sampleEnv2("e1"))
-	c.Record(sampleEnv2("e2"))
+	_, err := c.Record(sampleEnv2("e1"))
+	if err != nil {
+		return
+	}
+	_, err = c.Record(sampleEnv2("e2"))
+	if err != nil {
+		return
+	}
 	recs := c.Records()
 	// Attacker rewrites a record's content hash; they can't produce the matching
 	// signature without the key.
@@ -223,7 +250,10 @@ func TestSignedChainDetectsTamper(t *testing.T) {
 
 func TestUnsignedChainFailsSignatureCheck(t *testing.T) {
 	c := NewSessionChain("s1") // no key -> no signatures
-	c.Record(sampleEnv2("e1"))
+	_, err := c.Record(sampleEnv2("e1"))
+	if err != nil {
+		return
+	}
 	if res := VerifySignatures(c.Records(), []byte("k")); res.Valid {
 		t.Fatal("unsigned records should not pass a signature check")
 	}

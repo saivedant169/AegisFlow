@@ -2,6 +2,7 @@ package githubgate
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/saivedant169/AegisFlow/internal/envelope"
 	"github.com/saivedant169/AegisFlow/internal/evidence"
@@ -49,9 +50,7 @@ func (i *Interceptor) Evaluate(operation string, repo string, params map[string]
 	)
 
 	// Copy caller-supplied parameters into the envelope.
-	for k, v := range params {
-		env.Parameters[k] = v
-	}
+	maps.Copy(env.Parameters, params)
 
 	// Evaluate against tool policy rules.
 	decision := i.engine.Evaluate(env)

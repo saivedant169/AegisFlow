@@ -84,7 +84,7 @@ func writeScannable(b *strings.Builder, raw []byte) {
 // decodeJSONForScan returns the canonical re-encoding of valid JSON (escapes
 // resolved to literal characters), or "" if raw isn't valid JSON.
 func decodeJSONForScan(raw []byte) string {
-	var v interface{}
+	var v any
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return ""
 	}

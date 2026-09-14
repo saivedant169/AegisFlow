@@ -54,7 +54,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Match the request to a configured upstream service.
-	svc := MatchService(r.Host, r.URL.Path, p.services)
+	svc := MatchService(r.URL.Path, p.services)
 	if svc == nil {
 		writeJSON(w, http.StatusNotFound, types.NewErrorResponse(
 			http.StatusNotFound, "not_found", "no matching service for path: "+r.URL.Path,

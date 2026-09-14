@@ -94,7 +94,10 @@ func TestStoreDeactivate(t *testing.T) {
 		ID:     "m-1",
 		TaskID: "TICKET-100",
 	}
-	s.Register(m)
+	err := s.Register(m)
+	if err != nil {
+		return
+	}
 
 	if err := s.Deactivate("m-1"); err != nil {
 		t.Fatalf("Deactivate failed: %v", err)
@@ -114,9 +117,18 @@ func TestStoreDeactivate(t *testing.T) {
 func TestStoreList(t *testing.T) {
 	s := NewStore()
 
-	s.Register(&TaskManifest{ID: "m-1", TaskID: "T-1"})
-	s.Register(&TaskManifest{ID: "m-2", TaskID: "T-2"})
-	s.Register(&TaskManifest{ID: "m-3", TaskID: "T-3"})
+	err := s.Register(&TaskManifest{ID: "m-1", TaskID: "T-1"})
+	if err != nil {
+		return
+	}
+	err = s.Register(&TaskManifest{ID: "m-2", TaskID: "T-2"})
+	if err != nil {
+		return
+	}
+	err = s.Register(&TaskManifest{ID: "m-3", TaskID: "T-3"})
+	if err != nil {
+		return
+	}
 
 	all := s.List()
 	if len(all) != 3 {
@@ -124,7 +136,10 @@ func TestStoreList(t *testing.T) {
 	}
 
 	// Deactivate one and check ListActive
-	s.Deactivate("m-2")
+	err = s.Deactivate("m-2")
+	if err != nil {
+		return
+	}
 	active := s.ListActive()
 	if len(active) != 2 {
 		t.Errorf("expected 2 active manifests, got %d", len(active))
@@ -149,7 +164,10 @@ func TestStoreRegisterValidation(t *testing.T) {
 
 func TestStoreDriftRecording(t *testing.T) {
 	s := NewStore()
-	s.Register(&TaskManifest{ID: "m-1", TaskID: "T-1"})
+	err := s.Register(&TaskManifest{ID: "m-1", TaskID: "T-1"})
+	if err != nil {
+		return
+	}
 
 	events := []DriftEvent{
 		{Type: DriftUnexpectedTool, ManifestID: "m-1", Message: "bad tool", Timestamp: time.Now()},

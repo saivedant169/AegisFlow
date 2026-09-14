@@ -38,7 +38,10 @@ func TestAdminTransportScopesCredentialAndRejectsRedirect(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+			err := resp.Body.Close()
+			if err != nil {
+				return
+			}
 		}
 		if <-received != "reviewer-key" {
 			t.Fatal("admin credential missing")
@@ -48,7 +51,10 @@ func TestAdminTransportScopesCredentialAndRejectsRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		return
+	}
 	if leaked.Load() {
 		t.Fatal("admin credential leaked to another origin")
 	}

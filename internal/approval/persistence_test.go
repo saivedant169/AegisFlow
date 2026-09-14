@@ -39,7 +39,12 @@ func TestPersistentQueueRestoresPendingAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatalf("close second state: %v", err)
+		}
+	}(secondState)
 	second, err := NewPersistentQueue(100, secondState.DB(), []byte("persistence-key"))
 	if err != nil {
 		t.Fatalf("restore queue: %v", err)
@@ -106,7 +111,12 @@ func TestPersistentQueueApprovalStaysSingleUseAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer thirdState.Close()
+	defer func(thirdState *state.SQLite) {
+		err := thirdState.Close()
+		if err != nil {
+			t.Fatalf("close third state: %v", err)
+		}
+	}(thirdState)
 	third, err := NewPersistentQueue(100, thirdState.DB(), []byte("single-use-key"))
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +153,12 @@ func TestPersistentQueueRestoresExpiredStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatalf("close second state: %v", err)
+		}
+	}(secondState)
 	second, err := NewPersistentQueue(100, secondState.DB(), []byte("expiry-key"))
 	if err != nil {
 		t.Fatal(err)
@@ -229,7 +244,12 @@ func TestPersistentQueueRejectsTamperedItem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatalf("close second state: %v", err)
+		}
+	}(secondState)
 	if _, err := NewPersistentQueue(100, secondState.DB(), key); err == nil {
 		t.Fatal("tampered approval item passed signature check")
 	}
@@ -270,7 +290,12 @@ func TestPersistentQueueRejectsConsumedFlagRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatalf("close second state: %v", err)
+		}
+	}(secondState)
 	if _, err := NewPersistentQueue(100, secondState.DB(), key); err == nil {
 		t.Fatal("consumed flag rollback passed signature check")
 	}
@@ -297,7 +322,12 @@ func TestPersistentQueueRejectsDifferentSigningKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer secondState.Close()
+	defer func(secondState *state.SQLite) {
+		err := secondState.Close()
+		if err != nil {
+			t.Fatalf("close second state: %v", err)
+		}
+	}(secondState)
 	if _, err := NewPersistentQueue(100, secondState.DB(), []byte("different-key")); err == nil {
 		t.Fatal("approval state accepted a different signing key")
 	}
@@ -337,7 +367,7 @@ func TestPersistentQueueExpiresUnboundMCPApprovals(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	for restart := 0; restart < 2; restart++ {
+	for range 2 {
 		db, err = state.OpenSQLite(path)
 		if err != nil {
 			t.Fatal(err)

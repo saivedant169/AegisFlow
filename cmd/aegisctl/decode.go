@@ -9,7 +9,7 @@ import (
 
 // decodeJSON reads the response body and decodes it into dst.
 // Returns a descriptive error if reading or unmarshaling fails.
-func decodeJSON(resp *http.Response, dst interface{}) error {
+func decodeJSON(resp *http.Response, dst any) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("API returned HTTP %d", resp.StatusCode)
 	}
@@ -30,7 +30,7 @@ func decodeJSON(resp *http.Response, dst interface{}) error {
 }
 
 // marshalJSON is a checked wrapper around json.Marshal.
-func marshalJSON(v interface{}) ([]byte, error) {
+func marshalJSON(v any) ([]byte, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("encoding JSON: %w", err)

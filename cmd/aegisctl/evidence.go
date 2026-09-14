@@ -13,24 +13,36 @@ import (
 func cmdEvidenceSessions(adminURL string) {
 	resp, err := client.Get(adminURL + "/admin/v1/evidence/sessions")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	if resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	var sessions []SessionSummary
 	if err := json.Unmarshal(body, &sessions); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error parsing response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
@@ -55,7 +67,10 @@ func cmdEvidenceSessions(adminURL string) {
 			s.SessionID, s.TotalActions, valid, s.StartedAt, lastHash))
 	}
 	if err := tw.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		_, err := fmt.Fprintln(os.Stderr, "Error: could not flush output")
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 }
@@ -71,37 +86,55 @@ func cmdEvidenceExport(adminURL string, sessionID string, args []string) {
 
 	resp, err := client.Get(adminURL + "/admin/v1/evidence/sessions/" + sessionID + "/export")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	if resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	// Pretty-print the JSON
 	var pretty json.RawMessage
 	if err := json.Unmarshal(body, &pretty); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing JSON: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error parsing JSON: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	formatted, err := json.MarshalIndent(pretty, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error formatting JSON: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error formatting JSON: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	if outputFile != "" {
 		if err := os.WriteFile(outputFile, formatted, 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			_, err := fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
 		fmt.Printf("Exported session %s to %s\n", sessionID, outputFile)
@@ -130,25 +163,37 @@ func cmdEvidenceReport(adminURL string, sessionID string, args []string) {
 
 	resp, err := client.Get(adminURL + endpoint)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 	defer cleanup.Close(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		_, err := fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	if resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		_, err := fmt.Fprintf(os.Stderr, "Error (%d): %s\n", resp.StatusCode, string(body))
+		if err != nil {
+			return
+		}
 		os.Exit(1)
 	}
 
 	if outputFile != "" {
 		if err := os.WriteFile(outputFile, body, 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			_, err := fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			if err != nil {
+				return
+			}
 			os.Exit(1)
 		}
 		fmt.Printf("Report written to: %s\n", outputFile)

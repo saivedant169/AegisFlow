@@ -11,12 +11,12 @@ func NewAdminAdapter(r *Registry) *AdminAdapter {
 }
 
 // SessionRisk returns the risk score and alerts for a session.
-func (a *AdminAdapter) SessionRisk(sessionID string) (interface{}, error) {
+func (a *AdminAdapter) SessionRisk(sessionID string) (any, error) {
 	sa := a.registry.Get(sessionID)
 	if sa == nil {
 		return nil, nil
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"session_id": sessionID,
 		"risk_score": sa.SessionRiskScore(),
 		"blocked":    sa.Blocked(),
@@ -25,6 +25,6 @@ func (a *AdminAdapter) SessionRisk(sessionID string) (interface{}, error) {
 }
 
 // ListSessions returns all tracked session IDs.
-func (a *AdminAdapter) ListSessions() interface{} {
+func (a *AdminAdapter) ListSessions() any {
 	return a.registry.ListSessions()
 }

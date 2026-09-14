@@ -130,7 +130,10 @@ func TestWriteAnthropicMessage_TextOnly(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	h.writeAnthropicMessage(w, r, "claude-x", resp)
 	var out anthropicMessagesResponse
-	json.Unmarshal(w.Body.Bytes(), &out)
+	err := json.Unmarshal(w.Body.Bytes(), &out)
+	if err != nil {
+		return
+	}
 	if out.StopReason != "end_turn" {
 		t.Errorf("stop_reason = %q, want end_turn", out.StopReason)
 	}

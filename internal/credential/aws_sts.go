@@ -240,7 +240,7 @@ func signV4(req *http.Request, payload []byte, accessKey, secretKey, region, ser
 
 	// Step 1: canonical request
 	payloadHash := sha256Hex(payload)
-	signedHeaders := canonicalHeaders(req)
+	signedHeaders := canonicalHeaders()
 	canonicalReq := strings.Join([]string{
 		req.Method,
 		"/",
@@ -271,7 +271,7 @@ func signV4(req *http.Request, payload []byte, accessKey, secretKey, region, ser
 	req.Header.Set("Authorization", authHeader)
 }
 
-func canonicalHeaders(req *http.Request) []string {
+func canonicalHeaders() []string {
 	headers := []string{"content-type", "host", "x-amz-date"}
 	sort.Strings(headers)
 	return headers

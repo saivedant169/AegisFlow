@@ -41,9 +41,9 @@ type JSONRPCResponse struct {
 
 // JSONRPCError is a JSON-RPC 2.0 error object.
 type JSONRPCError struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
 }
 
 // ToolCallParams represents the parameters for a tools/call request.
@@ -533,8 +533,8 @@ func decodeSSEJSONRPC(body []byte, dst *JSONRPCResponse) error {
 			}
 			continue
 		}
-		if strings.HasPrefix(line, "data:") {
-			data = append(data, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		if after, ok := strings.CutPrefix(line, "data:"); ok {
+			data = append(data, strings.TrimSpace(after))
 		}
 	}
 	if err := scanner.Err(); err != nil {

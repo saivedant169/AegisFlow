@@ -220,7 +220,7 @@ func (r SuspiciousFanOut) Detect(history []envelope.ActionEnvelope) *BehaviorAle
 	// O(len(history)^2) restart-from-every-start scan.
 	counts := make(map[string]int)
 	left := 0
-	for right := 0; right < len(history); right++ {
+	for right := range history {
 		counts[history[right].Target]++
 		for history[right].Timestamp.Sub(history[left].Timestamp) > window {
 			t := history[left].Target

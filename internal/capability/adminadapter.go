@@ -13,10 +13,10 @@ func NewAdminAdapter(issuer *Issuer) *AdminAdapter {
 }
 
 // ActiveTickets returns all active tickets suitable for JSON serialization.
-func (a *AdminAdapter) ActiveTickets() interface{} {
+func (a *AdminAdapter) ActiveTickets() any {
 	tickets := a.issuer.Store().ActiveTickets()
 	if tickets == nil {
-		return []interface{}{}
+		return []any{}
 	}
 	return tickets
 }
@@ -31,7 +31,7 @@ func (a *AdminAdapter) RevokeTicket(id string) error {
 }
 
 // VerifyTicket verifies a ticket by ID and returns the result.
-func (a *AdminAdapter) VerifyTicket(id string) (interface{}, error) {
+func (a *AdminAdapter) VerifyTicket(id string) (any, error) {
 	if id == "" {
 		return nil, fmt.Errorf("ticket ID is required")
 	}
@@ -42,7 +42,7 @@ func (a *AdminAdapter) VerifyTicket(id string) (interface{}, error) {
 	}
 
 	err := a.issuer.Verify(ticket)
-	result := map[string]interface{}{
+	result := map[string]any{
 		"ticket_id": id,
 		"valid":     err == nil,
 	}

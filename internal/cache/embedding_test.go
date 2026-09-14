@@ -80,18 +80,24 @@ func TestOpenAIEmbedder(t *testing.T) {
 			t.Fatalf("missing or wrong auth header")
 		}
 
-		var reqBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		var reqBody map[string]any
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		if err != nil {
+			return
+		}
 		if reqBody["model"] != "text-embedding-3-small" {
 			t.Fatalf("unexpected model: %v", reqBody["model"])
 		}
 
-		resp := map[string]interface{}{
-			"data": []map[string]interface{}{
+		resp := map[string]any{
+			"data": []map[string]any{
 				{"embedding": []float64{0.1, 0.2, 0.3}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		err = json.NewEncoder(w).Encode(resp)
+		if err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 

@@ -50,7 +50,7 @@ func (h *AdminHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/admin/v1/identity/separation-rules", h.listSeparationRules)
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -74,7 +74,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 
 // --- Organizations ---
 
-func (h *AdminHandler) listOrgs(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) listOrgs(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, h.store.ListOrgs())
 }
 
@@ -218,7 +218,7 @@ func (h *AdminHandler) deleteEnvironment(w http.ResponseWriter, r *http.Request)
 
 // --- Identities ---
 
-func (h *AdminHandler) listIdentities(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) listIdentities(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, h.store.ListIdentities())
 }
 
@@ -254,7 +254,7 @@ func (h *AdminHandler) deleteIdentity(w http.ResponseWriter, r *http.Request) {
 
 // --- Separation Rules ---
 
-func (h *AdminHandler) listSeparationRules(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) listSeparationRules(w http.ResponseWriter, _ *http.Request) {
 	rules := DefaultRules()
 	type ruleInfo struct {
 		Name        string `json:"name"`

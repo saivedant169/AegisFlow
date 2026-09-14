@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"sync"
 	"time"
@@ -155,9 +156,7 @@ func cloneEnvelope(env *envelope.ActionEnvelope) (*envelope.ActionEnvelope, erro
 		resourceCopy.Path = append([]string(nil), env.Resource.Path...)
 		if env.Resource.Properties != nil {
 			resourceCopy.Properties = make(map[string]string, len(env.Resource.Properties))
-			for key, value := range env.Resource.Properties {
-				resourceCopy.Properties[key] = value
-			}
+			maps.Copy(resourceCopy.Properties, env.Resource.Properties)
 		}
 		snapshot.Resource = &resourceCopy
 	}
@@ -207,9 +206,7 @@ func cloneParameter(value any) (any, error) {
 		return cloned, nil
 	case map[string]string:
 		cloned := make(map[string]string, len(typed))
-		for key, item := range typed {
-			cloned[key] = item
-		}
+		maps.Copy(cloned, typed)
 		return cloned, nil
 	case map[string]any:
 		return cloneParameters(typed)
@@ -277,7 +274,7 @@ func (c *SessionChain) Export() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	bundle := map[string]interface{}{
+	bundle := map[string]any{
 		"session_id":  c.sessionID,
 		"records":     c.records,
 		"count":       len(c.records),

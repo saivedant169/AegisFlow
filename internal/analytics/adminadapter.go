@@ -11,16 +11,16 @@ func NewAdminAdapter(c *Collector, am *AlertManager) *AdminAdapter {
 	return &AdminAdapter{collector: c, alertManager: am}
 }
 
-func (a *AdminAdapter) RealtimeSummary() map[string]interface{} {
+func (a *AdminAdapter) RealtimeSummary() map[string]any {
 	raw := a.collector.RealtimeSummary()
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 	for k, v := range raw {
 		result[k] = v
 	}
 	return result
 }
 
-func (a *AdminAdapter) RecentAlerts(limit int) interface{} {
+func (a *AdminAdapter) RecentAlerts(limit int) any {
 	return a.alertManager.RecentAlerts(limit)
 }
 

@@ -223,7 +223,7 @@ func TestConcurrentGetSetSafety(t *testing.T) {
 	resp := &types.ChatCompletionResponse{ID: "concurrent"}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(2)
 		key := "key"
 		go func() {

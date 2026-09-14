@@ -33,7 +33,7 @@ func TestAdminAdapterActiveTickets_Empty(t *testing.T) {
 	adapter := NewAdminAdapter(iss)
 
 	result := adapter.ActiveTickets()
-	tickets, ok := result.([]interface{})
+	tickets, ok := result.([]any)
 	if !ok {
 		t.Fatalf("expected []interface{} for empty, got %T", result)
 	}
@@ -89,7 +89,7 @@ func TestAdminAdapterVerifyTicket(t *testing.T) {
 		t.Fatalf("verify failed: %v", err)
 	}
 
-	m, ok := result.(map[string]interface{})
+	m, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("expected map, got %T", result)
 	}

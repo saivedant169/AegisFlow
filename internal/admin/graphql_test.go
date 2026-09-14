@@ -63,11 +63,11 @@ func newGraphQLTestServer() *Server {
 // stubAnalyticsProvider satisfies AnalyticsProvider for tests.
 type stubAnalyticsProvider struct{}
 
-func (s *stubAnalyticsProvider) RealtimeSummary() map[string]interface{} {
-	return map[string]interface{}{"requests": 42}
+func (s *stubAnalyticsProvider) RealtimeSummary() map[string]any {
+	return map[string]any{"requests": 42}
 }
-func (s *stubAnalyticsProvider) RecentAlerts(limit int) interface{} {
-	return []interface{}{map[string]interface{}{"id": "a1", "severity": "warning"}}
+func (s *stubAnalyticsProvider) RecentAlerts(int) any {
+	return []any{map[string]any{"id": "a1", "severity": "warning"}}
 }
 func (s *stubAnalyticsProvider) AcknowledgeAlert(id string) bool {
 	return id == "a1"
@@ -82,7 +82,7 @@ func TestGraphQLQueryUsage(t *testing.T) {
 	if len(result.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", result.Errors)
 	}
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if !ok {
 		t.Fatalf("expected map, got %T", result.Data)
 	}
@@ -97,8 +97,8 @@ func TestGraphQLQueryProviders(t *testing.T) {
 	if len(result.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", result.Errors)
 	}
-	data := result.Data.(map[string]interface{})
-	providers, ok := data["providers"].([]interface{})
+	data := result.Data.(map[string]any)
+	providers, ok := data["providers"].([]any)
 	if !ok {
 		t.Fatalf("expected providers to be a list, got %T", data["providers"])
 	}
@@ -132,7 +132,7 @@ func TestGraphQLMutationAcknowledgeAlert(t *testing.T) {
 	if len(result.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", result.Errors)
 	}
-	data := result.Data.(map[string]interface{})
+	data := result.Data.(map[string]any)
 	ack, ok := data["acknowledgeAlert"].(bool)
 	if !ok || !ack {
 		t.Fatalf("expected acknowledgeAlert to return true, got %v", data["acknowledgeAlert"])
@@ -157,8 +157,8 @@ func TestGraphQLQueryTenantsPolicies(t *testing.T) {
 	if len(result.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", result.Errors)
 	}
-	data := result.Data.(map[string]interface{})
-	tenants := data["tenants"].([]interface{})
+	data := result.Data.(map[string]any)
+	tenants := data["tenants"].([]any)
 	if len(tenants) != 1 {
 		t.Fatalf("expected 1 tenant, got %d", len(tenants))
 	}
@@ -167,8 +167,8 @@ func TestGraphQLQueryTenantsPolicies(t *testing.T) {
 	if len(result.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", result.Errors)
 	}
-	data = result.Data.(map[string]interface{})
-	policies := data["policies"].([]interface{})
+	data = result.Data.(map[string]any)
+	policies := data["policies"].([]any)
 	if len(policies) != 1 {
 		t.Fatalf("expected 1 policy, got %d", len(policies))
 	}

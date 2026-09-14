@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -31,7 +32,8 @@ func init() {
 
 // formatValidationError maps a jsonschema.ValidationError to an OpenAI-compatible error (message, param, code).
 func formatValidationError(err error) (message, param, code string) {
-	validationErr, ok := err.(*jsonschema.ValidationError)
+	var validationErr *jsonschema.ValidationError
+	ok := errors.As(err, &validationErr)
 	if !ok {
 		return err.Error(), "", "invalid_request_error"
 	}
@@ -72,7 +74,7 @@ func formatValidationError(err error) (message, param, code string) {
 
 // validateRequest is a helper that parses the JSON body into a map and validates it against the schema.
 func validateRequest(body []byte, schema *jsonschema.Schema) (message, param, code string, err error) {
-	var v interface{}
+	var v any
 	if err := json.Unmarshal(body, &v); err != nil {
 		return "failed to parse request body", "", "invalid_request_error", err
 	}

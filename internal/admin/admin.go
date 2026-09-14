@@ -30,8 +30,8 @@ import (
 // import cycle with the analytics package. Use analytics.NewAdminAdapter to
 // wrap a *Collector + *AlertManager so it satisfies this interface.
 type AnalyticsProvider interface {
-	RealtimeSummary() map[string]interface{}
-	RecentAlerts(limit int) interface{}
+	RealtimeSummary() map[string]any
+	RecentAlerts(limit int) any
 	AcknowledgeAlert(id string) bool
 	Dimensions() []string
 }
@@ -40,16 +40,16 @@ type AnalyticsProvider interface {
 // cycle with the budget package. Use budget.NewAdminAdapter to wrap a
 // *budget.Manager so it satisfies this interface.
 type BudgetProvider interface {
-	AllStatuses() interface{}
-	ForecastAll() interface{}
+	AllStatuses() any
+	ForecastAll() any
 }
 
 // AuditProvider is the interface consumed by the admin API to avoid an import
 // cycle with the audit package. Use audit.NewAdminAdapter to wrap a
 // *audit.Logger so it satisfies this interface.
 type AuditProvider interface {
-	Query(actor, actorRole, action, tenantID string, limit int) (interface{}, error)
-	Verify() (interface{}, error)
+	Query(actor, actorRole, action, tenantID string, limit int) (any, error)
+	Verify() (any, error)
 	Log(actor, actorRole, action, resource, detail, tenantID, model string)
 	LatestTimestamp() (string, error)
 }
@@ -67,41 +67,41 @@ type FederationProvider interface {
 // import cycle with the costopt package. Use costopt.NewAdminAdapter to
 // wrap a *costopt.Engine so it satisfies this interface.
 type CostOptProvider interface {
-	Recommendations() interface{}
+	Recommendations() any
 }
 
 // ApprovalProvider is the interface consumed by the admin API to avoid an
 // import cycle with the approval package. Use approval.NewAdminAdapter to
 // wrap a *approval.Queue so it satisfies this interface.
 type ApprovalProvider interface {
-	Pending() interface{}
-	History(limit int) interface{}
-	Get(id string) (interface{}, error)
-	Approve(id, reviewer, comment string) (interface{}, error)
-	Deny(id, reviewer, comment string) (interface{}, error)
-	Submit(env interface{}) (string, error)
+	Pending() any
+	History(limit int) any
+	Get(id string) (any, error)
+	Approve(id, reviewer, comment string) (any, error)
+	Deny(id, reviewer, comment string) (any, error)
+	Submit(env any) (string, error)
 }
 
 // CredentialProvider is the interface consumed by the admin API to avoid an
 // import cycle with the credential package. Use credential.NewAdminAdapter to
 // wrap a *credential.Registry so it satisfies this interface.
 type CredentialProvider interface {
-	ActiveCredentials() interface{}
+	ActiveCredentials() any
 	ActiveCredentialCount() int
 	RevokeCredential(id string) error
 	// IssueCredential issues a credential and returns its provenance metadata
 	// (never the secret). The provenance is suitable for embedding in evidence
 	// records and API responses.
-	IssueCredential(providerName, taskID, target, capability, envelopeID string) (interface{}, error)
+	IssueCredential(providerName, taskID, target, capability, envelopeID string) (any, error)
 }
 
 // EvidenceProvider is the interface consumed by the admin API to avoid an
 // import cycle with the evidence package. Implementations provide session
 // evidence chain export and verification.
 type EvidenceProvider interface {
-	ExportSession(sessionID string) (interface{}, error)
-	VerifySession(sessionID string) (interface{}, error)
-	ListSessions() (interface{}, error)
+	ExportSession(sessionID string) (any, error)
+	VerifySession(sessionID string) (any, error)
+	ListSessions() (any, error)
 	RenderReport(sessionID string) (string, error)
 	RenderHTMLReport(sessionID string) (string, error)
 }
@@ -110,9 +110,9 @@ type EvidenceProvider interface {
 // import cycle with the capability package. Use capability.NewAdminAdapter to
 // wrap a *capability.Issuer so it satisfies this interface.
 type CapabilityProvider interface {
-	ActiveTickets() interface{}
+	ActiveTickets() any
 	RevokeTicket(id string) error
-	VerifyTicket(id string) (interface{}, error)
+	VerifyTicket(id string) (any, error)
 }
 
 // ToolPolicyProvider is the interface consumed by the admin API to avoid an
@@ -122,19 +122,19 @@ type ToolPolicyProvider interface {
 	Evaluate(env *envelope.ActionEnvelope) string // returns "allow", "review", or "block"
 	// EvaluateWithTrace returns a JSON-serializable decision trace. Returns nil
 	// if the provider does not support tracing.
-	EvaluateWithTrace(env *envelope.ActionEnvelope) interface{}
+	EvaluateWithTrace(env *envelope.ActionEnvelope) any
 }
 
 // ManifestProvider is the interface consumed by the admin API to avoid an
 // import cycle with the manifest package. Use manifest.NewAdminAdapter to
 // wrap a *manifest.Store + *manifest.DriftDetector so it satisfies this interface.
 type ManifestProvider interface {
-	Register(m interface{}) error
-	Get(id string) (interface{}, error)
-	List() interface{}
+	Register(m any) error
+	Get(id string) (any, error)
+	List() any
 	Deactivate(id string) error
-	GetDrift(id string) interface{}
-	CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) interface{}
+	GetDrift(id string) any
+	CheckDrift(taskID string, env *envelope.ActionEnvelope, actionCount int, currentBudget float64) any
 }
 
 // RolloutManager is the interface consumed by the admin API to avoid an import
@@ -152,16 +152,16 @@ type RolloutManager interface {
 // SupplyChainProvider is the interface consumed by the admin API to list
 // loaded supply chain assets and their trust status.
 type SupplyChainProvider interface {
-	ListAssets() interface{}
+	ListAssets() any
 }
 
 // PolicyVersionProvider is the interface consumed by the admin API to avoid an
 // import cycle with the toolpolicy package. Implementations expose policy
 // version history and rollback.
 type PolicyVersionProvider interface {
-	ListVersions() interface{}
-	GetVersion(version int) (interface{}, error)
-	CurrentVersion() interface{}
+	ListVersions() any
+	GetVersion(version int) (any, error)
+	CurrentVersion() any
 	Rollback(version int) error
 }
 
@@ -169,19 +169,19 @@ type PolicyVersionProvider interface {
 // import cycle with the behavioral package. Use behavioral.NewAdminAdapter to
 // wrap a *behavioral.Registry so it satisfies this interface.
 type BehavioralProvider interface {
-	SessionRisk(sessionID string) (interface{}, error)
-	ListSessions() interface{}
+	SessionRisk(sessionID string) (any, error)
+	ListSessions() any
 }
 
 // ResilienceProvider is the interface consumed by the admin API to expose
 // health monitoring, degradation modes, retention stats, and backup endpoints.
 // Use resilience.NewAdminAdapter to satisfy this interface.
 type ResilienceProvider interface {
-	DetailedHealth() interface{}
-	DegradationModes() interface{}
-	CreateBackup() (interface{}, error)
-	ListBackups() interface{}
-	RetentionStats() interface{}
+	DetailedHealth() any
+	DegradationModes() any
+	CreateBackup() (any, error)
+	ListBackups() any
+	RetentionStats() any
 }
 
 //go:embed dashboard.html
@@ -386,16 +386,16 @@ func writeAPIError(w http.ResponseWriter, code int, errType, message string) {
 	}
 }
 
-func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
 		return
 	}
 }
 
-func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSystemStatus(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	status := map[string]interface{}{
+	status := map[string]any{
 		"active_credentials":     0,
 		"latest_audit_timestamp": "",
 		"mcp_gateway":            "disabled",
@@ -412,7 +412,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.cfg.MCPGateway.Enabled {
-		mcpURL := fmt.Sprintf("http://%s:%d/", s.cfg.MCPGateway.Host, s.cfg.MCPGateway.Port)
+		mcpURL := fmt.Sprintf("https://%s:%d/", s.cfg.MCPGateway.Host, s.cfg.MCPGateway.Port)
 		client := &http.Client{Timeout: 2 * time.Second}
 		// A simple GET request to the root should return something or at least connect
 		resp, err := client.Get(mcpURL)
@@ -430,7 +430,7 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) usageHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) usageHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(s.tracker.GetAllUsage()); err != nil {
 		log.Print("JSON response write failed")
@@ -475,7 +475,7 @@ func (s *Server) providersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) tenantsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) tenantsHandler(w http.ResponseWriter, _ *http.Request) {
 	type tenantInfo struct {
 		ID                string   `json:"id"`
 		Name              string   `json:"name"`
@@ -504,7 +504,7 @@ func (s *Server) tenantsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) policiesHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) policiesHandler(w http.ResponseWriter, _ *http.Request) {
 	type policyInfo struct {
 		Name     string   `json:"name"`
 		Type     string   `json:"type"`
@@ -535,7 +535,7 @@ func (s *Server) policiesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) violationsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) violationsHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(s.requestLog.RecentViolations(100)); err != nil {
 		log.Print("JSON response write failed")
@@ -543,7 +543,7 @@ func (s *Server) violationsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) cacheHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) cacheHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.cache != nil {
 		if err := json.NewEncoder(w).Encode(s.cache.Stats()); err != nil {
@@ -558,7 +558,7 @@ func (s *Server) cacheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) dashboardHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) dashboardHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if _, err := w.Write(dashboardHTML); err != nil {
 		return
@@ -575,7 +575,7 @@ func (s *Server) rolloutUnavailable(w http.ResponseWriter) bool {
 	return false
 }
 
-func (s *Server) rolloutsListHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) rolloutsListHandler(w http.ResponseWriter, _ *http.Request) {
 	if s.rolloutUnavailable(w) {
 		return
 	}
@@ -718,19 +718,19 @@ func (s *Server) rolloutRollbackHandler(w http.ResponseWriter, r *http.Request) 
 
 // --- Budget handlers ---
 
-func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) budgetsHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.budgetProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"statuses":  []interface{}{},
-			"forecasts": []interface{}{},
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"statuses":  []any{},
+			"forecasts": []any{},
 		}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"statuses":  s.budgetProvider.AllStatuses(),
 		"forecasts": s.budgetProvider.ForecastAll(),
 	}); err != nil {
@@ -741,17 +741,17 @@ func (s *Server) budgetsHandler(w http.ResponseWriter, r *http.Request) {
 
 // --- Cost optimization handlers ---
 
-func (s *Server) handleCostRecommendations(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCostRecommendations(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.costOptProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": []interface{}{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"recommendations": []any{}}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
 	recs := s.costOptProvider.Recommendations()
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{"recommendations": recs}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"recommendations": recs}); err != nil {
 		log.Print("JSON response write failed")
 		return
 	}
@@ -767,14 +767,14 @@ func (s *Server) analyticsUnavailable(w http.ResponseWriter) bool {
 	return false
 }
 
-func (s *Server) analyticsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) analyticsHandler(w http.ResponseWriter, _ *http.Request) {
 	if s.analyticsUnavailable(w) {
 		return
 	}
 	dims := s.analyticsProvider.Dimensions()
 	summary := s.analyticsProvider.RealtimeSummary()
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"dimensions": dims,
 		"summary":    summary,
 	}); err != nil {
@@ -783,7 +783,7 @@ func (s *Server) analyticsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) analyticsRealtimeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) analyticsRealtimeHandler(w http.ResponseWriter, _ *http.Request) {
 	if s.analyticsUnavailable(w) {
 		return
 	}
@@ -794,7 +794,7 @@ func (s *Server) analyticsRealtimeHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *Server) alertsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) alertsHandler(w http.ResponseWriter, _ *http.Request) {
 	if s.analyticsUnavailable(w) {
 		return
 	}
@@ -826,7 +826,7 @@ func (s *Server) alertAcknowledgeHandler(w http.ResponseWriter, r *http.Request)
 func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 	if s.auditProvider == nil {
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
@@ -849,10 +849,10 @@ func (s *Server) auditHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) auditVerifyHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) auditVerifyHandler(w http.ResponseWriter, _ *http.Request) {
 	if s.auditProvider == nil {
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"valid": true, "message": "audit not configured"}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"valid": true, "message": "audit not configured"}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
@@ -897,7 +897,7 @@ func (s *Server) evidenceUnavailable(w http.ResponseWriter) bool {
 	return false
 }
 
-func (s *Server) handleEvidenceSessions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleEvidenceSessions(w http.ResponseWriter, _ *http.Request) {
 	if s.evidenceUnavailable(w) {
 		return
 	}
@@ -981,16 +981,16 @@ func (s *Server) handleEvidenceReportHTML(w http.ResponseWriter, r *http.Request
 
 // --- Credential handlers ---
 
-func (s *Server) handleCredentialsList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCredentialsList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.credentialProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"credentials": []interface{}{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"credentials": []any{}}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{"credentials": s.credentialProvider.ActiveCredentials()}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"credentials": s.credentialProvider.ActiveCredentials()}); err != nil {
 		log.Print("JSON response write failed")
 		return
 	}
@@ -1015,31 +1015,31 @@ func (s *Server) handleCredentialRevoke(w http.ResponseWriter, r *http.Request) 
 
 // --- Approval handlers ---
 
-func (s *Server) handleApprovalsPending(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleApprovalsPending(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.approvalProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"pending": []interface{}{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"pending": []any{}}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{"pending": s.approvalProvider.Pending()}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"pending": s.approvalProvider.Pending()}); err != nil {
 		log.Print("JSON response write failed")
 		return
 	}
 }
 
-func (s *Server) handleApprovalsHistory(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleApprovalsHistory(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.approvalProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"history": []any{}}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{"history": s.approvalProvider.History(100)}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"history": s.approvalProvider.History(100)}); err != nil {
 		log.Print("JSON response write failed")
 		return
 	}
@@ -1128,13 +1128,13 @@ type testActionRequest struct {
 }
 
 type testActionResponse struct {
-	Decision             string      `json:"decision"`
-	EnvelopeID           string      `json:"envelope_id"`
-	EvidenceHash         string      `json:"evidence_hash"`
-	Message              string      `json:"message"`
-	ApprovalID           string      `json:"approval_id,omitempty"`
-	CredentialProvenance interface{} `json:"credential_provenance,omitempty"`
-	DriftEvents          interface{} `json:"drift_events,omitempty"`
+	Decision             string `json:"decision"`
+	EnvelopeID           string `json:"envelope_id"`
+	EvidenceHash         string `json:"evidence_hash"`
+	Message              string `json:"message"`
+	ApprovalID           string `json:"approval_id,omitempty"`
+	CredentialProvenance any    `json:"credential_provenance,omitempty"`
+	DriftEvents          any    `json:"drift_events,omitempty"`
 }
 
 func (s *Server) handleTestAction(w http.ResponseWriter, r *http.Request) {
@@ -1256,7 +1256,7 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	}
 	env := envelope.NewEnvelope(actor, "simulate", envelope.Protocol(req.Protocol), req.Tool, req.Target, cap)
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"action":   env.Tool,
 		"decision": "block",
 		"trace":    nil,
@@ -1278,11 +1278,11 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 
 // actionTraceStore is a simple in-memory store of recent decision traces keyed
 // by envelope ID. In production this would be backed by a persistent store.
-var actionTraceStore = make(map[string]interface{})
+var actionTraceStore = make(map[string]any)
 
 // RecordActionTrace stores a decision trace so it can be retrieved by the why
 // endpoint.
-func RecordActionTrace(id string, trace interface{}) {
+func RecordActionTrace(id string, trace any) {
 	actionTraceStore[id] = trace
 }
 
@@ -1308,10 +1308,10 @@ func (s *Server) handleActionWhy(w http.ResponseWriter, r *http.Request) {
 
 // --- Manifest handlers ---
 
-func (s *Server) handleManifestList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleManifestList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.manifestProvider == nil {
-		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
@@ -1405,7 +1405,7 @@ func (s *Server) handleManifestCreate(w http.ResponseWriter, r *http.Request) {
 		riskTier = "medium"
 	}
 
-	m := map[string]interface{}{
+	m := map[string]any{
 		"id":                id,
 		"task_id":           req.TaskID,
 		"description":       req.Description,
@@ -1452,16 +1452,16 @@ func (s *Server) handleManifestDeactivate(w http.ResponseWriter, r *http.Request
 
 // --- Capability ticket handlers ---
 
-func (s *Server) handleTicketsList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTicketsList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.capabilityProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"tickets": []interface{}{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"tickets": []any{}}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{"tickets": s.capabilityProvider.ActiveTickets()}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"tickets": s.capabilityProvider.ActiveTickets()}); err != nil {
 		log.Print("JSON response write failed")
 		return
 	}
@@ -1502,19 +1502,19 @@ func (s *Server) handleTicketVerify(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleSupplyChain(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSupplyChain(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.supplyChainProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"enabled": false,
-			"assets":  []interface{}{},
+			"assets":  []any{},
 		}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"enabled": true,
 		"assets":  s.supplyChainProvider.ListAssets(),
 	}); err != nil {
@@ -1531,11 +1531,11 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.behavioralProvider == nil {
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"enabled":    false,
 			"session_id": sessionID,
 			"risk_score": 0,
-			"alerts":     []interface{}{},
+			"alerts":     []any{},
 		}); err != nil {
 			log.Print("JSON response write failed")
 			return
@@ -1557,7 +1557,7 @@ func (s *Server) handleSessionRisk(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleHealthDetailed(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHealthDetailed(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
@@ -1572,7 +1572,7 @@ func (s *Server) handleHealthDetailed(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleResilienceDegradation(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleResilienceDegradation(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
@@ -1587,7 +1587,7 @@ func (s *Server) handleResilienceDegradation(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
 		writeAPIError(w, http.StatusServiceUnavailable, "service_unavailable", "resilience not enabled")
@@ -1605,7 +1605,7 @@ func (s *Server) handleResilienceBackupCreate(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (s *Server) handleResilienceBackupsList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleResilienceBackupsList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
@@ -1620,7 +1620,7 @@ func (s *Server) handleResilienceBackupsList(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleResilienceRetention(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.resilienceProvider == nil {
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "resilience not enabled"}); err != nil {
@@ -1637,10 +1637,10 @@ func (s *Server) handleResilienceRetention(w http.ResponseWriter, r *http.Reques
 
 // --- Policy version handlers ---
 
-func (s *Server) handlePolicyVersionsList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePolicyVersionsList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.policyVersionProvider == nil {
-		if err := json.NewEncoder(w).Encode([]interface{}{}); err != nil {
+		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
 			log.Print("JSON response write failed")
 			return
 		}
@@ -1652,7 +1652,7 @@ func (s *Server) handlePolicyVersionsList(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *Server) handlePolicyVersionCurrent(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePolicyVersionCurrent(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.policyVersionProvider == nil {
 		writeAPIError(w, http.StatusNotFound, "not_found", "policy versioning not enabled")
@@ -1708,7 +1708,7 @@ func (s *Server) handlePolicyVersionRollback(w http.ResponseWriter, r *http.Requ
 		writeAPIError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"status":         "ok",
 		"rolled_back_to": version,
 	}); err != nil {
@@ -1726,7 +1726,7 @@ func (s *Server) tenantHandler(selectHandler func(*Server) http.HandlerFunc) htt
 			return
 		}
 		scoped := *s
-		type tenantProvider interface{ ForTenant(string) interface{} }
+		type tenantProvider interface{ ForTenant(string) any }
 		if s.approvalProvider != nil {
 			provider, ok := s.approvalProvider.(tenantProvider)
 			if !ok {
