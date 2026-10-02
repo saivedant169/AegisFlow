@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `aegisctl completion bash|zsh` to print shell command completion scripts.
 - Bearer-token environment variables and Streamable HTTP SSE responses for MCP HTTP upstreams.
 - Optional SQLite persistence for pending approvals, consumed approvals, and signed session evidence.
 - Approval security E2E covering process restart, exact retry, replay, argument changes, and altered evidence.

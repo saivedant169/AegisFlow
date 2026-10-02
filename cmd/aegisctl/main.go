@@ -30,6 +30,11 @@ func main() {
 	gatewayURL := strings.TrimRight(getEnv("AEGISFLOW_GATEWAY_URL", defaultGatewayURL), "/")
 
 	switch os.Args[1] {
+	case "completion":
+		if err := cmdCompletion(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "plugin":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: aegisctl plugin <search|info|install|list|outdated|remove> [args]")
@@ -294,6 +299,7 @@ Commands:
   test-action Run an agent action through governance pipeline (add --dry-run for local-only, no audit/queue)
   test [msg]  Send a test chat completion
   version     Show version (add --json for machine output)
+  completion  Print shell completion script: aegisctl completion <bash|zsh>
   help        Show this help
 
 Environment:

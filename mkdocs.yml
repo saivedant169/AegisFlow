@@ -59,6 +59,7 @@ nav:
   - Runtime support: runtime-support.md
   - Getting started:
       - Local quickstart: getting-started.md
+      - Shell completion: aegisctl-completion.md
       - Governed PR proof: PR_WRITER.md
       - Troubleshooting: troubleshooting.md
   - Agent security:
