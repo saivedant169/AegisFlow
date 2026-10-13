@@ -26,7 +26,7 @@ Approval applies to one exact action. Request ID and timestamp may change during
 
 ## Run starter kit
 
-Prerequisites: Go 1.26.6 or later, Node.js, `curl`, and `jq`.
+Prerequisites: Go 1.26.9 or later, Node.js, `curl`, and `jq`.
 
 ```bash
 git clone https://github.com/saivedant169/AegisFlow.git

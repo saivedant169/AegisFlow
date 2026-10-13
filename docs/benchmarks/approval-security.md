@@ -11,7 +11,7 @@ This test runs built AegisFlow binary against local mock MCP upstream. It uses r
 
 ## Run it
 
-Prerequisites: Go 1.26.6 or later, Node.js, `curl`, and `jq`.
+Prerequisites: Go 1.26.9 or later, Node.js, `curl`, and `jq`.
 
 ```bash
 make e2e-approval-security
