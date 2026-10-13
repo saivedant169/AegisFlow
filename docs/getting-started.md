@@ -134,6 +134,7 @@ make build
 
 ## Next Steps
 
+- [Install aegisctl shell completion](aegisctl-completion.md)
 - [Architecture documentation](architecture.md)
 - [Observability guide](observability.md)
 - [Webhook guide](webhooks.md)
