@@ -1,6 +1,6 @@
 module github.com/saivedant169/AegisFlow
 
-go 1.26.6
+go 1.26.9
 
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
@@ -18,7 +18,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.37.1
