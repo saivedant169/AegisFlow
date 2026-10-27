@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Security
 
 - Go toolchain requirement is now 1.26.9, container images build with Go 1.27.2, and `golang.org/x/net` is 0.60.0. Together these pick up the October 2026 Go security fixes for `net/http`, HTTP/2, `crypto/tls`, `net/textproto`, and `html/template` (GO-2026-6599, 6600, 6603, 6605, 6607, 6608, 6610, 6611, 6612, 6613, 6617).
+- Go toolchain requirement is now 1.26.10 and container images build with Go 1.27.3, picking up the fix for GO-2026-6809 in `crypto/x509`.
 
 ## [0.9.1] - 2026-09-13
 

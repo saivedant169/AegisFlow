@@ -16,12 +16,12 @@ This starter kit gets you from zero to governed agents in 15 minutes.
 
 You need one of:
 - **Docker** (recommended) -- Docker 20.10+ and Docker Compose v2
-- **Go 1.26.9+** if you want to build from source
+- **Go 1.26.10+** if you want to build from source
 - **Node.js 18+** -- only if you want to run the mock MCP server for testing
 
 ## Focused PR-writer installer
 
-From the repository root, run `bash starter-kit/install-pr-writer.sh`. This path requires Go 1.26.9+, Node.js 18+, and curl for the stdio bridge. It builds local binaries and runs free mock services on loopback.
+From the repository root, run `bash starter-kit/install-pr-writer.sh`. This path requires Go 1.26.10+, Node.js 18+, and curl for the stdio bridge. It builds local binaries and runs free mock services on loopback.
 
 The installer refuses occupied ports. Set `AEGISFLOW_INSTALL_BASE_PORT=18080` to use ports 18080 through 18083. Defaults are 8080, 8081, 8082, and mock port 3000. Existing services are never stopped by port number.
 

@@ -97,7 +97,7 @@ go install github.com/saivedant169/AegisFlow/cmd/aegisflow@v0.9.0
 go install github.com/saivedant169/AegisFlow/cmd/aegisctl@v0.9.0
 ```
 
-Source builds require Go 1.26.9 or later.
+Source builds require Go 1.26.10 or later.
 
 ### Container
 

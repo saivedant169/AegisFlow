@@ -4,7 +4,7 @@
 # Run this from the project root: ./scripts/full_demo.sh
 #
 # Prerequisites:
-#   - Go 1.26.9+ installed (brew install go)
+#   - Go 1.26.10+ installed (brew install go)
 #   - Ollama installed and running (brew install ollama && ollama serve)
 #   - Ollama model pulled (ollama pull qwen2.5:0.5b)
 #   - Python 3 with openai SDK (pip3 install openai)
