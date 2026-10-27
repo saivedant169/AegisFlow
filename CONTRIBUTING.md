@@ -16,7 +16,7 @@ Thank you for your interest in contributing to AegisFlow. This document provides
 ## Development Setup
 
 ```bash
-# Install Go 1.26.9 or later
+# Install Go 1.26.10 or later
 brew install go
 
 # Build
